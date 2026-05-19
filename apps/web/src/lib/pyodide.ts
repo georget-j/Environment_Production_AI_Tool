@@ -1,9 +1,8 @@
 /**
  * Pyodide loader.
  *
- * Pyodide is heavy (~10 MB compressed). We load it from jsdelivr on first
- * use, not on page load. The loadPyodide() function is exposed by the
- * loader script we inject; we keep a single instance per page-session.
+ * Pyodide is heavy (~10 MB compressed). We load it from jsdelivr lazily.
+ * The runner pre-warms it on page mount so first Run feels instant.
  */
 
 const PYODIDE_VERSION = "0.26.4";
@@ -68,8 +67,6 @@ export async function getPyodide(): Promise<PyodideInterface> {
     const pyodide = await window.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
     await pyodide.loadPackage(["micropip"]);
     const micropip = pyodide.pyimport("micropip");
-    // pytest is pure Python; install via micropip so we don't need a
-    // pyodide-built distribution.
     await micropip.install(["pytest"]);
     return pyodide;
   })().catch((exc) => {
@@ -98,10 +95,46 @@ export function writeTree(pyodide: PyodideInterface, files: Record<string, strin
   }
 }
 
+export type TestStatus = "passed" | "failed" | "error" | "skipped";
+
+export type TestRow = {
+  name: string;
+  status: TestStatus;
+};
+
 export type PytestResult = {
   exitCode: number;
   output: string;
+  tests: TestRow[];
+  summary: string;
 };
+
+// "tests/test_orders.py::test_compute_total_without_coupon PASSED  [ 14%]"
+const VERBOSE_LINE_RE = /^(.+?::[\w[\]\-.]+)\s+(PASSED|FAILED|ERROR|SKIPPED)\b/i;
+
+const STATUS_MAP: Record<string, TestStatus> = {
+  PASSED: "passed",
+  FAILED: "failed",
+  ERROR: "error",
+  SKIPPED: "skipped",
+};
+
+function parseVerboseOutput(text: string): { tests: TestRow[]; summary: string } {
+  const tests: TestRow[] = [];
+  let summary = "";
+  for (const line of text.split("\n")) {
+    const match = VERBOSE_LINE_RE.exec(line);
+    if (match) {
+      tests.push({ name: match[1].split("::").pop() ?? match[1], status: STATUS_MAP[match[2].toUpperCase()] });
+      continue;
+    }
+    // Summary line: "= 1 failed, 4 passed in 0.42s ="
+    if (/=+\s*\d+ (passed|failed|error|skipped)/.test(line)) {
+      summary = line.replace(/=/g, "").trim();
+    }
+  }
+  return { tests, summary };
+}
 
 export async function runPytest(
   pyodide: PyodideInterface,
@@ -111,13 +144,24 @@ export async function runPytest(
   pyodide.setStdout({ batched: (s) => lines.push(s) });
   pyodide.setStderr({ batched: (s) => lines.push(s) });
 
-  const argsLiteral = JSON.stringify(pytestArgs);
+  const argsLiteral = JSON.stringify(["-v", "--tb=short", "--no-header", ...pytestArgs]);
+
   const exit = await pyodide.runPythonAsync(`
-import pytest, os
+import sys, os
+sys.path.insert(0, "/home/pyodide")
 os.chdir("/home/pyodide")
+import pytest
 exit_code = pytest.main(${argsLiteral})
 int(exit_code)
 `);
 
-  return { exitCode: Number(exit), output: lines.join("\n") };
+  const output = lines.join("\n");
+  const { tests, summary } = parseVerboseOutput(output);
+
+  return {
+    exitCode: Number(exit),
+    output,
+    tests,
+    summary: summary || (Number(exit) === 0 ? "All tests passed" : "Some tests failed"),
+  };
 }
