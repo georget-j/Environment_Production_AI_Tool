@@ -1,0 +1,24 @@
+[project]
+name = "prodready-ai-api"
+version = "0.0.0"
+description = "ProdReady AI backend API (FastAPI). Lives under apps/api; this file is the monorepo-root Python config."
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["apps/api", "scripts"]
+extend-exclude = [".venv", "node_modules", "challenge-templates"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["apps/api/app", "scripts"]
+exclude = ["challenge-templates/.*"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps/api/tests"]
+pythonpath = ["apps/api"]

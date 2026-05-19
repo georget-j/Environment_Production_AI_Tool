@@ -1,0 +1,49 @@
+id: example-challenge-id
+title: "Example challenge title"
+track: backend-production-python
+module: module-slug
+difficulty: beginner
+
+scenario: >
+  Describe the production-style situation. Make it feel like a real ticket.
+
+learner_goal: >
+  Explain what the learner must accomplish.
+
+repo:
+  template: github.com/your-org/your-template-repo
+  branch: challenge-branch-name
+  codespaces_url: https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=REPO_ID
+
+setup:
+  commands:
+    - docker compose up -d
+    - pytest
+
+visible_checks:
+  - pytest tests/test_example.py
+
+hidden_checks:
+  - pytest tests/hidden/test_example_edge_cases.py
+
+validation:
+  lint:
+    - ruff check .
+  tests:
+    - pytest
+  pass_condition: "All tests pass and required behavior is implemented."
+
+skills:
+  - fastapi
+  - pytest
+  - debugging
+
+ai_rules:
+  max_hint_level: 3
+  do_not_reveal_solution: true
+  encourage_tests_first: true
+
+reflection_questions:
+  - "What caused the bug?"
+  - "Which test proved your fix worked?"
+  - "How would this issue show up in production?"

@@ -1,0 +1,18 @@
+{
+  "name": "prodready-ai",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ProdReady AI — AI-powered production coding simulator (monorepo root).",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter web build",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@11.1.3"
+}
