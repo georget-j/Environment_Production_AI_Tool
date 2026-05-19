@@ -1,6 +1,6 @@
 "use client";
 
-import { PrReviewSchema, type PrReview } from "@prodready/shared/review";
+import { PrReviewSchema, type PrReview } from "@/lib/shared/review";
 
 const SEVERITY_STYLES: Record<string, string> = {
   minor: "bg-yellow-100 text-yellow-900",
