@@ -4,6 +4,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Glossary } from "@/components/glossary";
+import { MentorMessage } from "@/components/mentor-message";
+import { cn } from "@/lib/utils";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -15,15 +17,26 @@ type Turn = {
   created_at: string;
 };
 
-/** Imperative surface that parents can call into. The Stuck? button on the
- * challenge runner uses this to ask a question on the learner's behalf. */
 export type MentorChatHandle = {
   askMentor: (message: string, hintLevel?: 1 | 2 | 3) => Promise<void>;
   scrollIntoView: () => void;
+  /** Append a client-side-only assistant message (e.g. show-answer summary).
+   * Not persisted to the AIMessage table. */
+  appendAssistantNotice: (text: string) => void;
 };
 
-export const MentorChat = forwardRef<MentorChatHandle, { challengeId: string }>(function MentorChat(
-  { challengeId },
+type Props = {
+  challengeId: string;
+  onJumpToCode?: (file: string, line: number | null) => void;
+  /** Called when the learner clicks "Show me the answer". The parent
+   * collects current editor content + readonly files and drives the API. */
+  onShowAnswer?: () => void;
+  /** True while the parent is in the middle of a show-answer call. */
+  showAnswerPending?: boolean;
+};
+
+export const MentorChat = forwardRef<MentorChatHandle, Props>(function MentorChat(
+  { challengeId, onJumpToCode, onShowAnswer, showAnswerPending = false },
   ref,
 ) {
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -31,7 +44,7 @@ export const MentorChat = forwardRef<MentorChatHandle, { challengeId: string }>(
   const [hintLevel, setHintLevel] = useState<1 | 2 | 3>(1);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const scroller = useRef<HTMLDivElement | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const rootRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -48,10 +61,6 @@ export const MentorChat = forwardRef<MentorChatHandle, { challengeId: string }>(
       if (res.ok) setTurns(await res.json());
     })();
   }, [challengeId]);
-
-  useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
-  }, [turns.length]);
 
   async function postChat(text: string, level: 1 | 2 | 3): Promise<boolean> {
     setPending(true);
@@ -73,7 +82,6 @@ export const MentorChat = forwardRef<MentorChatHandle, { challengeId: string }>(
       },
       body: JSON.stringify({ challenge_id: challengeId, message: text, hint_level: level }),
     });
-
     setPending(false);
     if (!response.ok) {
       const body = await response.text();
@@ -92,7 +100,13 @@ export const MentorChat = forwardRef<MentorChatHandle, { challengeId: string }>(
     if (ok) setMessage("");
   }
 
-  // Imperative API for parents (Stuck? button on the challenge runner).
+  async function quickHint(level: 1 | 2 | 3) {
+    if (pending) return;
+    setHintLevel(level);
+    const text = `Give me a Hint level ${level} for my current state on this challenge. Don't reveal the full code.`;
+    await postChat(text, level);
+  }
+
   useImperativeHandle(
     ref,
     () => ({
@@ -104,8 +118,19 @@ export const MentorChat = forwardRef<MentorChatHandle, { challengeId: string }>(
       scrollIntoView() {
         rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       },
+      appendAssistantNotice(text: string) {
+        setTurns((prev) => [
+          ...prev,
+          {
+            id: `local-${Date.now()}`,
+            role: "assistant",
+            content: text,
+            hint_level: null,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      },
     }),
-    // postChat captures challengeId via closure; explicit dep keeps lint happy.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [challengeId],
   );
@@ -134,68 +159,146 @@ export const MentorChat = forwardRef<MentorChatHandle, { challengeId: string }>(
     setTurns([]);
   }
 
+  // Split: most recent user→assistant pair is the primary view; older
+  // turns collapse into a disclosure.
+  const assistantTurns = turns.filter((t) => t.role === "assistant");
+  const latestAssistant = assistantTurns[assistantTurns.length - 1];
+  const userTurns = turns.filter((t) => t.role === "user");
+  const latestUser = userTurns[userTurns.length - 1];
+  const historyTurns = turns.filter((t) => t !== latestAssistant && t !== latestUser);
+
   return (
-    <section ref={rootRef} className="rounded-lg border border-border">
-      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <h3 className="text-sm font-semibold">AI mentor</h3>
-        <div className="flex items-center gap-2 text-xs">
-          {[1, 2, 3].map((level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => setHintLevel(level as 1 | 2 | 3)}
-              className={`rounded-md px-2 py-1 ${
-                hintLevel === level
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              Hint {level}
-            </button>
-          ))}
+    <section
+      ref={rootRef}
+      className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-lg border border-border bg-background lg:max-h-[calc(100vh-3rem)]"
+    >
+      <header className="border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold">AI mentor</h3>
           <button
             type="button"
             onClick={clear}
             disabled={turns.length === 0}
-            className="rounded-md px-2 py-1 text-muted-foreground hover:bg-muted disabled:opacity-40"
+            className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted disabled:opacity-40"
             title="Delete all mentor messages for this challenge"
           >
             Clear
           </button>
         </div>
+
+        <div className="mt-2 flex flex-wrap gap-2">
+          {[1, 2, 3].map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => quickHint(level as 1 | 2 | 3)}
+              disabled={pending}
+              className={cn(
+                "rounded-md border px-3 py-1.5 text-xs font-medium",
+                hintLevel === level && pending
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-foreground hover:bg-muted",
+                pending && "cursor-wait opacity-60",
+              )}
+              title={
+                level === 1
+                  ? "Hint 1 — Socratic: asks a question, doesn't give the answer"
+                  : level === 2
+                    ? "Hint 2 — points at the file/function to look at"
+                    : "Hint 3 — sketches pseudocode"
+              }
+            >
+              Hint {level}
+            </button>
+          ))}
+          {onShowAnswer && (
+            <button
+              type="button"
+              onClick={onShowAnswer}
+              disabled={showAnswerPending || pending}
+              className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+              title="Replace your code with a working version"
+            >
+              {showAnswerPending ? "Generating…" : "Show me the answer"}
+            </button>
+          )}
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Click a <Glossary term="hint">Hint button to get help at that level</Glossary> — each
+          replaces the previous one.
+        </p>
       </header>
 
-      <div ref={scroller} className="max-h-96 space-y-3 overflow-y-auto p-4 text-sm">
-        {turns.length === 0 ? (
-          <p className="text-muted-foreground">
-            Ask a question. <Glossary term="hint">Hint 1 is Socratic — it asks you a question
-            instead of giving an answer. Hint 3 sketches pseudocode.</Glossary>
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {pending && (
+          <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+            Mentor is thinking…
+          </div>
+        )}
+
+        {!pending && !latestAssistant && (
+          <p className="text-sm text-muted-foreground">
+            Click a Hint button above, or type a question below.
           </p>
-        ) : (
-          turns.map((t) => (
-            <div
-              key={t.id}
-              className={`rounded-md px-3 py-2 ${
-                t.role === "user" ? "bg-muted/40" : "bg-background border border-border"
-              }`}
-            >
-              <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
-                {t.role}
-                {t.hint_level !== null && ` · hint ${t.hint_level}`}
-              </p>
-              <p className="whitespace-pre-wrap">{t.content}</p>
+        )}
+
+        {latestUser && (
+          <div className="rounded-md bg-muted/40 px-3 py-2">
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">You</p>
+            <p className="whitespace-pre-wrap text-sm">{latestUser.content}</p>
+          </div>
+        )}
+
+        {latestAssistant && (
+          <div className="rounded-md border border-border bg-background px-3 py-2">
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              Mentor
+              {latestAssistant.hint_level !== null && ` · hint ${latestAssistant.hint_level}`}
+            </p>
+            <MentorMessage text={latestAssistant.content} onJumpToCode={onJumpToCode} />
+          </div>
+        )}
+
+        {historyTurns.length > 0 && (
+          <details
+            className="rounded-md border border-border bg-muted/10 text-xs"
+            open={historyOpen}
+            onToggle={(e) => setHistoryOpen((e.target as HTMLDetailsElement).open)}
+          >
+            <summary className="cursor-pointer px-3 py-2 text-muted-foreground hover:text-foreground">
+              Earlier conversation ({historyTurns.length})
+            </summary>
+            <div className="space-y-2 border-t border-border p-3">
+              {historyTurns.map((t) => (
+                <div
+                  key={t.id}
+                  className={`rounded px-2 py-1.5 ${
+                    t.role === "user" ? "bg-muted/40" : "bg-background border border-border"
+                  }`}
+                >
+                  <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {t.role}
+                    {t.hint_level !== null && ` · hint ${t.hint_level}`}
+                  </p>
+                  {t.role === "assistant" ? (
+                    <MentorMessage text={t.content} onJumpToCode={onJumpToCode} />
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm">{t.content}</p>
+                  )}
+                </div>
+              ))}
             </div>
-          ))
+          </details>
         )}
       </div>
 
       <form onSubmit={send} className="space-y-2 border-t border-border p-4">
         <textarea
-          rows={2}
+          rows={3}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="What's confusing you right now?"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          placeholder="Or type your own question…"
+          className="block w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
         {error && <p className="text-xs text-red-600">{error}</p>}
         <Button type="submit" disabled={pending || !message.trim()} className="w-full">

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,14 @@ import {
 } from "@/lib/pyodide";
 import type { ChallengeRunnerConfig, TestCase } from "@/lib/featured-files";
 import { Glossary } from "@/components/glossary";
+
+/** Imperative surface the parent (ChallengeView) calls into to drive the
+ * editor — e.g. when the mentor chat says "look at app/orders.py:24" or when
+ * "Show me the answer" returns a replacement set of files. */
+export type ChallengeRunnerHandle = {
+  jumpTo: (path: string, line: number | null) => void;
+  applyFiles: (next: Record<string, string>) => void;
+};
 
 type FailureExplanation = {
   test_name: string;
@@ -54,6 +62,9 @@ type Props = {
   /** Called when the learner clicks 'Stuck?'. Receives a pre-baked
    * message the parent can forward to the mentor chat. */
   onStuck?: (message: string) => void;
+  /** Snapshot callback fired each time the file map changes (used by the
+   * show-answer flow to know what to send to the API). */
+  onFilesChange?: (files: Record<string, string>) => void;
 };
 
 type ExplainState =
@@ -130,15 +141,19 @@ function statusClass(status: TestStatus | "pending"): string {
   }
 }
 
-export function ChallengeRunner({
-  challengeSlug,
-  challengeId,
-  repoTemplateUrl,
-  branch,
-  config,
-  onTestsPassed,
-  onStuck,
-}: Props) {
+export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function ChallengeRunner(
+  {
+    challengeSlug,
+    challengeId,
+    repoTemplateUrl,
+    branch,
+    config,
+    onTestsPassed,
+    onStuck,
+    onFilesChange,
+  },
+  ref,
+) {
   const meta = parseOwnerRepo(repoTemplateUrl);
   const allPaths = [...config.editable, ...config.readonly];
 
@@ -361,6 +376,40 @@ export function ChallengeRunner({
     [files],
   );
 
+  const applyFiles = useCallback(
+    (next: Record<string, string>) => {
+      setFiles((prev) => {
+        const merged = { ...prev, ...next };
+        if (typeof window !== "undefined") {
+          for (const [p, body] of Object.entries(next)) {
+            if (config.editable.includes(p)) {
+              window.localStorage.setItem(storageKey(challengeSlug, p), body);
+            }
+          }
+        }
+        return merged;
+      });
+      // Focus a file that was actually replaced so the learner sees the diff.
+      const firstReplaced = Object.keys(next).find((p) => config.editable.includes(p));
+      if (firstReplaced) setActiveTab(firstReplaced);
+    },
+    [challengeSlug, config.editable],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      jumpTo: (path, line) => jumpTo(path, line ?? null),
+      applyFiles,
+    }),
+    [jumpTo, applyFiles],
+  );
+
+  // Notify parent of file map snapshot changes so show-answer can grab them.
+  useEffect(() => {
+    onFilesChange?.(files);
+  }, [files, onFilesChange]);
+
   const editable = config.editable.includes(activeTab);
   const passed = runState.kind === "done" && runState.result.exitCode === 0;
 
@@ -483,14 +532,14 @@ export function ChallengeRunner({
             const ex = findExplanation(t);
             const showFailureBox = t.status === "failed" || t.status === "error";
             return (
-              <li key={t.id} className="px-3 py-2">
-                <div className="flex items-start gap-3 text-xs">
+              <li key={t.id} className="px-3 py-2.5">
+                <div className="flex items-start gap-3 text-sm">
                   <span className={cn("w-4 shrink-0 font-mono", statusClass(t.status))}>
                     {t.status === "pending" ? "·" : statusEmoji(t.status)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-[11px]">{shortName(t)}</p>
-                    <p className="text-muted-foreground">{t.description}</p>
+                    <p className="truncate font-mono text-xs">{shortName(t)}</p>
+                    <p className="mt-0.5 text-muted-foreground">{t.description}</p>
                   </div>
                 </div>
                 {showFailureBox && (
@@ -700,4 +749,4 @@ export function ChallengeRunner({
       )}
     </section>
   );
-}
+});

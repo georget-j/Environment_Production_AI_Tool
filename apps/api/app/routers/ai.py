@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.ai.answers import AnswerInput, answer
 from app.ai.explainer import ExplainInput, explain
 from app.ai.mentor import ChallengeContext, chat
 from app.auth import AuthUser, get_current_user
@@ -165,6 +166,56 @@ def explain_tests_endpoint(
 
     return ExplainTestsResponse(
         failures=[FailureExplanation(**f) for f in payload.get("failures", [])]
+    )
+
+
+class ShowAnswerRequest(BaseModel):
+    challenge_id: UUID
+    editable_files: dict[str, str]
+    readonly_files: dict[str, str] = Field(default_factory=dict)
+    test_output: str | None = None
+
+
+class FixedFile(BaseModel):
+    path: str
+    content: str
+
+
+class ShowAnswerResponse(BaseModel):
+    fixed_files: list[FixedFile]
+    summary: str
+
+
+@router.post("/show-answer", response_model=ShowAnswerResponse)
+def show_answer_endpoint(
+    body: ShowAnswerRequest,
+    db: Session = Depends(get_db),
+    user: AuthUser = Depends(get_current_user),
+) -> ShowAnswerResponse:
+    challenge = db.get(Challenge, body.challenge_id)
+    if challenge is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Challenge not found")
+
+    editable = {p: (body.editable_files.get(p) or "")[:6000] for p in body.editable_files}
+    readonly = {p: (body.readonly_files.get(p) or "")[:4000] for p in body.readonly_files}
+
+    try:
+        payload, _metadata = answer(
+            AnswerInput(
+                challenge_title=challenge.title,
+                scenario=challenge.scenario,
+                learner_goal=challenge.learner_goal,
+                editable_files=editable,
+                readonly_files=readonly,
+                test_output=body.test_output,
+            )
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+
+    return ShowAnswerResponse(
+        fixed_files=[FixedFile(**f) for f in payload.get("fixed_files", [])],
+        summary=payload.get("summary", ""),
     )
 
 
