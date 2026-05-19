@@ -152,7 +152,7 @@ export function ChallengeRunner({
       for (const path of allPaths) {
         const url = `${RAW_BASE}/${meta.owner}/${meta.repo}/${branch}/${path}`;
         try {
-          const res = await fetch(url, { cache: "force-cache" });
+          const res = await fetch(url, { cache: "no-cache" });
           if (!res.ok) {
             next[path] = "";
             continue;

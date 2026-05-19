@@ -50,7 +50,7 @@ export function CodePreview({ repoTemplateUrl, branch, paths }: Props) {
     (async () => {
       const url = `${RAW_BASE}/${meta.owner}/${meta.repo}/${ref}/${activePath}`;
       try {
-        const res = await fetch(url, { cache: "force-cache" });
+        const res = await fetch(url, { cache: "no-cache" });
         if (cancelled) return;
         if (!res.ok) {
           setContents((c) => ({ ...c, [activePath]: { error: `${res.status}` } }));
