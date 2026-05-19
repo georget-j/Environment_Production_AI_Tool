@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { apiFetch, type ChallengeDetail } from "@/lib/api";
 import { StartChallengeButton } from "@/components/start-challenge-button";
 import { SubmissionForm } from "@/components/submission-form";
+import { MentorChat } from "@/components/mentor-chat";
 
 type Params = Promise<{ slug: string }>;
 
@@ -36,6 +37,8 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
             {challenge.instructions}
           </pre>
         </section>
+
+        <MentorChat challengeId={challenge.id} />
       </article>
 
       <aside className="space-y-6">
