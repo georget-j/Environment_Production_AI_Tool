@@ -48,12 +48,20 @@ def create_checkout_session(
     user: AuthUser = Depends(get_current_user),
 ) -> CheckoutResponse:
     settings = get_settings()
-    if not settings.stripe_price_pro_monthly:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Pro price not configured")
 
     db_user = db.get(User, user.id)
     if db_user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User row missing")
+
+    # Emulation: skip Stripe entirely. Flip the user to active and return the
+    # success URL so the web flow continues unchanged.
+    if settings.stripe_emulated:
+        db_user.subscription_status = "active"
+        db.commit()
+        return CheckoutResponse(url=body.success_url)
+
+    if not settings.stripe_price_pro_monthly:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Pro price not configured")
 
     client = _stripe_client()
 
@@ -84,6 +92,8 @@ async def stripe_webhook(
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     settings = get_settings()
+    if settings.stripe_emulated:
+        return {"received": "emulated"}
     if not settings.stripe_webhook_secret:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Stripe webhook not configured")
     if stripe_signature is None:

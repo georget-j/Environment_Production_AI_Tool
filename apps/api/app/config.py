@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_price_pro_monthly: str = ""
+    # When true, /api/billing/checkout flips the user to 'active' immediately and
+    # returns the success_url. /api/billing/webhook becomes a no-op. Use for demos
+    # before real Stripe keys are wired up.
+    stripe_emulated: bool = False
 
 
 @lru_cache
