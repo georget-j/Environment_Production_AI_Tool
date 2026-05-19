@@ -5,13 +5,15 @@ description = "ProdReady AI backend API (FastAPI). Lives under apps/api; this fi
 requires-python = ">=3.12"
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py312"
 src = ["apps/api", "scripts"]
 extend-exclude = [".venv", "node_modules", "challenge-templates"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+# B008: FastAPI uses Depends() in defaults by design.
+ignore = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
