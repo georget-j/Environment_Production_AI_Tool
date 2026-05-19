@@ -13,7 +13,7 @@ import subprocess
 from functools import lru_cache
 from pathlib import Path
 
-_PROMPTS_FILE = Path(__file__).resolve().parents[4] / "prompts" / "AI_MENTOR_SYSTEM_PROMPTS.md"
+_PROMPTS_FILE = Path(__file__).resolve().parent / "system_prompts.md"
 _SECTION_RE = re.compile(r"^##\s+(.+?)\s*$\n+```text?\n(.*?)```", re.MULTILINE | re.DOTALL)
 
 
