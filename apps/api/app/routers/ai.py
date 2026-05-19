@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.explainer import ExplainInput, explain
 from app.ai.mentor import ChallengeContext, chat
 from app.auth import AuthUser, get_current_user
 from app.db import get_db
@@ -113,6 +114,54 @@ def chat_endpoint(
     return ChatResponse(
         user_turn=ChatTurnOut.model_validate(user_msg),
         assistant_turn=ChatTurnOut.model_validate(assistant_msg),
+    )
+
+
+class ExplainTestsRequest(BaseModel):
+    challenge_id: UUID
+    test_output: str = Field(..., min_length=1, max_length=20000)
+    files: dict[str, str] = Field(default_factory=dict)
+
+
+class FailureExplanation(BaseModel):
+    test_name: str
+    what_was_checked: str
+    what_happened: str
+    where_to_look: str
+
+
+class ExplainTestsResponse(BaseModel):
+    failures: list[FailureExplanation]
+
+
+@router.post("/explain-tests", response_model=ExplainTestsResponse)
+def explain_tests_endpoint(
+    body: ExplainTestsRequest,
+    db: Session = Depends(get_db),
+    user: AuthUser = Depends(get_current_user),
+) -> ExplainTestsResponse:
+    challenge = db.get(Challenge, body.challenge_id)
+    if challenge is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Challenge not found")
+
+    # Truncate files defensively (the model has a context window).
+    capped = {path: (body.files.get(path) or "")[:4000] for path in body.files}
+
+    try:
+        payload, _metadata = explain(
+            ExplainInput(
+                challenge_title=challenge.title,
+                scenario=challenge.scenario,
+                learner_goal=challenge.learner_goal,
+                test_output=body.test_output,
+                files=capped,
+            )
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+
+    return ExplainTestsResponse(
+        failures=[FailureExplanation(**f) for f in payload.get("failures", [])]
     )
 
 

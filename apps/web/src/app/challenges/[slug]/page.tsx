@@ -51,6 +51,7 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
         {config?.mode === "pyodide" && repoUrl ? (
           <ChallengeRunner
             challengeSlug={challenge.slug}
+            challengeId={challenge.id}
             repoTemplateUrl={repoUrl}
             branch={branch}
             config={config}

@@ -15,6 +15,13 @@ import {
 } from "@/lib/pyodide";
 import type { ChallengeRunnerConfig, TestCase } from "@/lib/featured-files";
 
+type FailureExplanation = {
+  test_name: string;
+  what_was_checked: string;
+  what_happened: string;
+  where_to_look: string;
+};
+
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => <p className="p-6 text-center text-xs text-muted-foreground">Loading editor…</p>,
@@ -26,11 +33,18 @@ const SUBMIT_REPO_URL = "https://prodready-ai.vercel.app/in-browser";
 
 type Props = {
   challengeSlug: string;
+  challengeId: string;
   repoTemplateUrl: string;
   branch: string;
   config: Extract<ChallengeRunnerConfig, { mode: "pyodide" }>;
   onTestsPassed?: () => void;
 };
+
+type ExplainState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ready"; failures: FailureExplanation[] }
+  | { kind: "error"; message: string };
 
 type PyodideState =
   | { kind: "cold" }
@@ -102,6 +116,7 @@ function statusClass(status: TestStatus | "pending"): string {
 
 export function ChallengeRunner({
   challengeSlug,
+  challengeId,
   repoTemplateUrl,
   branch,
   config,
@@ -116,6 +131,7 @@ export function ChallengeRunner({
   const [pyodideState, setPyodideState] = useState<PyodideState>({ kind: "cold" });
   const [runState, setRunState] = useState<RunState>({ kind: "idle" });
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
+  const [explainState, setExplainState] = useState<ExplainState>({ kind: "idle" });
   const passedNotified = useRef(false);
   const router = useRouter();
 
@@ -212,8 +228,49 @@ export function ChallengeRunner({
     setRunState({ kind: "idle" });
   }, [meta, files, config.editable, branch, challengeSlug]);
 
+  const explainFailures = useCallback(
+    async (testOutput: string, currentFiles: Record<string, string>) => {
+      setExplainState({ kind: "loading" });
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setExplainState({ kind: "error", message: "Sign in to see AI explanations." });
+        return;
+      }
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/ai/explain-tests`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            challenge_id: challengeId,
+            test_output: testOutput,
+            files: currentFiles,
+          }),
+        });
+        if (!response.ok) {
+          setExplainState({ kind: "error", message: `Explanation API ${response.status}` });
+          return;
+        }
+        const data = (await response.json()) as { failures: FailureExplanation[] };
+        setExplainState({ kind: "ready", failures: data.failures });
+      } catch (exc) {
+        setExplainState({
+          kind: "error",
+          message: exc instanceof Error ? exc.message : "Explanation failed",
+        });
+      }
+    },
+    [challengeId],
+  );
+
   const handleRun = useCallback(async () => {
     setRunState({ kind: "running" });
+    setExplainState({ kind: "idle" });
     try {
       const pyodide = await getPyodide();
       setPyodideState({ kind: "ready" });
@@ -231,6 +288,13 @@ export function ChallengeRunner({
         passedNotified.current = true;
         onTestsPassed?.();
       }
+      // If any test failed, kick off the AI explanation in the background.
+      const hasFailure = result.tests.some(
+        (t) => t.status === "failed" || t.status === "error",
+      );
+      if (hasFailure) {
+        void explainFailures(result.output, files);
+      }
     } catch (exc) {
       setRunState({
         kind: "done",
@@ -242,7 +306,7 @@ export function ChallengeRunner({
         },
       });
     }
-  }, [files, config.tests, onTestsPassed]);
+  }, [files, config.tests, onTestsPassed, explainFailures]);
 
   const editable = config.editable.includes(activeTab);
   const passed = runState.kind === "done" && runState.result.exitCode === 0;
@@ -281,7 +345,13 @@ export function ChallengeRunner({
     router.push(`/submissions/${data.id}`);
   }, [runState, challengeSlug, router]);
 
-  // Build a per-test view by joining config.tests with the parsed pytest output.
+  // Build a per-test view by joining config.tests with the parsed pytest output
+  // and the AI explanation, if any.
+  const explanationByName: Record<string, FailureExplanation> =
+    explainState.kind === "ready"
+      ? Object.fromEntries(explainState.failures.map((f) => [f.test_name, f]))
+      : {};
+
   const testRows = config.tests.map((t) => {
     const observed =
       runState.kind === "done"
@@ -328,21 +398,60 @@ export function ChallengeRunner({
       )}
 
       <section className="rounded-md border border-border">
-        <header className="border-b border-border bg-muted/30 px-3 py-2 text-xs font-semibold">
-          Tests for this challenge ({config.tests.length})
+        <header className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-xs font-semibold">
+          <span>Tests for this challenge ({config.tests.length})</span>
+          {explainState.kind === "loading" && (
+            <span className="font-normal text-muted-foreground">Asking mentor about failures…</span>
+          )}
+          {explainState.kind === "error" && (
+            <span className="font-normal text-red-700">{explainState.message}</span>
+          )}
         </header>
         <ul className="divide-y divide-border">
-          {testRows.map((t) => (
-            <li key={t.id} className="flex items-start gap-3 px-3 py-2 text-xs">
-              <span className={cn("w-4 shrink-0 font-mono", statusClass(t.status))}>
-                {t.status === "pending" ? "·" : statusEmoji(t.status)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-mono text-[11px]">{shortName(t)}</p>
-                <p className="text-muted-foreground">{t.description}</p>
-              </div>
-            </li>
-          ))}
+          {testRows.map((t) => {
+            const ex = explanationByName[shortName(t)] ?? explanationByName[t.id];
+            const showFailureBox = (t.status === "failed" || t.status === "error");
+            return (
+              <li key={t.id} className="px-3 py-2 text-xs">
+                <div className="flex items-start gap-3">
+                  <span className={cn("w-4 shrink-0 font-mono", statusClass(t.status))}>
+                    {t.status === "pending" ? "·" : statusEmoji(t.status)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-mono text-[11px]">{shortName(t)}</p>
+                    <p className="text-muted-foreground">{t.description}</p>
+                  </div>
+                </div>
+                {showFailureBox && (
+                  <div className="mt-2 ml-7 space-y-1 rounded-md border border-red-200 bg-red-50/60 p-3 text-[11px] leading-relaxed">
+                    {ex ? (
+                      <>
+                        <p>
+                          <span className="font-semibold">What this test checked: </span>
+                          {ex.what_was_checked}
+                        </p>
+                        <p>
+                          <span className="font-semibold">What happened: </span>
+                          {ex.what_happened}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Where to look next: </span>
+                          {ex.where_to_look}
+                        </p>
+                      </>
+                    ) : explainState.kind === "loading" ? (
+                      <p className="text-muted-foreground">Generating explanation…</p>
+                    ) : explainState.kind === "error" ? (
+                      <p className="text-muted-foreground">
+                        Mentor couldn&apos;t reach the AI ({explainState.message}). Check the raw
+                        output below.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </section>
 
