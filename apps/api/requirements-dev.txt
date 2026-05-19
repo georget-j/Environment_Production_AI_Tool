@@ -4,3 +4,4 @@ pytest-asyncio==0.24.0
 ruff==0.7.2
 mypy==1.13.0
 types-pyyaml==6.0.12.20240917
+jsonschema==4.23.0

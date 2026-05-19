@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { AiReview } from "@/components/ai-review";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -102,11 +103,9 @@ export default function SubmissionPage({ params }: { params: Params }) {
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold">AI review</h2>
+        <h2 className="mb-3 text-sm font-semibold">AI review</h2>
         {submission.ai_review_json && Object.keys(submission.ai_review_json).length > 0 ? (
-          <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-4 text-xs">
-            {JSON.stringify(submission.ai_review_json, null, 2)}
-          </pre>
+          <AiReview raw={submission.ai_review_json} />
         ) : (
           <p className="text-sm text-muted-foreground">Generating…</p>
         )}

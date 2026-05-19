@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.review import ReviewInput, review
 from app.auth import AuthUser, get_current_user
 from app.db import get_db
 from app.models import Challenge, Submission, UserChallengeProgress
@@ -97,6 +98,31 @@ def submit_challenge(
 
     db.commit()
     db.refresh(submission)
+
+    # Run the AI PR review synchronously. If OpenAI is unconfigured or the call
+    # fails, persist an empty review_json and let the UI render the failure mode.
+    try:
+        review_json, metadata = review(
+            ReviewInput(
+                title=challenge.title,
+                scenario=challenge.scenario,
+                learner_goal=challenge.learner_goal,
+                skills=challenge.skills,
+                repo_url=submission.repo_url,
+                commit_sha=submission.commit_sha,
+                test_output=submission.test_output,
+                tests_passed=summary.passed,
+            )
+        )
+        submission.ai_review_json = review_json
+        submission.prompt_sha = metadata["prompt_sha"]
+        db.commit()
+        db.refresh(submission)
+    except Exception as exc:
+        submission.ai_review_json = {"error": str(exc)[:300]}
+        db.commit()
+        db.refresh(submission)
+
     return SubmissionOut.model_validate(submission)
 
 
