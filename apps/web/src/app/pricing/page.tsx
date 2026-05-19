@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { UpgradeButton } from "@/components/upgrade-button";
 
 export default function PricingPage() {
   return (
@@ -23,15 +22,13 @@ export default function PricingPage() {
           <p className="my-4 text-3xl font-bold">
             £19<span className="text-base font-normal text-muted-foreground">/mo</span>
           </p>
-          <ul className="space-y-2 text-sm text-muted-foreground">
+          <ul className="mb-6 space-y-2 text-sm text-muted-foreground">
             <li>All challenges in the Backend Production track</li>
             <li>Unlimited AI mentor</li>
             <li>Full PR review on every submission</li>
             <li>Portfolio summary</li>
           </ul>
-          <Link href="/login?next=/dashboard">
-            <Button className="mt-6 w-full">Upgrade</Button>
-          </Link>
+          <UpgradeButton className="w-full" />
         </div>
       </div>
     </div>

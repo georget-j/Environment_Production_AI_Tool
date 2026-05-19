@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import AuthUser, get_current_user
 from app.config import get_settings
-from app.routers import ai, challenges, submissions, tracks
+from app.routers import ai, billing, challenges, submissions, tracks
 
 settings = get_settings()
 
@@ -21,6 +21,7 @@ app.include_router(tracks.router)
 app.include_router(challenges.router)
 app.include_router(submissions.router)
 app.include_router(ai.router)
+app.include_router(billing.router)
 
 
 @app.get("/healthz")

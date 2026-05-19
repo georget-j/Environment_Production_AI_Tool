@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.access import ensure_can_access
 from app.auth import AuthUser, get_current_user
 from app.db import get_db
 from app.models import Challenge, Module, UserChallengeProgress
@@ -47,6 +48,7 @@ def start_challenge(
     challenge = db.scalar(select(Challenge).where(Challenge.slug == slug))
     if not challenge:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Challenge not found")
+    ensure_can_access(db, user.id, challenge)
 
     existing = db.scalar(
         select(UserChallengeProgress).where(
