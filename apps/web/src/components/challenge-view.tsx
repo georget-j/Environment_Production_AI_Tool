@@ -19,19 +19,15 @@ type Props = {
   repoTemplateUrl: string | null;
   repoBranch: string | null;
   config: ChallengeRunnerConfig | undefined;
-  /** Left column: scenario / goal / instructions / sidebar info. */
-  left: React.ReactNode;
 };
 
 /**
- * Owns the runner + mentor wiring and lays them out as a 3-col grid on lg+
- * (left context · workspace · pinned mentor sidebar), falling back to a single
- * stacked column on smaller viewports.
- *
- *  - Holds an imperative handle to the ChallengeRunner so the mentor's inline
- *    file:line links and the show-answer flow can drive the editor.
- *  - Captures the latest file map snapshot via onFilesChange so show-answer
- *    has something to send to the API.
+ * 2-column workspace shell. The page renders a full-width hero above this
+ * component; ChallengeView owns:
+ *   - left column: the runner (or read-only preview)
+ *   - right column: the mentor sidebar (sticky on lg+)
+ * Both share an imperative bridge so the mentor's file:line links and the
+ * show-answer flow can drive the editor.
  */
 export function ChallengeView({
   challengeId,
@@ -39,7 +35,6 @@ export function ChallengeView({
   repoTemplateUrl,
   repoBranch,
   config,
-  left,
 }: Props) {
   const mentorRef = useRef<MentorChatHandle | null>(null);
   const runnerRef = useRef<ChallengeRunnerHandle | null>(null);
@@ -63,7 +58,6 @@ export function ChallengeView({
     if (config?.mode !== "pyodide") return;
     setShowAnswerPending(true);
     try {
-      // Lazy import to keep this off the initial bundle.
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const {
@@ -73,7 +67,6 @@ export function ChallengeView({
         alert("Please sign in first.");
         return;
       }
-
       const allFiles = filesRef.current;
       const editable: Record<string, string> = {};
       const readonly: Record<string, string> = {};
@@ -81,7 +74,6 @@ export function ChallengeView({
         if (config.editable.includes(path)) editable[path] = body;
         else readonly[path] = body;
       }
-
       const response = await fetch(`${API_BASE_URL}/api/ai/show-answer`, {
         method: "POST",
         headers: {
@@ -108,12 +100,10 @@ export function ChallengeView({
       for (const f of data.fixed_files) next[f.path] = f.content;
       runnerRef.current?.applyFiles(next);
 
-      // Mark locally so we can show 'answer-viewed' later.
       if (typeof window !== "undefined") {
         window.localStorage.setItem(`prodready:answer-viewed:${challengeSlug}`, "1");
       }
 
-      // Push the summary into the mentor chat (client-side only).
       mentorRef.current?.appendAssistantNotice(
         `Here's a working version. ${data.summary}\n\nClick Run tests to confirm it passes.`,
       );
@@ -144,24 +134,18 @@ export function ChallengeView({
       />
     );
 
-  const mentor = (
-    <MentorChat
-      ref={mentorRef}
-      challengeId={challengeId}
-      onJumpToCode={handleJumpToCode}
-      onShowAnswer={config?.mode === "pyodide" ? () => setShowAnswerOpen(true) : undefined}
-      showAnswerPending={showAnswerPending}
-    />
-  );
-
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,_1fr)_minmax(0,_1.6fr)_380px] lg:items-start">
-      <article className="space-y-6 lg:sticky lg:top-6 lg:self-start">{left}</article>
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]">
+      <section className="min-w-0">{runner}</section>
 
-      <section className="space-y-6 min-w-0">{runner}</section>
-
-      <aside className="lg:sticky lg:top-6 lg:self-start lg:h-[calc(100vh-3rem)]">
-        {mentor}
+      <aside className="min-w-0 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:self-start">
+        <MentorChat
+          ref={mentorRef}
+          challengeId={challengeId}
+          onJumpToCode={handleJumpToCode}
+          onShowAnswer={config?.mode === "pyodide" ? () => setShowAnswerOpen(true) : undefined}
+          showAnswerPending={showAnswerPending}
+        />
       </aside>
 
       <ShowAnswerModal

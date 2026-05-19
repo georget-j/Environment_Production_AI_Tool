@@ -475,33 +475,14 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
     return { ...t, status: observed?.status ?? ("pending" as const) };
   });
 
+  // Auto-open the tests disclosure whenever there are failures the learner
+  // needs to read explanations for.
+  const failureCount = runState.kind === "done"
+    ? runState.result.tests.filter((t) => t.status === "failed" || t.status === "error").length
+    : 0;
+
   return (
     <section className="space-y-4">
-      <div className="rounded-md border border-border bg-blue-50/40 p-4 text-xs leading-relaxed text-foreground">
-        <p className="mb-2 font-semibold">How this works</p>
-        <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
-          <li>
-            Edit the unlocked files in the workspace below — your changes are saved as you type.
-          </li>
-          <li>
-            Click <strong>Run tests</strong>. <Glossary term="pytest" /> runs <em>inside your
-            browser</em> via <Glossary term="pyodide" /> (Python compiled to WebAssembly). No code
-            is sent anywhere.
-          </li>
-          <li>
-            We run a fixed set of <Glossary term="test">test cases</Glossary> — listed below — and
-            show pass/fail per test plus the raw output.
-          </li>
-          <li>
-            When all tests pass, <strong>Submit solution</strong> records your win and runs the AI
-            review.
-          </li>
-        </ol>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Underlined words like <Glossary term="pytest" /> have a definition — hover for help.
-        </p>
-      </div>
-
       {pyodideState.kind === "warming" && (
         <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
           Loading the Python runtime (~10 MB, one-time). You can start editing — Run will be ready
@@ -514,89 +495,15 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
         </div>
       )}
 
-      <section
-        data-onboarding="tests-panel"
-        className="rounded-md border border-border"
-      >
-        <header className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-xs font-semibold">
-          <span>Tests for this challenge ({config.tests.length})</span>
-          {explainState.kind === "loading" && (
-            <span className="font-normal text-muted-foreground">Asking mentor about failures…</span>
-          )}
-          {explainState.kind === "error" && (
-            <span className="font-normal text-red-700">{explainState.message}</span>
-          )}
-        </header>
-        <ul className="divide-y divide-border">
-          {testRows.map((t) => {
-            const ex = findExplanation(t);
-            const showFailureBox = t.status === "failed" || t.status === "error";
-            return (
-              <li key={t.id} className="px-3 py-2.5">
-                <div className="flex items-start gap-3 text-sm">
-                  <span className={cn("w-4 shrink-0 font-mono", statusClass(t.status))}>
-                    {t.status === "pending" ? "·" : statusEmoji(t.status)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-xs">{shortName(t)}</p>
-                    <p className="mt-0.5 text-muted-foreground">{t.description}</p>
-                  </div>
-                </div>
-                {showFailureBox && (
-                  <div className="mt-2 ml-7 space-y-2 rounded-md border border-red-200 bg-red-50/60 p-4 text-sm leading-relaxed">
-                    {ex ? (
-                      <>
-                        <p>
-                          <span className="font-semibold">What this test checked: </span>
-                          {ex.what_was_checked}
-                        </p>
-                        <p>
-                          <span className="font-semibold">What happened: </span>
-                          {ex.what_happened}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Where to look next: </span>
-                          {ex.where_to_look}
-                        </p>
-                        {ex.file && ex.file in files && (
-                          <button
-                            type="button"
-                            onClick={() => jumpTo(ex.file!, ex.line ?? null)}
-                            className="mt-1 inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
-                          >
-                            Jump to{" "}
-                            <code className="font-mono">
-                              {ex.file}
-                              {ex.line ? `:${ex.line}` : ""}
-                            </code>{" "}
-                            →
-                          </button>
-                        )}
-                      </>
-                    ) : explainState.kind === "loading" ? (
-                      <p className="text-muted-foreground">Generating explanation…</p>
-                    ) : explainState.kind === "ready" ? (
-                      <p className="text-muted-foreground">
-                        Mentor returned an explanation but couldn&apos;t match it to this test.
-                        Check the raw pytest output below.
-                      </p>
-                    ) : explainState.kind === "error" ? (
-                      <p className="text-muted-foreground">
-                        Mentor couldn&apos;t reach the AI ({explainState.message}). Check the raw
-                        output below.
-                      </p>
-                    ) : null}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <p className="text-sm text-muted-foreground">
+        Edit the unlocked files. Click <strong>Run tests</strong> to execute{" "}
+        <Glossary term="pytest" /> in your browser. The mentor on the right can help if you get
+        stuck.
+      </p>
 
       <section data-onboarding="workspace" className="space-y-3">
         <header className="flex flex-wrap items-center justify-between gap-2">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold">Workspace</h2>
             <p className="text-xs text-muted-foreground">
               {config.editable.length} editable file{config.editable.length === 1 ? "" : "s"} ·{" "}
@@ -669,8 +576,6 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
             theme="vs-light"
             onMount={(editor) => {
               editorRef.current = editor as unknown as MonacoEditorRef;
-              // If the current tab has failure locations from the last run,
-              // paint them as red gutter markers + line decorations.
               const linesForTab = failureLocations[activeTab] ?? [];
               if (linesForTab.length > 0) {
                 decorationIdsRef.current = (editor as unknown as MonacoEditorRef).deltaDecorations(
@@ -747,6 +652,95 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
           </details>
         </section>
       )}
+
+      <details
+        data-onboarding="tests-panel"
+        className="overflow-hidden rounded-md border border-border"
+        open={failureCount > 0}
+      >
+        <summary className="flex cursor-pointer items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-sm font-semibold hover:bg-muted/50">
+          <span>
+            Tests ({config.tests.length})
+            {runState.kind === "done" && (
+              <span className="ml-2 font-normal text-muted-foreground">
+                {runState.result.tests.filter((t) => t.status === "passed").length} passed
+                {failureCount > 0 && ` · ${failureCount} failed`}
+              </span>
+            )}
+          </span>
+          {explainState.kind === "loading" && (
+            <span className="text-xs font-normal text-muted-foreground">
+              Mentor is explaining failures…
+            </span>
+          )}
+        </summary>
+        <ul className="divide-y divide-border">
+          {testRows.map((t) => {
+            const ex = findExplanation(t);
+            const showFailureBox = t.status === "failed" || t.status === "error";
+            return (
+              <li key={t.id} className="px-3 py-2.5">
+                <div className="flex items-start gap-3 text-sm">
+                  <span className={cn("w-4 shrink-0 font-mono", statusClass(t.status))}>
+                    {t.status === "pending" ? "·" : statusEmoji(t.status)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-mono text-xs">{shortName(t)}</p>
+                    <p className="mt-0.5 text-muted-foreground">{t.description}</p>
+                  </div>
+                </div>
+                {showFailureBox && (
+                  <div className="mt-2 ml-7 space-y-2 rounded-md border border-red-200 bg-red-50/60 p-4 text-sm leading-relaxed">
+                    {ex ? (
+                      <>
+                        <p>
+                          <span className="font-semibold">What this test checked: </span>
+                          {ex.what_was_checked}
+                        </p>
+                        <p>
+                          <span className="font-semibold">What happened: </span>
+                          {ex.what_happened}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Where to look next: </span>
+                          {ex.where_to_look}
+                        </p>
+                        {ex.file && ex.file in files && (
+                          <button
+                            type="button"
+                            onClick={() => jumpTo(ex.file!, ex.line ?? null)}
+                            className="mt-1 inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                          >
+                            Jump to{" "}
+                            <code className="font-mono">
+                              {ex.file}
+                              {ex.line ? `:${ex.line}` : ""}
+                            </code>{" "}
+                            →
+                          </button>
+                        )}
+                      </>
+                    ) : explainState.kind === "loading" ? (
+                      <p className="text-muted-foreground">Generating explanation…</p>
+                    ) : explainState.kind === "ready" ? (
+                      <p className="text-muted-foreground">
+                        Mentor returned an explanation but couldn&apos;t match it to this test.
+                        Check the raw pytest output below.
+                      </p>
+                    ) : explainState.kind === "error" ? (
+                      <p className="text-muted-foreground">
+                        Mentor couldn&apos;t reach the AI ({explainState.message}). Check the raw
+                        output below.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </details>
+
     </section>
   );
 });

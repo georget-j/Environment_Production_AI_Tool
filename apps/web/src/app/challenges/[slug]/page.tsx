@@ -17,82 +17,68 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
 
   const config = CHALLENGE_CONFIG[challenge.slug];
 
-  // Pre-rendered (server) content for the left column: scenario, goal,
-  // instructions, plus the per-mode quick-help cards and skills.
-  const left = (
-    <>
-      <header className="space-y-3">
+  return (
+    <div className="space-y-8 py-6">
+      {/* Hero: full-width title + scenario + goal */}
+      <header className="space-y-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {challenge.module.title}
         </p>
-        <h1 className="text-2xl font-semibold leading-tight lg:text-3xl">{challenge.title}</h1>
-        <p className="max-w-prose text-sm leading-relaxed text-foreground">{challenge.scenario}</p>
+        <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">{challenge.title}</h1>
+        <p className="max-w-3xl text-base leading-relaxed text-foreground">{challenge.scenario}</p>
+
+        <div className="max-w-3xl rounded-md border-l-4 border-primary bg-muted/40 px-4 py-3 text-sm leading-relaxed">
+          <span className="font-semibold">Your goal: </span>
+          {challenge.learner_goal}
+        </div>
+
+        {challenge.instructions?.trim() && (
+          <details className="max-w-3xl rounded-md border border-border bg-muted/10">
+            <summary className="cursor-pointer px-4 py-2 text-sm font-medium hover:bg-muted/30">
+              Instructions
+            </summary>
+            <div className="border-t border-border px-4 py-3">
+              <Markdown>{challenge.instructions}</Markdown>
+            </div>
+          </details>
+        )}
       </header>
 
-      <section>
-        <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Goal
-        </h2>
-        <p className="max-w-prose text-sm leading-relaxed">{challenge.learner_goal}</p>
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Instructions
-        </h2>
-        <div className="max-w-prose rounded-md border border-border bg-muted/20 p-4">
-          <Markdown>{challenge.instructions}</Markdown>
-        </div>
-      </section>
-
-      {config?.mode === "pyodide" ? (
-        <details className="rounded-md border border-border p-3 text-sm" open>
-          <summary className="cursor-pointer text-sm font-semibold">How this works</summary>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-            <li>Edit the unlocked files in the workspace.</li>
-            <li>Click <strong>Run tests</strong> — Python boots in your browser.</li>
-            <li>Iterate until the tests pass.</li>
-            <li>
-              Stuck? Use the <strong>Hint</strong> buttons in the mentor sidebar, or click{" "}
-              <strong>I&apos;m stuck — help</strong> in the result panel.
-            </li>
-            <li>Submit when green — your edits are saved as you go.</li>
-          </ol>
-        </details>
-      ) : (
-        <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-          Read through the files. Ask the mentor anything that isn&apos;t obvious.
-        </div>
-      )}
-
-      <section className="rounded-md border border-border p-3">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Skills
-        </h3>
-        <div className="flex flex-wrap gap-1.5">
-          {challenge.skills.map((s) => (
-            <span
-              key={s}
-              className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground"
-            >
-              {s}
-            </span>
-          ))}
-        </div>
-      </section>
-    </>
-  );
-
-  return (
-    <div className="py-6">
       <ChallengeView
         challengeId={challenge.id}
         challengeSlug={challenge.slug}
         repoTemplateUrl={challenge.repo_template_url}
         repoBranch={challenge.repo_branch}
         config={config}
-        left={left}
       />
+
+      {/* Footer: skills + quick reference */}
+      <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Skills
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {challenge.skills.map((s) => (
+              <span
+                key={s}
+                className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground"
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+        <details className="text-muted-foreground">
+          <summary className="cursor-pointer text-xs hover:text-foreground">How this works</summary>
+          <div className="mt-2 max-w-md rounded-md border border-border bg-muted/10 p-3 text-xs leading-relaxed">
+            Edit the unlocked files in the workspace. Click <strong>Run tests</strong> — Python
+            runs entirely inside your browser. The mentor on the right gives hints; click{" "}
+            <strong>Show me the answer</strong> if you&apos;re truly stuck. Submit when all tests
+            pass.
+          </div>
+        </details>
+      </footer>
     </div>
   );
 }

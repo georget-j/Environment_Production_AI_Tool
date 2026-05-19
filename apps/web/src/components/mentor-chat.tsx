@@ -186,7 +186,7 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(function MentorCha
           </button>
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {[1, 2, 3].map((level) => (
             <button
               key={level}
@@ -194,7 +194,7 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(function MentorCha
               onClick={() => quickHint(level as 1 | 2 | 3)}
               disabled={pending}
               className={cn(
-                "rounded-md border px-3 py-1.5 text-xs font-medium",
+                "rounded-md border px-2 py-2 text-xs font-medium",
                 hintLevel === level && pending
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border bg-background text-foreground hover:bg-muted",
@@ -211,21 +211,21 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(function MentorCha
               Hint {level}
             </button>
           ))}
-          {onShowAnswer && (
-            <button
-              type="button"
-              onClick={onShowAnswer}
-              disabled={showAnswerPending || pending}
-              className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"
-              title="Replace your code with a working version"
-            >
-              {showAnswerPending ? "Generating…" : "Show me the answer"}
-            </button>
-          )}
         </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Click a <Glossary term="hint">Hint button to get help at that level</Glossary> — each
-          replaces the previous one.
+        {onShowAnswer && (
+          <button
+            type="button"
+            onClick={onShowAnswer}
+            disabled={showAnswerPending || pending}
+            className="mt-2 w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+            title="Replace your code with a working version"
+          >
+            {showAnswerPending ? "Generating answer…" : "Show me the answer"}
+          </button>
+        )}
+        <p className="mt-2 text-sm text-muted-foreground">
+          Click a <Glossary term="hint">Hint button</Glossary> for help at that level. Each new
+          hint replaces the previous one.
         </p>
       </header>
 
@@ -294,7 +294,7 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(function MentorCha
 
       <form onSubmit={send} className="space-y-2 border-t border-border p-4">
         <textarea
-          rows={3}
+          rows={2}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Or type your own question…"
