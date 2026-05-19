@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { apiFetch, type ChallengeDetail } from "@/lib/api";
 import { StartChallengeButton } from "@/components/start-challenge-button";
+import { SubmissionForm } from "@/components/submission-form";
 
 type Params = Promise<{ slug: string }>;
 
@@ -72,6 +73,7 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
         </div>
 
         <StartChallengeButton slug={challenge.slug} />
+        <SubmissionForm challengeSlug={challenge.slug} />
       </aside>
     </div>
   );

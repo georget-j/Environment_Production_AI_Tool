@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import AuthUser, get_current_user
 from app.config import get_settings
-from app.routers import challenges, tracks
+from app.routers import challenges, submissions, tracks
 
 settings = get_settings()
 
@@ -19,6 +19,7 @@ app.add_middleware(
 
 app.include_router(tracks.router)
 app.include_router(challenges.router)
+app.include_router(submissions.router)
 
 
 @app.get("/healthz")
