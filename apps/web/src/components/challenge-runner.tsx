@@ -347,10 +347,21 @@ export function ChallengeRunner({
 
   // Build a per-test view by joining config.tests with the parsed pytest output
   // and the AI explanation, if any.
-  const explanationByName: Record<string, FailureExplanation> =
-    explainState.kind === "ready"
-      ? Object.fromEntries(explainState.failures.map((f) => [f.test_name, f]))
-      : {};
+  function findExplanation(t: TestCase): FailureExplanation | undefined {
+    if (explainState.kind !== "ready") return undefined;
+    const short = shortName(t);
+    return explainState.failures.find((f) => {
+      const name = f.test_name;
+      return (
+        name === t.id ||
+        name === short ||
+        name.endsWith(`::${short}`) ||
+        t.id.endsWith(`::${name}`) ||
+        name.includes(short) ||
+        short.includes(name)
+      );
+    });
+  }
 
   const testRows = config.tests.map((t) => {
     const observed =
@@ -409,11 +420,11 @@ export function ChallengeRunner({
         </header>
         <ul className="divide-y divide-border">
           {testRows.map((t) => {
-            const ex = explanationByName[shortName(t)] ?? explanationByName[t.id];
-            const showFailureBox = (t.status === "failed" || t.status === "error");
+            const ex = findExplanation(t);
+            const showFailureBox = t.status === "failed" || t.status === "error";
             return (
-              <li key={t.id} className="px-3 py-2 text-xs">
-                <div className="flex items-start gap-3">
+              <li key={t.id} className="px-3 py-2">
+                <div className="flex items-start gap-3 text-xs">
                   <span className={cn("w-4 shrink-0 font-mono", statusClass(t.status))}>
                     {t.status === "pending" ? "·" : statusEmoji(t.status)}
                   </span>
@@ -423,7 +434,7 @@ export function ChallengeRunner({
                   </div>
                 </div>
                 {showFailureBox && (
-                  <div className="mt-2 ml-7 space-y-1 rounded-md border border-red-200 bg-red-50/60 p-3 text-[11px] leading-relaxed">
+                  <div className="mt-2 ml-7 space-y-2 rounded-md border border-red-200 bg-red-50/60 p-4 text-sm leading-relaxed">
                     {ex ? (
                       <>
                         <p>
@@ -441,6 +452,11 @@ export function ChallengeRunner({
                       </>
                     ) : explainState.kind === "loading" ? (
                       <p className="text-muted-foreground">Generating explanation…</p>
+                    ) : explainState.kind === "ready" ? (
+                      <p className="text-muted-foreground">
+                        Mentor returned an explanation but couldn&apos;t match it to this test.
+                        Check the raw pytest output below.
+                      </p>
                     ) : explainState.kind === "error" ? (
                       <p className="text-muted-foreground">
                         Mentor couldn&apos;t reach the AI ({explainState.message}). Check the raw

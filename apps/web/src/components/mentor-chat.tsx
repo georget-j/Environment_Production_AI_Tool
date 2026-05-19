@@ -76,11 +76,35 @@ export function MentorChat({ challengeId }: { challengeId: string }) {
     setMessage("");
   }
 
+  async function clear() {
+    if (turns.length === 0) return;
+    if (!confirm("Clear the entire mentor conversation for this challenge?")) return;
+    setError(null);
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      setError("Sign in to clear the chat.");
+      return;
+    }
+    const response = await fetch(`${API_BASE_URL}/api/ai/messages/${challengeId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      setError(`Clear failed (${response.status}): ${body.slice(0, 200)}`);
+      return;
+    }
+    setTurns([]);
+  }
+
   return (
     <section className="rounded-lg border border-border">
-      <header className="flex items-center justify-between border-b border-border px-4 py-3">
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold">AI mentor</h3>
-        <div className="flex items-center gap-1 text-xs">
+        <div className="flex items-center gap-2 text-xs">
           {[1, 2, 3].map((level) => (
             <button
               key={level}
@@ -95,6 +119,15 @@ export function MentorChat({ challengeId }: { challengeId: string }) {
               Hint {level}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={clear}
+            disabled={turns.length === 0}
+            className="rounded-md px-2 py-1 text-muted-foreground hover:bg-muted disabled:opacity-40"
+            title="Delete all mentor messages for this challenge"
+          >
+            Clear
+          </button>
         </div>
       </header>
 

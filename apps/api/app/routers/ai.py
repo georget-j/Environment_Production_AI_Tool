@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.ai.explainer import ExplainInput, explain
@@ -180,3 +180,24 @@ def list_messages(
         .all()
     )
     return [ChatTurnOut.model_validate(r) for r in rows if r.role in ("user", "assistant")]
+
+
+@router.delete("/messages/{challenge_id}")
+def clear_messages(
+    challenge_id: UUID,
+    db: Session = Depends(get_db),
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, int]:
+    """Delete all of this learner's chat history for a challenge.
+
+    Owner-only by definition: the WHERE clause includes user_id. Returns
+    the number of rows removed for the UI to show a confirmation.
+    """
+    result = db.execute(
+        delete(AIMessage).where(
+            AIMessage.user_id == user.id,
+            AIMessage.challenge_id == challenge_id,
+        )
+    )
+    db.commit()
+    return {"deleted": result.rowcount or 0}
