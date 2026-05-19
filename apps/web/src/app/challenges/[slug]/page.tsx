@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
 import { apiFetch, type ChallengeDetail } from "@/lib/api";
-import { StartChallengeButton } from "@/components/start-challenge-button";
-import { SubmissionForm } from "@/components/submission-form";
 import { MentorChat } from "@/components/mentor-chat";
 import { Markdown } from "@/components/markdown";
 import { CodePreview } from "@/components/code-preview";
-import { FEATURED_FILES } from "@/lib/featured-files";
+import { ChallengeRunner } from "@/components/challenge-runner";
+import { CHALLENGE_CONFIG } from "@/lib/featured-files";
 
 type Params = Promise<{ slug: string }>;
 
@@ -18,11 +17,9 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
     notFound();
   }
 
-  const featuredFiles = FEATURED_FILES[challenge.slug] ?? [];
-  const validation = challenge.validation_config_json as {
-    tests?: string[];
-    lint?: string[];
-  };
+  const config = CHALLENGE_CONFIG[challenge.slug];
+  const branch = challenge.repo_branch ?? "main";
+  const repoUrl = challenge.repo_template_url ?? "";
 
   return (
     <div className="grid gap-8 py-8 lg:grid-cols-[3fr_2fr]">
@@ -51,59 +48,46 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
           </div>
         </section>
 
-        <CodePreview
-          repoTemplateUrl={challenge.repo_template_url}
-          branch={challenge.repo_branch}
-          paths={featuredFiles}
-        />
+        {config?.mode === "pyodide" && repoUrl ? (
+          <ChallengeRunner
+            challengeSlug={challenge.slug}
+            repoTemplateUrl={repoUrl}
+            branch={branch}
+            config={config}
+          />
+        ) : (
+          <CodePreview
+            repoTemplateUrl={challenge.repo_template_url}
+            branch={challenge.repo_branch}
+            paths={config?.mode === "reading" ? config.readonly : []}
+          />
+        )}
 
         <MentorChat challengeId={challenge.id} />
       </article>
 
       <aside className="space-y-4">
-        <div className="space-y-2 rounded-lg border border-border p-4">
-          <h3 className="text-sm font-semibold">Repo</h3>
-          {challenge.repo_template_url ? (
-            <>
-              <a
-                href={
-                  challenge.repo_branch
-                    ? `${challenge.repo_template_url}/tree/${challenge.repo_branch}`
-                    : challenge.repo_template_url
-                }
-                target="_blank"
-                rel="noreferrer"
-                className="block break-all text-sm text-blue-600 hover:underline"
-              >
-                {challenge.repo_template_url}
-              </a>
-              {challenge.repo_branch && (
-                <p className="text-xs text-muted-foreground">
-                  Branch: <code className="font-mono">{challenge.repo_branch}</code>
-                </p>
-              )}
-              <p className="pt-1 text-xs text-muted-foreground">
-                Fork it → clone → check out the branch → make pytest pass.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">TBD</p>
-          )}
-        </div>
-
-        <div className="space-y-2 rounded-lg border border-border p-4">
-          <h3 className="text-sm font-semibold">How we check your work</h3>
-          {validation.tests?.map((cmd) => (
-            <pre key={cmd} className="rounded bg-muted/30 px-2 py-1 font-mono text-xs">
-              {cmd}
-            </pre>
-          ))}
-          {validation.lint?.map((cmd) => (
-            <pre key={cmd} className="rounded bg-muted/30 px-2 py-1 font-mono text-xs">
-              {cmd}
-            </pre>
-          ))}
-        </div>
+        {config?.mode === "pyodide" ? (
+          <div className="space-y-2 rounded-lg border border-border p-4">
+            <h3 className="text-sm font-semibold">How this works</h3>
+            <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+              <li>Edit the unlocked files in the workspace.</li>
+              <li>
+                Click <strong>Run tests</strong> — Python boots in your browser.
+              </li>
+              <li>Iterate until the tests pass.</li>
+              <li>Submit when green — your edits are saved as you go.</li>
+            </ol>
+          </div>
+        ) : (
+          <div className="space-y-2 rounded-lg border border-border p-4">
+            <h3 className="text-sm font-semibold">How this works</h3>
+            <p className="text-xs text-muted-foreground">
+              Read through the files. Ask the mentor anything that isn&apos;t obvious. Submit by
+              answering the mentor&apos;s closing question (a small reflection).
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2 rounded-lg border border-border p-4">
           <h3 className="text-sm font-semibold">Skills</h3>
@@ -119,8 +103,6 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
           </div>
         </div>
 
-        <StartChallengeButton slug={challenge.slug} />
-        <SubmissionForm challengeSlug={challenge.slug} />
       </aside>
     </div>
   );
