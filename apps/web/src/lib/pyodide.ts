@@ -79,19 +79,20 @@ export async function getPyodide(): Promise<PyodideInterface> {
 
 /**
  * Write a tree of files into Pyodide's in-memory filesystem.
- * Paths like "tests/test_orders.py" auto-create the parent directory.
+ * Coerces every path to absolute so writes don't depend on cwd.
  */
 export function writeTree(pyodide: PyodideInterface, files: Record<string, string>): void {
-  for (const [path, body] of Object.entries(files)) {
-    const segments = path.split("/");
+  for (const [rawPath, body] of Object.entries(files)) {
+    const abs = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+    const segments = abs.split("/").filter(Boolean);
     let cursor = "";
     for (let i = 0; i < segments.length - 1; i++) {
-      cursor = cursor ? `${cursor}/${segments[i]}` : segments[i];
+      cursor = `${cursor}/${segments[i]}`;
       if (!pyodide.FS.analyzePath(cursor).exists) {
         pyodide.FS.mkdir(cursor);
       }
     }
-    pyodide.FS.writeFile(path, body);
+    pyodide.FS.writeFile(abs, body);
   }
 }
 

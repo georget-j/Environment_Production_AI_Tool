@@ -219,7 +219,7 @@ export function ChallengeRunner({
       setPyodideState({ kind: "ready" });
       const rooted: Record<string, string> = {};
       for (const [p, body] of Object.entries(files)) {
-        rooted[`home/pyodide/${p}`] = body;
+        rooted[`/home/pyodide/${p}`] = body;
       }
       writeTree(pyodide, rooted);
       const result = await runPytest(
