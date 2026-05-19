@@ -103,15 +103,24 @@ export type TestRow = {
   status: TestStatus;
 };
 
+/** Production-code locations parsed out of the `--tb=short` traceback.
+ * Maps a file path (e.g. "app/orders.py") to the set of 1-indexed line
+ * numbers that appeared in failure tracebacks. Test files are excluded.
+ */
+export type FailureLocations = Record<string, number[]>;
+
 export type PytestResult = {
   exitCode: number;
   output: string;
   tests: TestRow[];
   summary: string;
+  failureLocations: FailureLocations;
 };
 
 // "tests/test_orders.py::test_compute_total_without_coupon PASSED  [ 14%]"
 const VERBOSE_LINE_RE = /^(.+?::[\w[\]\-.]+)\s+(PASSED|FAILED|ERROR|SKIPPED)\b/i;
+// Short traceback line: "app/orders.py:24: in compute_total" or "app/orders.py:24:"
+const TB_LOCATION_RE = /^([\w./-]+\.py):(\d+):/;
 
 const STATUS_MAP: Record<string, TestStatus> = {
   PASSED: "passed",
@@ -120,21 +129,53 @@ const STATUS_MAP: Record<string, TestStatus> = {
   SKIPPED: "skipped",
 };
 
-function parseVerboseOutput(text: string): { tests: TestRow[]; summary: string } {
+function parseVerboseOutput(text: string): {
+  tests: TestRow[];
+  summary: string;
+  failureLocations: FailureLocations;
+} {
   const tests: TestRow[] = [];
   let summary = "";
-  for (const line of text.split("\n")) {
-    const match = VERBOSE_LINE_RE.exec(line);
-    if (match) {
-      tests.push({ name: match[1].split("::").pop() ?? match[1], status: STATUS_MAP[match[2].toUpperCase()] });
+  const failureLocations: FailureLocations = {};
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trimStart();
+
+    const statusMatch = VERBOSE_LINE_RE.exec(line);
+    if (statusMatch) {
+      tests.push({
+        name: statusMatch[1].split("::").pop() ?? statusMatch[1],
+        status: STATUS_MAP[statusMatch[2].toUpperCase()],
+      });
       continue;
     }
+
     // Summary line: "= 1 failed, 4 passed in 0.42s ="
     if (/=+\s*\d+ (passed|failed|error|skipped)/.test(line)) {
       summary = line.replace(/=/g, "").trim();
+      continue;
+    }
+
+    // Traceback location: skip test files, pytest internals, std-lib, and pyodide.
+    const tbMatch = TB_LOCATION_RE.exec(line);
+    if (tbMatch) {
+      const path = tbMatch[1];
+      const lineNumber = parseInt(tbMatch[2], 10);
+      if (
+        path.startsWith("tests/") ||
+        path.includes("/_pytest/") ||
+        path.includes("/pluggy/") ||
+        path.includes("/python3") ||
+        path.startsWith("/lib/")
+      ) {
+        continue;
+      }
+      const existing = failureLocations[path] ?? [];
+      if (!existing.includes(lineNumber)) {
+        failureLocations[path] = [...existing, lineNumber];
+      }
     }
   }
-  return { tests, summary };
+  return { tests, summary, failureLocations };
 }
 
 export async function runPytest(
@@ -157,12 +198,13 @@ int(exit_code)
 `);
 
   const output = lines.join("\n");
-  const { tests, summary } = parseVerboseOutput(output);
+  const { tests, summary, failureLocations } = parseVerboseOutput(output);
 
   return {
     exitCode: Number(exit),
     output,
     tests,
     summary: summary || (Number(exit) === 0 ? "All tests passed" : "Some tests failed"),
+    failureLocations,
   };
 }

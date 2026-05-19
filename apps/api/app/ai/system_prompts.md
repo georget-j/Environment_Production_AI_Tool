@@ -57,6 +57,13 @@ For each failure:
   literal numbers / values from the pytest output.
 - where_to_look: one sentence pointing at the file + function or line
   in the production code. Do NOT show the fix.
+- file: the production-code file path most likely to contain the bug
+  (e.g. "app/orders.py"). NOT the test file. NOT a Python stdlib path.
+  If you're unsure, return null.
+- line: the 1-indexed line number inside `file` where the learner
+  should focus. If you're unsure, return null.
+- function: the function/method name inside `file` to inspect. If
+  none applies, return null.
 
 Tone: a calm senior in a 1:1. No "perhaps", no "it seems", no menus of
 alternative fixes. One direction, one sentence each.

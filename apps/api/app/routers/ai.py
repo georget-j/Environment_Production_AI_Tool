@@ -128,6 +128,9 @@ class FailureExplanation(BaseModel):
     what_was_checked: str
     what_happened: str
     where_to_look: str
+    file: str | None = None
+    line: int | None = None
+    function: str | None = None
 
 
 class ExplainTestsResponse(BaseModel):

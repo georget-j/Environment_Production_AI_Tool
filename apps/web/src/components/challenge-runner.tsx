@@ -14,12 +14,25 @@ import {
   type TestStatus,
 } from "@/lib/pyodide";
 import type { ChallengeRunnerConfig, TestCase } from "@/lib/featured-files";
+import { Glossary } from "@/components/glossary";
 
 type FailureExplanation = {
   test_name: string;
   what_was_checked: string;
   what_happened: string;
   where_to_look: string;
+  file?: string | null;
+  line?: number | null;
+  function?: string | null;
+};
+
+// Minimal Monaco surface we use — typed locally so we don't import editor
+// types eagerly (which would break Next.js SSR).
+type MonacoEditorRef = {
+  revealLineInCenter: (line: number) => void;
+  deltaDecorations: (oldIds: string[], newDecos: unknown[]) => string[];
+  setPosition: (pos: { lineNumber: number; column: number }) => void;
+  focus: () => void;
 };
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -38,6 +51,9 @@ type Props = {
   branch: string;
   config: Extract<ChallengeRunnerConfig, { mode: "pyodide" }>;
   onTestsPassed?: () => void;
+  /** Called when the learner clicks 'Stuck?'. Receives a pre-baked
+   * message the parent can forward to the mentor chat. */
+  onStuck?: (message: string) => void;
 };
 
 type ExplainState =
@@ -121,6 +137,7 @@ export function ChallengeRunner({
   branch,
   config,
   onTestsPassed,
+  onStuck,
 }: Props) {
   const meta = parseOwnerRepo(repoTemplateUrl);
   const allPaths = [...config.editable, ...config.readonly];
@@ -132,8 +149,12 @@ export function ChallengeRunner({
   const [runState, setRunState] = useState<RunState>({ kind: "idle" });
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
   const [explainState, setExplainState] = useState<ExplainState>({ kind: "idle" });
+  const [failureLocations, setFailureLocations] = useState<Record<string, number[]>>({});
   const passedNotified = useRef(false);
   const router = useRouter();
+  const editorRef = useRef<MonacoEditorRef | null>(null);
+  // Decoration ids returned by Monaco; we keep them to clear on next change.
+  const decorationIdsRef = useRef<string[]>([]);
 
   // Pre-warm Pyodide on mount so the first Run feels instant.
   useEffect(() => {
@@ -284,6 +305,7 @@ export function ChallengeRunner({
         config.tests.map((t) => t.id),
       );
       setRunState({ kind: "done", result });
+      setFailureLocations(result.failureLocations);
       if (result.exitCode === 0 && !passedNotified.current) {
         passedNotified.current = true;
         onTestsPassed?.();
@@ -303,10 +325,41 @@ export function ChallengeRunner({
           output: exc instanceof Error ? exc.message : String(exc),
           tests: [],
           summary: "Runner error",
+          failureLocations: {},
         },
       });
     }
   }, [files, config.tests, onTestsPassed, explainFailures]);
+
+  /** Open `path` (if among the loaded files) and scroll Monaco to `line`,
+   * adding a transient yellow highlight. Used by 'Jump to code →' buttons
+   * in the AI explanation panel. */
+  const jumpTo = useCallback(
+    (path: string, line: number | null | undefined) => {
+      if (!(path in files)) return;
+      setActiveTab(path);
+      if (!line || line < 1) return;
+      // Wait for the editor to remount on tab switch before driving the API.
+      requestAnimationFrame(() => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        editor.revealLineInCenter(line);
+        editor.setPosition({ lineNumber: line, column: 1 });
+        decorationIdsRef.current = editor.deltaDecorations(decorationIdsRef.current, [
+          {
+            range: { startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: 1 },
+            options: {
+              isWholeLine: true,
+              className: "prodready-jump-target",
+              linesDecorationsClassName: "prodready-jump-gutter",
+            },
+          },
+        ]);
+        editor.focus();
+      });
+    },
+    [files],
+  );
 
   const editable = config.editable.includes(activeTab);
   const passed = runState.kind === "done" && runState.result.exitCode === 0;
@@ -382,18 +435,22 @@ export function ChallengeRunner({
             Edit the unlocked files in the workspace below — your changes are saved as you type.
           </li>
           <li>
-            Click <strong>Run tests</strong>. Pytest runs <em>inside your browser</em> via Pyodide
-            (Python compiled to WebAssembly). No code is sent anywhere.
+            Click <strong>Run tests</strong>. <Glossary term="pytest" /> runs <em>inside your
+            browser</em> via <Glossary term="pyodide" /> (Python compiled to WebAssembly). No code
+            is sent anywhere.
           </li>
           <li>
-            We run a fixed set of test cases — listed below — and show pass/fail per test plus the
-            raw pytest output.
+            We run a fixed set of <Glossary term="test">test cases</Glossary> — listed below — and
+            show pass/fail per test plus the raw output.
           </li>
           <li>
             When all tests pass, <strong>Submit solution</strong> records your win and runs the AI
             review.
           </li>
         </ol>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Underlined words like <Glossary term="pytest" /> have a definition — hover for help.
+        </p>
       </div>
 
       {pyodideState.kind === "warming" && (
@@ -408,7 +465,10 @@ export function ChallengeRunner({
         </div>
       )}
 
-      <section className="rounded-md border border-border">
+      <section
+        data-onboarding="tests-panel"
+        className="rounded-md border border-border"
+      >
         <header className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-xs font-semibold">
           <span>Tests for this challenge ({config.tests.length})</span>
           {explainState.kind === "loading" && (
@@ -449,6 +509,20 @@ export function ChallengeRunner({
                           <span className="font-semibold">Where to look next: </span>
                           {ex.where_to_look}
                         </p>
+                        {ex.file && ex.file in files && (
+                          <button
+                            type="button"
+                            onClick={() => jumpTo(ex.file!, ex.line ?? null)}
+                            className="mt-1 inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                          >
+                            Jump to{" "}
+                            <code className="font-mono">
+                              {ex.file}
+                              {ex.line ? `:${ex.line}` : ""}
+                            </code>{" "}
+                            →
+                          </button>
+                        )}
                       </>
                     ) : explainState.kind === "loading" ? (
                       <p className="text-muted-foreground">Generating explanation…</p>
@@ -471,7 +545,7 @@ export function ChallengeRunner({
         </ul>
       </section>
 
-      <section className="space-y-3">
+      <section data-onboarding="workspace" className="space-y-3">
         <header className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold">Workspace</h2>
@@ -491,6 +565,7 @@ export function ChallengeRunner({
             </Button>
             <Button
               size="sm"
+              data-onboarding="run-button"
               onClick={handleRun}
               disabled={runState.kind === "running" || pyodideState.kind === "warming"}
             >
@@ -543,6 +618,25 @@ export function ChallengeRunner({
               tabSize: 4,
             }}
             theme="vs-light"
+            onMount={(editor) => {
+              editorRef.current = editor as unknown as MonacoEditorRef;
+              // If the current tab has failure locations from the last run,
+              // paint them as red gutter markers + line decorations.
+              const linesForTab = failureLocations[activeTab] ?? [];
+              if (linesForTab.length > 0) {
+                decorationIdsRef.current = (editor as unknown as MonacoEditorRef).deltaDecorations(
+                  [],
+                  linesForTab.map((ln) => ({
+                    range: { startLineNumber: ln, startColumn: 1, endLineNumber: ln, endColumn: 1 },
+                    options: {
+                      isWholeLine: true,
+                      className: "prodready-failure-line",
+                      linesDecorationsClassName: "prodready-failure-gutter",
+                    },
+                  })),
+                );
+              }
+            }}
           />
         </div>
       </section>
@@ -562,15 +656,34 @@ export function ChallengeRunner({
                   ? "Runner error"
                   : `✗ ${runState.result.summary || `pytest exited ${runState.result.exitCode}`}`}
             </p>
-            {passed && (
-              <Button
-                size="sm"
-                onClick={handleSubmit}
-                disabled={submitState.kind === "submitting"}
-              >
-                {submitState.kind === "submitting" ? "Submitting…" : "Submit solution"}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {!passed && onStuck && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const failed = runState.result.tests
+                      .filter((t) => t.status === "failed" || t.status === "error")
+                      .map((t) => t.name);
+                    const list = failed.length > 0 ? failed.join(", ") : "the failing test";
+                    onStuck(
+                      `I ran the tests and ${failed.length || "some"} failed (${list}). I'm not sure where to start — can you walk me through what to look at?`,
+                    );
+                  }}
+                >
+                  I&apos;m stuck — help
+                </Button>
+              )}
+              {passed && (
+                <Button
+                  size="sm"
+                  onClick={handleSubmit}
+                  disabled={submitState.kind === "submitting"}
+                >
+                  {submitState.kind === "submitting" ? "Submitting…" : "Submit solution"}
+                </Button>
+              )}
+            </div>
           </div>
           {submitState.kind === "error" && (
             <p className="text-xs text-red-700">{submitState.message}</p>

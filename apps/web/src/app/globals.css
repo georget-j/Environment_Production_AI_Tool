@@ -29,3 +29,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Monaco editor decorations driven by the challenge runner.
+ * .prodready-failure-* highlights lines pointed to by failing test
+ * tracebacks (red). .prodready-jump-* is the transient yellow
+ * highlight fired by the "Jump to code →" button. */
+.prodready-failure-line {
+  background-color: rgba(254, 226, 226, 0.6);
+}
+.prodready-failure-gutter {
+  background-color: #ef4444;
+  width: 3px !important;
+  margin-left: 2px;
+}
+.prodready-jump-target {
+  background-color: rgba(254, 240, 138, 0.6);
+  animation: prodready-flash 1.2s ease-out 1;
+}
+.prodready-jump-gutter {
+  background-color: #eab308;
+  width: 3px !important;
+  margin-left: 2px;
+}
+@keyframes prodready-flash {
+  0% { background-color: rgba(250, 204, 21, 0.9); }
+  100% { background-color: rgba(254, 240, 138, 0.6); }
+}

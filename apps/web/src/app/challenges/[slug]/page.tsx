@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
 import { apiFetch, type ChallengeDetail } from "@/lib/api";
-import { MentorChat } from "@/components/mentor-chat";
 import { Markdown } from "@/components/markdown";
-import { CodePreview } from "@/components/code-preview";
-import { ChallengeRunner } from "@/components/challenge-runner";
 import { CHALLENGE_CONFIG } from "@/lib/featured-files";
+import { ChallengeView } from "@/components/challenge-view";
 
 type Params = Promise<{ slug: string }>;
 
@@ -18,8 +16,6 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
   }
 
   const config = CHALLENGE_CONFIG[challenge.slug];
-  const branch = challenge.repo_branch ?? "main";
-  const repoUrl = challenge.repo_template_url ?? "";
 
   return (
     <div className="grid gap-8 py-8 lg:grid-cols-[3fr_2fr]">
@@ -48,23 +44,13 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
           </div>
         </section>
 
-        {config?.mode === "pyodide" && repoUrl ? (
-          <ChallengeRunner
-            challengeSlug={challenge.slug}
-            challengeId={challenge.id}
-            repoTemplateUrl={repoUrl}
-            branch={branch}
-            config={config}
-          />
-        ) : (
-          <CodePreview
-            repoTemplateUrl={challenge.repo_template_url}
-            branch={challenge.repo_branch}
-            paths={config?.mode === "reading" ? config.readonly : []}
-          />
-        )}
-
-        <MentorChat challengeId={challenge.id} />
+        <ChallengeView
+          challengeId={challenge.id}
+          challengeSlug={challenge.slug}
+          repoTemplateUrl={challenge.repo_template_url}
+          repoBranch={challenge.repo_branch}
+          config={config}
+        />
       </article>
 
       <aside className="space-y-4">
@@ -77,6 +63,7 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
                 Click <strong>Run tests</strong> — Python boots in your browser.
               </li>
               <li>Iterate until the tests pass.</li>
+              <li>Stuck? Click <strong>I&apos;m stuck — help</strong> in the result panel.</li>
               <li>Submit when green — your edits are saved as you go.</li>
             </ol>
           </div>
@@ -103,7 +90,6 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
             ))}
           </div>
         </div>
-
       </aside>
     </div>
   );

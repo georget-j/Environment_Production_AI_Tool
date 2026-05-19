@@ -29,12 +29,23 @@ EXPLAIN_SCHEMA: dict[str, Any] = {
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": ["test_name", "what_was_checked", "what_happened", "where_to_look"],
+                    "required": [
+                        "test_name",
+                        "what_was_checked",
+                        "what_happened",
+                        "where_to_look",
+                        "file",
+                        "line",
+                        "function",
+                    ],
                     "properties": {
                         "test_name": {"type": "string"},
                         "what_was_checked": {"type": "string"},
                         "what_happened": {"type": "string"},
                         "where_to_look": {"type": "string"},
+                        "file": {"type": ["string", "null"]},
+                        "line": {"type": ["integer", "null"]},
+                        "function": {"type": ["string", "null"]},
                     },
                 },
             }
