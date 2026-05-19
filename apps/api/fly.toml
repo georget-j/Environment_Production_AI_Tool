@@ -1,0 +1,31 @@
+app = "prodready-api"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+  OPENAI_MODEL_CHAT = "gpt-4o-mini"
+  OPENAI_MODEL_REVIEW = "gpt-4o"
+  CORS_ORIGINS = '["https://prodready-ai.vercel.app","http://localhost:3000"]'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
