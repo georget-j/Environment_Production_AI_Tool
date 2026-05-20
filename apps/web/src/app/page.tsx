@@ -9,8 +9,8 @@ export default function HomePage() {
           The missing bridge between coding tutorials and your first production engineering job.
         </h1>
         <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-          Complete realistic engineering tickets in real repos, get guided by an AI senior
-          engineer, pass automated checks, and graduate with portfolio-ready proof of work.
+          Edit realistic broken Python services in your browser, get guided by an AI senior
+          engineer, watch the tests turn green, and graduate with portfolio-ready proof of work.
         </p>
         <div className="flex items-center justify-center gap-3">
           <Link href="/login">
@@ -25,16 +25,16 @@ export default function HomePage() {
       </section>
 
       <section className="grid gap-6 md:grid-cols-3">
-        <Feature title="Real production workflow">
-          GitHub branches, pull requests, CI, Docker, pytest, migrations. Not toy exercises.
+        <Feature title="Realistic production code">
+          Broken FastAPI services, real pytest suites, in-browser execution. Not toy exercises.
         </Feature>
         <Feature title="AI senior engineer">
-          Socratic mentoring, structured PR reviews, and error explanations. The AI guides; tests
+          Socratic mentoring, structured code reviews, and error explanations. The AI guides; tests
           decide pass/fail.
         </Feature>
         <Feature title="Portfolio proof">
-          Every challenge produces a GitHub PR, a passing CI run, and an AI review you can show to
-          a hiring manager.
+          Every challenge ends with a green test suite and an AI code review you can show to a
+          hiring manager.
         </Feature>
       </section>
     </div>

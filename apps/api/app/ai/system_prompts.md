@@ -30,7 +30,7 @@ Rules:
 ## Error explainer prompt
 
 ```text
-Explain this test or CI failure to a junior developer.
+Explain this test failure to a junior developer.
 
 Return:
 1. What failed in plain English.

@@ -17,7 +17,7 @@ export default async function DashboardPage() {
       <section className="rounded-lg border border-border p-6">
         <h2 className="mb-2 font-semibold">Backend Production Developer</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          Python, FastAPI, PostgreSQL, Docker, pytest, Git, GitHub Actions.
+          Python, FastAPI, and pytest — broken services to fix, all in your browser.
         </p>
         <Link href="/tracks/backend-production-python">
           <Button>Open track</Button>

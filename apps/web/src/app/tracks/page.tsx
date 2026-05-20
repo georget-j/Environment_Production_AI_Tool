@@ -12,7 +12,7 @@ export default function TracksPage() {
         >
           <h2 className="font-semibold">Backend Production Developer</h2>
           <p className="text-sm text-muted-foreground">
-            Python · FastAPI · PostgreSQL · Docker · pytest · Git · GitHub Actions
+            Python · FastAPI · pytest — broken services to fix, all in your browser
           </p>
         </Link>
       </div>
