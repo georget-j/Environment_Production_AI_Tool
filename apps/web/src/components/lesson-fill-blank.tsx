@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { celebrate } from "@/lib/celebrate";
 import type { FillBlankLessonConfig } from "@/lib/featured-files";
 import { getPyodide, runPythonStdout } from "@/lib/pyodide";
-import { useResponsiveHeight } from "@/lib/use-responsive-height";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -45,7 +44,6 @@ function normalise(s: string): string {
 
 export function LessonFillBlank({ config, nextSlug }: Props) {
   const router = useRouter();
-  const editorHeight = useResponsiveHeight(180, 240);
   const [code, setCode] = useState(config.template);
   const [pyodideState, setPyodideState] = useState<PyodideState>({
     kind: "cold",
@@ -127,8 +125,8 @@ export function LessonFillBlank({ config, nextSlug }: Props) {
     pyodideState.kind !== "ready" || runState.kind === "running";
 
   return (
-    <section className="flex h-full flex-col gap-3 rounded-lg border border-border bg-background p-4">
-      <header className="flex items-center justify-between gap-2">
+    <section className="flex h-full min-h-0 flex-col gap-3 overflow-hidden rounded-lg border border-border bg-background p-4">
+      <header className="flex flex-none items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Replace the blanks</h3>
         <div className="flex items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={reset}>
@@ -144,9 +142,9 @@ export function LessonFillBlank({ config, nextSlug }: Props) {
         </div>
       </header>
 
-      <div className="overflow-hidden rounded-md border border-border">
+      <div className="min-h-[160px] flex-1 overflow-hidden rounded-md border border-border">
         <MonacoEditor
-          height={`${editorHeight}px`}
+          height="100%"
           defaultLanguage="python"
           theme="vs-dark"
           value={code}

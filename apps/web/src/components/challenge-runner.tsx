@@ -24,7 +24,6 @@ import {
 import type { ChallengeRunnerConfig, TestCase } from "@/lib/featured-files";
 import { Glossary } from "@/components/glossary";
 import { celebrate } from "@/lib/celebrate";
-import { useResponsiveHeight } from "@/lib/use-responsive-height";
 
 /** Imperative surface the parent (ChallengeView) calls into to drive the
  * editor — e.g. when the mentor chat says "look at app/orders.py:24" or when
@@ -191,8 +190,6 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     >({});
     const router = useRouter();
     const editorRef = useRef<MonacoEditorRef | null>(null);
-    // 280px on phones, 420px on tablet+; keeps editor from eating the viewport.
-    const editorHeight = useResponsiveHeight(280, 420);
     // Decoration ids returned by Monaco; we keep them to clear on next change.
     const decorationIdsRef = useRef<string[]>([]);
 
@@ -541,21 +538,21 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
         : 0;
 
     return (
-      <section className="space-y-4">
+      <section className="flex h-full min-h-0 flex-col gap-3">
         {pyodideState.kind === "warming" && (
-          <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          <div className="flex-none rounded-md border border-border bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground">
             Loading the Python runtime (~10 MB, one-time). You can start editing
             — Run will be ready shortly.
           </div>
         )}
         {pyodideState.kind === "error" && (
-          <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="flex-none rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
             Couldn&apos;t load Python: {pyodideState.message}
           </div>
         )}
 
-        <section className="space-y-3">
-          <header className="flex flex-wrap items-center justify-between gap-2">
+        <section className="flex min-h-0 flex-[3] flex-col gap-2">
+          <header className="flex flex-none flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <h2 className="text-sm font-semibold">Workspace</h2>
               <p className="text-xs text-muted-foreground">
@@ -595,7 +592,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
             </p>
           )}
 
-          <div className="flex flex-wrap gap-1 overflow-x-auto border-b border-border">
+          <div className="flex flex-none flex-wrap gap-1 overflow-x-auto border-b border-border">
             {allPaths.map((p) => {
               const isEditable = config.editable.includes(p);
               return (
@@ -618,10 +615,10 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
             })}
           </div>
 
-          <div className="overflow-hidden rounded-md border border-border">
+          <div className="min-h-[180px] flex-1 overflow-hidden rounded-md border border-border">
             <MonacoEditor
               key={activeTab}
-              height={`${editorHeight}px`}
+              height="100%"
               language={languageFromPath(activeTab)}
               value={files[activeTab] ?? ""}
               onChange={editable ? handleEdit : undefined}
@@ -663,7 +660,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
         {runState.kind === "done" && (
           <section
             className={cn(
-              "space-y-3 rounded-md border p-3",
+              "flex-none space-y-2 rounded-md border p-3",
               passed
                 ? "border-green-300 bg-green-50"
                 : "border-red-300 bg-red-50",
@@ -728,11 +725,8 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
           </section>
         )}
 
-        <details
-          className="overflow-hidden rounded-md border border-border"
-          open={failureCount > 0}
-        >
-          <summary className="flex cursor-pointer items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-sm font-semibold hover:bg-muted/50">
+        <section className="flex min-h-0 flex-[2] flex-col overflow-hidden rounded-md border border-border">
+          <header className="flex flex-none items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-sm font-semibold">
             <span>
               Tests ({config.tests.length})
               {runState.kind === "done" && (
@@ -751,8 +745,8 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
                 Mentor is explaining failures…
               </span>
             )}
-          </summary>
-          <ul className="divide-y divide-border">
+          </header>
+          <ul className="flex-1 divide-y divide-border overflow-y-auto">
             {testRows.map((t) => {
               const ex = findExplanation(t);
               const showFailureBox =
@@ -835,7 +829,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
               );
             })}
           </ul>
-        </details>
+        </section>
       </section>
     );
   },

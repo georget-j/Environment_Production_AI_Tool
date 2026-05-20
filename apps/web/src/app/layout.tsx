@@ -29,7 +29,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen antialiased">
         <SiteNav />
-        <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
+        {/* No py-* here — each page owns its own vertical padding so the
+         * lesson workspace can claim the full viewport height below the
+         * nav. Non-lesson pages add their own py-8 / py-10. */}
+        <main className="mx-auto max-w-6xl px-6">{children}</main>
       </body>
     </html>
   );

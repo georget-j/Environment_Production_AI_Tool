@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChallengeRunner,
   type ChallengeRunnerHandle,
@@ -55,6 +55,23 @@ export function ChallengeView({
   const [showAnswerPending, setShowAnswerPending] = useState(false);
   const [showAnswerError, setShowAnswerError] =
     useState<ShowAnswerError | null>(null);
+  const [mentorOverlayOpen, setMentorOverlayOpen] = useState(false);
+
+  // Lock body scroll + Escape-to-close while the mobile mentor overlay
+  // is open. No-ops on lg+ because the overlay is hidden by CSS there.
+  useEffect(() => {
+    if (!mentorOverlayOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMentorOverlayOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [mentorOverlayOpen]);
 
   const handleStuck = useCallback((message: string) => {
     void mentorRef.current?.askMentor(message, 2);
@@ -181,36 +198,60 @@ export function ChallengeView({
       );
   }
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]">
-      <section className="min-w-0">{runner}</section>
+  const mentorOnShowAnswer =
+    config?.mode === "pyodide" ? () => setShowAnswerOpen(true) : undefined;
 
-      <aside className="min-w-0 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:self-start">
-        <MentorChat
-          ref={mentorRef}
-          challengeId={challengeId}
-          onJumpToCode={handleJumpToCode}
-          onShowAnswer={
-            config?.mode === "pyodide"
-              ? () => setShowAnswerOpen(true)
-              : undefined
-          }
-          showAnswerPending={showAnswerPending}
-        />
+  return (
+    <div className="grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]">
+      <section className="min-h-0 min-w-0 overflow-hidden">{runner}</section>
+
+      {/* Mentor: lives in the grid's right column on lg+. On smaller
+       * screens the grid is single-column (workspace only) and the
+       * mentor is rendered as a full-screen overlay when the floating
+       * "Ask the mentor" button is tapped. Same MentorChat instance —
+       * only the wrapper's position class changes. */}
+      <aside
+        className={
+          mentorOverlayOpen
+            ? "fixed inset-0 z-50 flex min-h-0 min-w-0 flex-col bg-background lg:relative lg:inset-auto lg:z-auto lg:bg-transparent"
+            : "hidden min-h-0 min-w-0 lg:flex lg:flex-col"
+        }
+      >
+        {mentorOverlayOpen && (
+          <div className="flex items-center justify-between border-b border-border bg-background px-4 py-2 lg:hidden">
+            <p className="text-sm font-semibold">AI mentor</p>
+            <button
+              type="button"
+              onClick={() => setMentorOverlayOpen(false)}
+              className="rounded-md px-2 py-1 text-sm hover:bg-muted"
+              aria-label="Close mentor"
+            >
+              ✕ Close
+            </button>
+          </div>
+        )}
+        <div className="min-h-0 flex-1">
+          <MentorChat
+            ref={mentorRef}
+            challengeId={challengeId}
+            onJumpToCode={handleJumpToCode}
+            onShowAnswer={mentorOnShowAnswer}
+            showAnswerPending={showAnswerPending}
+          />
+        </div>
       </aside>
 
-      {/* Mobile-only: floating "Ask the mentor" jump button. The mentor
-       * panel lives below the runner on small screens; this gives a
-       * one-tap shortcut so the learner doesn't have to scroll past the
-       * entire editor to reach it. Hidden on lg+ where the mentor is
-       * already pinned in the sidebar. */}
-      <button
-        type="button"
-        onClick={() => mentorRef.current?.scrollIntoView()}
-        className="fixed bottom-4 right-4 z-40 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg hover:bg-primary/90 lg:hidden"
-      >
-        Ask the mentor ↓
-      </button>
+      {/* Mobile-only floating button: opens the mentor as a full-screen
+       * overlay. Hidden on lg+ where the mentor is already in view. */}
+      {!mentorOverlayOpen && (
+        <button
+          type="button"
+          onClick={() => setMentorOverlayOpen(true)}
+          className="fixed bottom-4 right-4 z-40 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg hover:bg-primary/90 lg:hidden"
+        >
+          Ask the mentor
+        </button>
+      )}
 
       <ShowAnswerModal
         open={showAnswerOpen}
