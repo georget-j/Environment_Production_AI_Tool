@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from openai import OpenAI
 
-from app.ai.prompts import get_prompt, get_prompt_sha
+from app.ai.prompts import get_prompt_sha, get_prompt_with_guardrail
 from app.config import get_settings
 
 _HINT_INSTRUCTIONS = {
@@ -46,7 +46,7 @@ def build_messages(
     context: ChallengeContext, history: list[dict[str, str]], user_message: str, hint_level: int
 ) -> list[dict[str, str]]:
     level = max(1, min(3, hint_level))
-    system_prompt = get_prompt("socratic-hint-prompt")
+    system_prompt = get_prompt_with_guardrail("socratic-hint-prompt")
     context_block = (
         f"Challenge: {context.title}\n"
         f"Scenario: {context.scenario}\n"

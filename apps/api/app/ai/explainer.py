@@ -14,7 +14,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from app.ai.prompts import get_prompt, get_prompt_sha
+from app.ai.prompts import get_prompt_sha, get_prompt_with_guardrail
 from app.config import get_settings
 
 EXPLAIN_SCHEMA: dict[str, Any] = {
@@ -69,7 +69,7 @@ def explain(payload: ExplainInput) -> tuple[dict, dict]:
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
 
-    system_prompt = get_prompt("test-failure-explainer-prompt")
+    system_prompt = get_prompt_with_guardrail("test-failure-explainer-prompt")
 
     # Cap each file at 4000 chars so we don't blow the context window.
     file_block = "\n\n".join(

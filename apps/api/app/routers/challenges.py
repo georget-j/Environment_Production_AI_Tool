@@ -8,7 +8,7 @@ from app.access import ensure_can_access
 from app.auth import AuthUser, get_current_user
 from app.db import get_db
 from app.models import Challenge, Module, UserChallengeProgress
-from app.schemas import ChallengeDetail, ModuleOut, ProgressOut
+from app.schemas import ChallengeDetail, ChallengeNavRef, ModuleOut, ProgressOut
 
 router = APIRouter(prefix="/api/challenges", tags=["challenges"])
 
@@ -21,6 +21,32 @@ def get_challenge(slug: str, db: Session = Depends(get_db)) -> ChallengeDetail:
     module = db.get(Module, challenge.module_id)
     if module is None:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Challenge has no module")
+
+    # Sibling challenges across the whole track, ordered first by module
+    # position then by challenge position. Used for prev/next nav + "Lesson N
+    # of M" display in the UI.
+    siblings = (
+        db.execute(
+            select(Challenge.slug, Challenge.title, Challenge.id)
+            .join(Module, Challenge.module_id == Module.id)
+            .where(Module.track_id == module.track_id)
+            .order_by(Module.order_index, Challenge.order_index)
+        )
+        .all()
+    )
+    total = len(siblings)
+    position = 1
+    previous_ref: ChallengeNavRef | None = None
+    next_ref: ChallengeNavRef | None = None
+    for i, row in enumerate(siblings):
+        if row.id == challenge.id:
+            position = i + 1
+            if i > 0:
+                previous_ref = ChallengeNavRef(slug=siblings[i - 1].slug, title=siblings[i - 1].title)
+            if i < total - 1:
+                next_ref = ChallengeNavRef(slug=siblings[i + 1].slug, title=siblings[i + 1].title)
+            break
+
     return ChallengeDetail(
         id=challenge.id,
         slug=challenge.slug,
@@ -36,6 +62,10 @@ def get_challenge(slug: str, db: Session = Depends(get_db)) -> ChallengeDetail:
         validation_config_json=challenge.validation_config_json,
         ai_rules_json=challenge.ai_rules_json,
         module=ModuleOut.model_validate(module),
+        previous=previous_ref,
+        next=next_ref,
+        position_in_track=position,
+        total_in_track=max(total, 1),
     )
 
 

@@ -3,6 +3,7 @@ import { apiFetch, type ChallengeDetail } from "@/lib/api";
 import { Markdown } from "@/components/markdown";
 import { CHALLENGE_CONFIG } from "@/lib/featured-files";
 import { ChallengeView } from "@/components/challenge-view";
+import { LessonNav } from "@/components/lesson-nav";
 
 type Params = Promise<{ slug: string }>;
 
@@ -19,6 +20,13 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
 
   return (
     <div className="space-y-8 py-6">
+      <LessonNav
+        previous={challenge.previous}
+        next={challenge.next}
+        position={challenge.position_in_track}
+        total={challenge.total_in_track}
+      />
+
       {/* Hero: full-width title + scenario + goal */}
       <header className="space-y-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

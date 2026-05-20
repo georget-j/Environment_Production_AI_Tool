@@ -14,7 +14,10 @@ from functools import lru_cache
 from pathlib import Path
 
 _PROMPTS_FILE = Path(__file__).resolve().parent / "system_prompts.md"
-_SECTION_RE = re.compile(r"^##\s+(.+?)\s*$\n+```text?\n(.*?)```", re.MULTILINE | re.DOTALL)
+# Heading must fit on one line (`[^\n]+?`) so we never glom a body-less
+# section into the next section's slug; body uses DOTALL so it can span
+# multiple lines until the closing fence.
+_SECTION_RE = re.compile(r"^##\s+([^\n]+?)\s*$\n+```text?\n(.*?)```", re.MULTILINE | re.DOTALL)
 
 
 @lru_cache(maxsize=1)
@@ -54,6 +57,19 @@ def get_prompt(slug: str) -> str:
     if slug not in sections:
         raise KeyError(f"Unknown prompt section: {slug!r}. Available: {sorted(sections)}")
     return sections[slug]
+
+
+def get_prompt_with_guardrail(slug: str) -> str:
+    """Prepend the runtime guardrail to a learner-facing prompt.
+
+    Use for the mentor, explainer, and show-answer prompts — anywhere we
+    want the AI to obey the in-browser-sandbox constraints. The PR reviewer
+    prompt uses get_prompt() directly because production-deployment talk is
+    legitimate in that context.
+    """
+    guardrail = get_prompt("runtime-guardrail")
+    body = get_prompt(slug)
+    return f"{guardrail}\n\n{body}"
 
 
 def get_prompt_sha() -> str:

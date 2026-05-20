@@ -6,6 +6,8 @@ import {
   type ChallengeRunnerHandle,
 } from "@/components/challenge-runner";
 import { CodePreview } from "@/components/code-preview";
+import { LessonFillBlank } from "@/components/lesson-fill-blank";
+import { LessonPredict } from "@/components/lesson-predict";
 import { MentorChat, type MentorChatHandle } from "@/components/mentor-chat";
 import { OnboardingTour } from "@/components/onboarding-tour";
 import { ShowAnswerModal } from "@/components/show-answer-modal";
@@ -131,25 +133,42 @@ export function ChallengeView({
     }
   }, [challengeId, config]);
 
-  const runner =
-    config?.mode === "pyodide" && repoTemplateUrl ? (
-      <ChallengeRunner
-        ref={runnerRef}
-        challengeSlug={challengeSlug}
-        challengeId={challengeId}
-        repoTemplateUrl={repoTemplateUrl}
-        branch={repoBranch ?? "main"}
-        config={config}
-        onStuck={handleStuck}
-        onFilesChange={handleFilesChange}
-      />
-    ) : (
-      <CodePreview
-        repoTemplateUrl={repoTemplateUrl}
-        branch={repoBranch}
-        paths={config?.mode === "reading" ? config.readonly : []}
-      />
-    );
+  let runner: React.ReactNode;
+  switch (config?.mode) {
+    case "pyodide":
+      runner = repoTemplateUrl ? (
+        <ChallengeRunner
+          ref={runnerRef}
+          challengeSlug={challengeSlug}
+          challengeId={challengeId}
+          repoTemplateUrl={repoTemplateUrl}
+          branch={repoBranch ?? "main"}
+          config={config}
+          onStuck={handleStuck}
+          onFilesChange={handleFilesChange}
+        />
+      ) : (
+        <p className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          This challenge is missing a template URL — please contact support.
+        </p>
+      );
+      break;
+    case "predict":
+      runner = <LessonPredict config={config} />;
+      break;
+    case "fillblank":
+      runner = <LessonFillBlank config={config} />;
+      break;
+    case "reading":
+    default:
+      runner = (
+        <CodePreview
+          repoTemplateUrl={repoTemplateUrl}
+          branch={repoBranch}
+          paths={config?.mode === "reading" ? config.readonly : []}
+        />
+      );
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]">

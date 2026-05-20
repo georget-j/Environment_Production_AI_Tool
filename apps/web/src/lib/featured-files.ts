@@ -26,6 +26,35 @@ export type TestCase = {
   description: string;
 };
 
+/**
+ * Python Basics 'predict' lesson: show code, learner types what they
+ * expect stdout to be, JS compares. No Pyodide execution.
+ */
+export type PredictLessonConfig = {
+  mode: "predict";
+  /** The Python snippet shown read-only to the learner. */
+  code: string;
+  /** Exact stdout the snippet would print (whitespace-trimmed compare). */
+  expected_stdout: string;
+  /** Short hint shown above the input box (e.g. "Type the number you expect"). */
+  prompt?: string;
+};
+
+/**
+ * Python Basics 'fillblank' lesson: Monaco editor with `___` placeholders.
+ * Learner replaces the blanks, clicks Run, Pyodide executes the file,
+ * stdout is compared to `expected_stdout`.
+ */
+export type FillBlankLessonConfig = {
+  mode: "fillblank";
+  /** Initial editor content. Use `___` (triple underscore) where the learner edits. */
+  template: string;
+  /** Exact stdout the finished code should print (whitespace-trimmed compare). */
+  expected_stdout: string;
+  /** One-line hint shown under the editor. */
+  hint?: string;
+};
+
 export type ChallengeRunnerConfig =
   | {
       mode: "pyodide";
@@ -36,9 +65,15 @@ export type ChallengeRunnerConfig =
   | {
       mode: "reading";
       readonly: string[];
-    };
+    }
+  | PredictLessonConfig
+  | FillBlankLessonConfig;
+
+import { PYTHON_BASICS_CONFIG } from "@/lib/python-basics-config.generated";
 
 export const CHALLENGE_CONFIG: Record<string, ChallengeRunnerConfig> = {
+  ...PYTHON_BASICS_CONFIG,
+
   "fastapi-commerce-run-and-explore": {
     mode: "reading",
     readonly: ["app/main.py", "app/orders.py", "tests/test_orders.py"],

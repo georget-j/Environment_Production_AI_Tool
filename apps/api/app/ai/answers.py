@@ -15,7 +15,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from app.ai.prompts import get_prompt, get_prompt_sha
+from app.ai.prompts import get_prompt_sha, get_prompt_with_guardrail
 from app.config import get_settings
 
 ANSWER_SCHEMA: dict[str, Any] = {
@@ -60,7 +60,7 @@ def answer(payload: AnswerInput) -> tuple[dict, dict]:
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
 
-    system_prompt = get_prompt("show-answer-prompt")
+    system_prompt = get_prompt_with_guardrail("show-answer-prompt")
 
     def _section(name: str, files: dict[str, str], cap: int) -> str:
         if not files:

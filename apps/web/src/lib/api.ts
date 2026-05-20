@@ -57,6 +57,12 @@ export type ChallengeSummary = {
   order_index: number;
   is_free: boolean;
   skills: string[];
+  module_id: string;
+};
+
+export type ChallengeNavRef = {
+  slug: string;
+  title: string;
 };
 
 export type ChallengeDetail = ChallengeSummary & {
@@ -68,6 +74,10 @@ export type ChallengeDetail = ChallengeSummary & {
   validation_config_json: Record<string, unknown>;
   ai_rules_json: Record<string, unknown>;
   module: ModuleOut;
+  previous: ChallengeNavRef | null;
+  next: ChallengeNavRef | null;
+  position_in_track: number;
+  total_in_track: number;
 };
 
 export type TrackDetail = TrackOut & {

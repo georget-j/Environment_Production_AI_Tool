@@ -34,6 +34,12 @@ class ChallengeSummary(_Base):
     order_index: int
     is_free: bool
     skills: list[str]
+    module_id: UUID
+
+
+class ChallengeNavRef(_Base):
+    slug: str
+    title: str
 
 
 class ChallengeDetail(ChallengeSummary):
@@ -45,6 +51,10 @@ class ChallengeDetail(ChallengeSummary):
     validation_config_json: dict
     ai_rules_json: dict
     module: ModuleOut
+    previous: ChallengeNavRef | None = None
+    next: ChallengeNavRef | None = None
+    position_in_track: int = 1
+    total_in_track: int = 1
 
 
 class TrackDetail(TrackOut):

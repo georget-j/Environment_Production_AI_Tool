@@ -178,6 +178,28 @@ function parseVerboseOutput(text: string): {
   return { tests, summary, failureLocations };
 }
 
+/**
+ * Run a Python string and return what it printed to stdout.
+ * No pytest, no test discovery, no file system writes — used by the
+ * Python Basics `predict` and `fillblank` lesson modes.
+ */
+export async function runPythonStdout(
+  pyodide: PyodideInterface,
+  code: string,
+): Promise<{ stdout: string; error: string | null }> {
+  const lines: string[] = [];
+  const errLines: string[] = [];
+  pyodide.setStdout({ batched: (s) => lines.push(s) });
+  pyodide.setStderr({ batched: (s) => errLines.push(s) });
+  try {
+    await pyodide.runPythonAsync(code);
+    return { stdout: lines.join("\n"), error: errLines.join("\n") || null };
+  } catch (exc) {
+    const message = exc instanceof Error ? exc.message : String(exc);
+    return { stdout: lines.join("\n"), error: message };
+  }
+}
+
 export async function runPytest(
   pyodide: PyodideInterface,
   pytestArgs: string[],
