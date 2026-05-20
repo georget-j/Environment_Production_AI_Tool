@@ -23,6 +23,9 @@ class ChatRequest(BaseModel):
     challenge_id: UUID
     message: str = Field(..., min_length=1, max_length=4000)
     hint_level: int = Field(1, ge=1, le=3)
+    # Snapshot of the learner's current editor contents. Sent on every
+    # chat call so the mentor never has to ask the learner to paste code.
+    current_files: dict[str, str] = Field(default_factory=dict)
 
 
 class ChatTurnOut(BaseModel):
@@ -76,12 +79,20 @@ def chat_endpoint(
         .limit(1)
     )
 
+    # Defensive: cap each file to 6000 chars before handing to the prompt
+    # builder (which also caps per-file to 4000).
+    capped_files = {
+        path: (body.current_files.get(path) or "")[:6000]
+        for path in body.current_files
+    }
+
     context = ChallengeContext(
         title=challenge.title,
         scenario=challenge.scenario,
         learner_goal=challenge.learner_goal,
         latest_test_output=latest_submission.test_output if latest_submission else None,
         attempts_count=progress.attempts_count if progress else 0,
+        current_files=capped_files or None,
     )
 
     history = _load_history(db, user.id, challenge.id)

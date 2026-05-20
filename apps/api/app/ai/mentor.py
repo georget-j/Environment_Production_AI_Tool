@@ -40,6 +40,24 @@ class ChallengeContext:
     learner_goal: str
     latest_test_output: str | None
     attempts_count: int
+    # Snapshot of the learner's CURRENT editor contents, keyed by path. Sent
+    # by the web client on every chat call so the mentor doesn't have to ask
+    # the learner to paste their code.
+    current_files: dict[str, str] | None = None
+
+
+# Per-file content cap so a noisy lesson can't blow up the prompt.
+_FILE_BYTE_CAP = 4000
+
+
+def _render_current_files(files: dict[str, str] | None) -> str:
+    if not files:
+        return "(the learner's editor is empty or this lesson has no editable files)"
+    parts: list[str] = []
+    for path, body in files.items():
+        snippet = (body or "")[:_FILE_BYTE_CAP]
+        parts.append(f"--- {path} ---\n{snippet}")
+    return "\n\n".join(parts)
 
 
 def build_messages(
@@ -51,10 +69,14 @@ def build_messages(
         f"Challenge: {context.title}\n"
         f"Scenario: {context.scenario}\n"
         f"Goal: {context.learner_goal}\n"
-        f"Attempt count: {context.attempts_count}\n"
+        f"Attempt count: {context.attempts_count}\n\n"
+        f"Learner's current editor contents:\n"
+        f"{_render_current_files(context.current_files)}\n\n"
         f"Latest test output (last 2000 chars):\n"
         f"{(context.latest_test_output or '(none yet)')[-2000:]}\n\n"
-        f"{_HINT_INSTRUCTIONS[level]}"
+        f"{_HINT_INSTRUCTIONS[level]}\n"
+        f"Important: you ALREADY have the learner's current code above. "
+        f"Never ask them to paste or share their code — refer to it directly."
     )
     messages: list[dict[str, str]] = [
         {"role": "system", "content": system_prompt},

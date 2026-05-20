@@ -73,6 +73,13 @@ export function ChallengeView({
     };
   }, [mentorOverlayOpen]);
 
+  // Snapshot of the learner's current editor contents. For pyodide mode
+  // it's the filesRef (kept fresh by ChallengeRunner's onFilesChange). For
+  // fillblank mode the runner stores the single editable as
+  // `solution.py` via its onCodeChange callback. The MentorChat ships this
+  // map with every chat request so the mentor never has to ask for code.
+  const getFilesSnapshot = useCallback(() => ({ ...filesRef.current }), []);
+
   const handleStuck = useCallback((message: string) => {
     void mentorRef.current?.askMentor(message, 2);
   }, []);
@@ -185,7 +192,17 @@ export function ChallengeView({
       runner = <LessonPredict config={config} nextSlug={nextSlug} />;
       break;
     case "fillblank":
-      runner = <LessonFillBlank config={config} nextSlug={nextSlug} />;
+      runner = (
+        <LessonFillBlank
+          config={config}
+          nextSlug={nextSlug}
+          onCodeChange={(code) => {
+            // Mirror the single editable into filesRef so MentorChat picks
+            // it up via getFilesSnapshot.
+            filesRef.current = { "solution.py": code };
+          }}
+        />
+      );
       break;
     case "reading":
     default:
@@ -237,6 +254,7 @@ export function ChallengeView({
             onJumpToCode={handleJumpToCode}
             onShowAnswer={mentorOnShowAnswer}
             showAnswerPending={showAnswerPending}
+            getFilesSnapshot={getFilesSnapshot}
           />
         </div>
       </aside>

@@ -20,6 +20,9 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 type Props = {
   config: FillBlankLessonConfig;
   nextSlug: string | null;
+  /** Notified whenever the learner edits the snippet. ChallengeView uses
+   * this to keep the snapshot it ships to the mentor in sync. */
+  onCodeChange?: (code: string) => void;
 };
 
 const AUTO_ADVANCE_MS = 1500;
@@ -40,9 +43,15 @@ function normalise(s: string): string {
   return s.replace(/\s+$/g, "").trimStart();
 }
 
-export function LessonFillBlank({ config, nextSlug }: Props) {
+export function LessonFillBlank({ config, nextSlug, onCodeChange }: Props) {
   const router = useRouter();
   const [code, setCode] = useState(config.template);
+
+  // Push the initial template + every edit up to the parent so the mentor
+  // snapshot stays current.
+  useEffect(() => {
+    onCodeChange?.(code);
+  }, [code, onCodeChange]);
   const [pyodideState, setPyodideState] = useState<PyodideState>({
     kind: "cold",
   });

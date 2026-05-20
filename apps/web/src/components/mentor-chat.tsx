@@ -40,11 +40,21 @@ type Props = {
   onShowAnswer?: () => void;
   /** True while the parent is in the middle of a show-answer call. */
   showAnswerPending?: boolean;
+  /** Returns the learner's current editor contents (path → body). The
+   * mentor ships this with every chat request so it never has to ask the
+   * learner to paste their code. Empty map for read-only lessons. */
+  getFilesSnapshot?: () => Record<string, string>;
 };
 
 export const MentorChat = forwardRef<MentorChatHandle, Props>(
   function MentorChat(
-    { challengeId, onJumpToCode, onShowAnswer, showAnswerPending = false },
+    {
+      challengeId,
+      onJumpToCode,
+      onShowAnswer,
+      showAnswerPending = false,
+      getFilesSnapshot,
+    },
     ref,
   ) {
     const [turns, setTurns] = useState<Turn[]>([]);
@@ -95,6 +105,7 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(
           challenge_id: challengeId,
           message: text,
           hint_level: level,
+          current_files: getFilesSnapshot ? getFilesSnapshot() : {},
         }),
       });
       setPending(false);
