@@ -168,13 +168,23 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(function MentorCha
     setTurns([]);
   }
 
-  // Split: most recent user→assistant pair is the primary view; older
-  // turns collapse into a disclosure.
-  const assistantTurns = turns.filter((t) => t.role === "assistant");
-  const latestAssistant = assistantTurns[assistantTurns.length - 1];
-  const userTurns = turns.filter((t) => t.role === "user");
-  const latestUser = userTurns[userTurns.length - 1];
-  const historyTurns = turns.filter((t) => t !== latestAssistant && t !== latestUser);
+  // One backwards pass: pick the most recent assistant + user turn (those
+  // become the primary view) and bucket everything else as history.
+  let latestAssistant: Turn | undefined;
+  let latestUser: Turn | undefined;
+  const historyTurns: Turn[] = [];
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const t = turns[i];
+    if (!latestAssistant && t.role === "assistant") {
+      latestAssistant = t;
+      continue;
+    }
+    if (!latestUser && t.role === "user") {
+      latestUser = t;
+      continue;
+    }
+    historyTurns.unshift(t);
+  }
 
   return (
     <section

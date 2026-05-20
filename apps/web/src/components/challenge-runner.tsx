@@ -58,7 +58,6 @@ type Props = {
   repoTemplateUrl: string;
   branch: string;
   config: Extract<ChallengeRunnerConfig, { mode: "pyodide" }>;
-  onTestsPassed?: () => void;
   /** Called when the learner clicks 'Stuck?'. Receives a pre-baked
    * message the parent can forward to the mentor chat. */
   onStuck?: (message: string) => void;
@@ -148,7 +147,6 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
     repoTemplateUrl,
     branch,
     config,
-    onTestsPassed,
     onStuck,
     onFilesChange,
   },
@@ -165,7 +163,6 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
   const [explainState, setExplainState] = useState<ExplainState>({ kind: "idle" });
   const [failureLocations, setFailureLocations] = useState<Record<string, number[]>>({});
-  const passedNotified = useRef(false);
   const router = useRouter();
   const editorRef = useRef<MonacoEditorRef | null>(null);
   // Decoration ids returned by Monaco; we keep them to clear on next change.
@@ -192,7 +189,6 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
     };
   }, []);
 
-  // Load all files (editable get hydrated from localStorage on top of canonical).
   useEffect(() => {
     if (!meta) {
       setLoadError("Invalid repo URL");
@@ -200,22 +196,19 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
     }
     let cancelled = false;
     (async () => {
-      const next: Record<string, string> = {};
-      for (const path of allPaths) {
-        const url = `${RAW_BASE}/${meta.owner}/${meta.repo}/${branch}/${path}`;
-        try {
-          const res = await fetch(url, { cache: "no-cache" });
-          if (!res.ok) {
-            next[path] = "";
-            continue;
+      const entries = await Promise.all(
+        allPaths.map(async (path) => {
+          const url = `${RAW_BASE}/${meta.owner}/${meta.repo}/${branch}/${path}`;
+          try {
+            const res = await fetch(url, { cache: "no-cache" });
+            return [path, res.ok ? await res.text() : ""] as const;
+          } catch {
+            return [path, ""] as const;
           }
-          next[path] = await res.text();
-        } catch {
-          next[path] = "";
-        }
-      }
+        }),
+      );
       if (cancelled) return;
-
+      const next: Record<string, string> = Object.fromEntries(entries);
       for (const path of config.editable) {
         const saved =
           typeof window !== "undefined"
@@ -248,14 +241,19 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
     if (!meta) return;
     if (!confirm("Reset your edits to the original code? This can't be undone.")) return;
     const next = { ...files };
-    for (const path of config.editable) {
-      const url = `${RAW_BASE}/${meta.owner}/${meta.repo}/${branch}/${path}`;
-      try {
-        const res = await fetch(url, { cache: "no-cache" });
-        if (res.ok) next[path] = await res.text();
-      } catch {
-        /* ignore */
-      }
+    const fresh = await Promise.all(
+      config.editable.map(async (path) => {
+        const url = `${RAW_BASE}/${meta.owner}/${meta.repo}/${branch}/${path}`;
+        try {
+          const res = await fetch(url, { cache: "no-cache" });
+          return [path, res.ok ? await res.text() : null] as const;
+        } catch {
+          return [path, null] as const;
+        }
+      }),
+    );
+    for (const [path, body] of fresh) {
+      if (body !== null) next[path] = body;
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(storageKey(challengeSlug, path));
       }
@@ -321,10 +319,6 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
       );
       setRunState({ kind: "done", result });
       setFailureLocations(result.failureLocations);
-      if (result.exitCode === 0 && !passedNotified.current) {
-        passedNotified.current = true;
-        onTestsPassed?.();
-      }
       // If any test failed, kick off the AI explanation in the background.
       const hasFailure = result.tests.some(
         (t) => t.status === "failed" || t.status === "error",
@@ -344,7 +338,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
         },
       });
     }
-  }, [files, config.tests, onTestsPassed, explainFailures]);
+  }, [files, config.tests, explainFailures]);
 
   /** Open `path` (if among the loaded files) and scroll Monaco to `line`,
    * adding a transient yellow highlight. Used by 'Jump to code →' buttons
@@ -495,13 +489,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground">
-        Edit the unlocked files. Click <strong>Run tests</strong> to execute{" "}
-        <Glossary term="pytest" /> in your browser. The mentor on the right can help if you get
-        stuck.
-      </p>
-
-      <section data-onboarding="workspace" className="space-y-3">
+      <section className="space-y-3">
         <header className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold">Workspace</h2>
@@ -521,7 +509,6 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
             </Button>
             <Button
               size="sm"
-              data-onboarding="run-button"
               onClick={handleRun}
               disabled={runState.kind === "running" || pyodideState.kind === "warming"}
             >
@@ -575,10 +562,11 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
             }}
             theme="vs-light"
             onMount={(editor) => {
-              editorRef.current = editor as unknown as MonacoEditorRef;
+              const ed = editor as unknown as MonacoEditorRef;
+              editorRef.current = ed;
               const linesForTab = failureLocations[activeTab] ?? [];
               if (linesForTab.length > 0) {
-                decorationIdsRef.current = (editor as unknown as MonacoEditorRef).deltaDecorations(
+                decorationIdsRef.current = ed.deltaDecorations(
                   [],
                   linesForTab.map((ln) => ({
                     range: { startLineNumber: ln, startColumn: 1, endLineNumber: ln, endColumn: 1 },
@@ -654,7 +642,6 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(function
       )}
 
       <details
-        data-onboarding="tests-panel"
         className="overflow-hidden rounded-md border border-border"
         open={failureCount > 0}
       >

@@ -9,9 +9,12 @@ import { CodePreview } from "@/components/code-preview";
 import { MentorChat, type MentorChatHandle } from "@/components/mentor-chat";
 import { OnboardingTour } from "@/components/onboarding-tour";
 import { ShowAnswerModal } from "@/components/show-answer-modal";
+import { createClient } from "@/lib/supabase/client";
 import type { ChallengeRunnerConfig } from "@/lib/featured-files";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+type ShowAnswerError = { kind: "auth" | "loading" | "no-editable" | "api"; message: string };
 
 type Props = {
   challengeId: string;
@@ -41,6 +44,7 @@ export function ChallengeView({
   const filesRef = useRef<Record<string, string>>({});
   const [showAnswerOpen, setShowAnswerOpen] = useState(false);
   const [showAnswerPending, setShowAnswerPending] = useState(false);
+  const [showAnswerError, setShowAnswerError] = useState<ShowAnswerError | null>(null);
 
   const handleStuck = useCallback((message: string) => {
     void mentorRef.current?.askMentor(message, 2);
@@ -57,22 +61,22 @@ export function ChallengeView({
   const handleShowAnswerConfirm = useCallback(async () => {
     if (config?.mode !== "pyodide") return;
     setShowAnswerPending(true);
+    setShowAnswerError(null);
     try {
-      const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        alert("Please sign in first.");
+        setShowAnswerError({ kind: "auth", message: "Sign in to use Show me the answer." });
         return;
       }
       const allFiles = filesRef.current;
-      // Guard: if files haven't loaded yet, refuse rather than POST {}
-      // (the model would otherwise produce a hallucination of "the answer"
-      //  with no context).
       if (Object.keys(allFiles).length === 0) {
-        alert("Files are still loading — try again in a moment.");
+        setShowAnswerError({
+          kind: "loading",
+          message: "Files are still loading — try again in a moment.",
+        });
         return;
       }
       const editable: Record<string, string> = {};
@@ -82,7 +86,10 @@ export function ChallengeView({
         else readonly[path] = body;
       }
       if (Object.keys(editable).length === 0) {
-        alert("This challenge has no editable files.");
+        setShowAnswerError({
+          kind: "no-editable",
+          message: "This challenge has no editable files.",
+        });
         return;
       }
       const response = await fetch(`${API_BASE_URL}/api/ai/show-answer`, {
@@ -100,7 +107,10 @@ export function ChallengeView({
       });
       if (!response.ok) {
         const body = await response.text();
-        alert(`Show-answer failed (${response.status}): ${body.slice(0, 200)}`);
+        setShowAnswerError({
+          kind: "api",
+          message: `Show-answer failed (${response.status}): ${body.slice(0, 200)}`,
+        });
         return;
       }
       const data = (await response.json()) as {
@@ -158,7 +168,11 @@ export function ChallengeView({
       <ShowAnswerModal
         open={showAnswerOpen}
         pending={showAnswerPending}
-        onCancel={() => setShowAnswerOpen(false)}
+        errorMessage={showAnswerError?.message ?? null}
+        onCancel={() => {
+          setShowAnswerOpen(false);
+          setShowAnswerError(null);
+        }}
         onConfirm={handleShowAnswerConfirm}
       />
 
