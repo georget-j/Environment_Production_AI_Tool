@@ -24,12 +24,10 @@ type Props = {
 
 const AUTO_ADVANCE_MS = 1500;
 
-type Pyodide = Awaited<ReturnType<typeof getPyodide>>;
-
 type PyodideState =
   | { kind: "cold" }
   | { kind: "warming" }
-  | { kind: "ready"; pyodide: Pyodide }
+  | { kind: "ready" }
   | { kind: "error"; message: string };
 
 type RunState =
@@ -71,8 +69,8 @@ export function LessonFillBlank({ config, nextSlug }: Props) {
     setPyodideState({ kind: "warming" });
     void (async () => {
       try {
-        const pyodide = await getPyodide();
-        setPyodideState({ kind: "ready", pyodide });
+        await getPyodide();
+        setPyodideState({ kind: "ready" });
       } catch (exc) {
         setPyodideState({
           kind: "error",
@@ -94,7 +92,7 @@ export function LessonFillBlank({ config, nextSlug }: Props) {
       return;
     }
     setRunState({ kind: "running" });
-    const { stdout, error } = await runPythonStdout(pyodideState.pyodide, code);
+    const { stdout, error } = await runPythonStdout(code);
     if (error) {
       setRunState({
         kind: "fail",

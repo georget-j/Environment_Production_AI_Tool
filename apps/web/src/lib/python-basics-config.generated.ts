@@ -14,13 +14,13 @@ export const PYTHON_BASICS_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "fillblank",
   "template": "___ = \"Python\"\nprint(language)",
   "expected_stdout": "Python",
-  "hint": "The variable name on the left of `=` should match the name used in `print()`."
+  "hint": "The name on the left of `=` should match the one in `print()`."
 },
   "python-basics-03-strings-and-f-strings": {
   "mode": "fillblank",
   "template": "language = \"Python\"\nprint(f\"My favourite language is {___}\")",
   "expected_stdout": "My favourite language is Python",
-  "hint": "What variable name did the line above define?"
+  "hint": "The variable defined on the line above."
 },
   "python-basics-04-numbers-and-arithmetic": {
   "mode": "predict",
@@ -56,19 +56,19 @@ export const PYTHON_BASICS_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "fillblank",
   "template": "for i in range(1, ___):\n    print(i)",
   "expected_stdout": "1\n2\n3\n4\n5",
-  "hint": "`range(start, stop)` stops BEFORE `stop`, so what number do you put to include 5?"
+  "hint": "`range(start, stop)` stops BEFORE `stop`. What includes 5?"
 },
   "python-basics-10-for-loops-over-lists": {
   "mode": "fillblank",
   "template": "names = [\"Ada\", \"Linus\", \"Grace\"]\nfor ___ in names:\n    print(name)",
   "expected_stdout": "Ada\nLinus\nGrace",
-  "hint": "The variable name in the `for` line should match the name used inside the loop."
+  "hint": "The variable in `for ___ in names:` must match the one in `print(...)`."
 },
   "python-basics-11-while-loops": {
   "mode": "fillblank",
   "template": "count = 5\nwhile count > 0:\n    print(count)\n    count = count ___ 1\nprint(\"Go!\")",
   "expected_stdout": "5\n4\n3\n2\n1\nGo!",
-  "hint": "Each iteration needs to make `count` smaller \u2014 which operator?"
+  "hint": "Each iteration must make `count` smaller."
 },
   "python-basics-12-break-and-continue": {
   "mode": "predict",
@@ -80,7 +80,7 @@ export const PYTHON_BASICS_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "fillblank",
   "template": "scores = [95, 88, 76, 60]\nprint(scores[___])",
   "expected_stdout": "88",
-  "hint": "The first element is at index 0, so the SECOND is at\u2026?"
+  "hint": "Indexes start at 0. The second element is at\u2026?"
 },
   "python-basics-14-list-operations": {
   "mode": "fillblank",
@@ -92,43 +92,43 @@ export const PYTHON_BASICS_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "fillblank",
   "template": "country = {\"name\": \"France\", \"capital\": \"Paris\", \"population\": 67}\nprint(country[___])",
   "expected_stdout": "Paris",
-  "hint": "Use the key (as a string) inside square brackets."
+  "hint": "Use the key \u2014 as a string \u2014 inside the square brackets."
 },
   "python-basics-16-sets-and-tuples": {
   "mode": "predict",
   "code": "print(len({1, 2, 2, 2, 3}))",
   "expected_stdout": "3",
-  "prompt": "Sets remove duplicates. How many unique values are there?"
+  "prompt": "How many unique values are in the set?"
 },
   "python-basics-17-defining-functions": {
   "mode": "fillblank",
   "template": "def ___():\n    print(\"Python rocks\")\n\nsay_python()\nsay_python()",
   "expected_stdout": "Python rocks\nPython rocks",
-  "hint": "The function name in `def NAME():` should match the call below."
+  "hint": "The name in `def NAME():` must match the call below."
 },
   "python-basics-18-parameters": {
   "mode": "fillblank",
   "template": "def welcome(___):\n    print(f\"Welcome, {name}\")\n\nwelcome(\"Grace\")",
   "expected_stdout": "Welcome, Grace",
-  "hint": "The parameter name in the parentheses should match the variable used inside the body."
+  "hint": "The parameter name in `(...)` must match what's used inside the body."
 },
   "python-basics-19-return-values": {
   "mode": "fillblank",
   "template": "def add(a, b):\n    return ___\n\nprint(add(2, 3))\nprint(add(10, 20))",
   "expected_stdout": "5\n30",
-  "hint": "The expression that adds two numbers \u2014 using the parameter names `a` and `b`."
+  "hint": "The expression that adds the two parameters."
 },
   "python-basics-20-local-vs-global-scope": {
   "mode": "predict",
   "code": "count = 5\ndef add_one():\n    count = 100\n    print(count)\n\nadd_one()\nprint(count)",
   "expected_stdout": "100\n5",
-  "prompt": "What does each `print` output, in order, separated by a newline?"
+  "prompt": "One number per line, in order."
 },
   "python-basics-21-try-and-except": {
   "mode": "fillblank",
   "template": "user = {\"name\": \"Ada\"}\ntry:\n    email = user[\"email\"]\n___ KeyError:\n    email = \"unknown\"\nprint(email)",
   "expected_stdout": "unknown",
-  "hint": "The keyword that starts a fallback block when a `try` raises an error."
+  "hint": "The keyword that starts a fallback block after `try`."
 },
   "python-basics-22-list-comprehensions": {
   "mode": "fillblank",
@@ -140,18 +140,18 @@ export const PYTHON_BASICS_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "fillblank",
   "template": "___ math\nprint(round(math.pi, 2))",
   "expected_stdout": "3.14",
-  "hint": "The keyword that pulls a module into your file."
+  "hint": "The keyword that brings a module into your file."
 },
   "python-basics-24-defining-classes": {
   "mode": "fillblank",
-  "template": "class Greeter:\n    def __init__(self, name):\n        self.___ = name\n\n    def greet(self):\n        print(f\"Hello from {self.name}\")\n\ng = Greeter(\"Python\")\ng.greet()",
+  "template": "class Greeter:\n    def __init__(self, name):\n        self.___ = name\n    def greet(self):\n        print(f\"Hello from {self.name}\")\n\ng = Greeter(\"Python\")\ng.greet()",
   "expected_stdout": "Hello from Python",
-  "hint": "The attribute name on `self` should match what `greet()` reads as `self.name`."
+  "hint": "The attribute name on `self` must match what `greet()` reads."
 },
   "python-basics-25-a-tiny-to-do-list": {
   "mode": "fillblank",
   "template": "tasks = []\n\ndef add_task(title, done=False):\n    tasks.___({\"title\": title, \"done\": done})\n\ndef show_tasks():\n    for task in tasks:\n        mark = \"x\" if task[\"done\"] else \" \"\n        print(f\"- [{mark}] {task['title']}\")\n\nadd_task(\"Learn Python\")\nadd_task(\"Drink coffee\", done=True)\nadd_task(\"Write a function\")\nshow_tasks()",
   "expected_stdout": "- [ ] Learn Python\n- [x] Drink coffee\n- [ ] Write a function",
-  "hint": "The list method that adds an item to the end of a list (you used it back in lesson 14)."
+  "hint": "The same list method you used back in lesson 14."
 },
 };

@@ -1,0 +1,24 @@
+name: Keep Fly API warm
+# Pings the public /healthz endpoint every 4 minutes. The Fly machine
+# auto-stops after 5 minutes idle (see apps/api/fly.toml); keeping it warm
+# avoids the ~5s cold start on the first request after an idle period.
+#
+# No secrets required — /healthz is public. ~10 GH Actions minutes/month
+# on the free tier; safe for both public and private repos.
+
+on:
+  schedule:
+    - cron: "*/4 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Ping /healthz
+        run: |
+          set -e
+          status=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 30 https://prodready-api.fly.dev/healthz)
+          echo "HTTP $status"
+          test "$status" = "200"

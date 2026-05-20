@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
+import { NavAuthButton } from "@/components/nav-auth-button";
 
-export async function SiteNav() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+/**
+ * Site nav. Server component, no Supabase round-trip — the user-specific
+ * Dashboard / Sign-in button is rendered client-side by NavAuthButton
+ * after hydration. Removing the server-side `getUser()` call shaved a
+ * Supabase call off every page render.
+ */
+export function SiteNav() {
   return (
     <header className="border-b border-border">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
@@ -15,23 +15,19 @@ export async function SiteNav() {
           ProdReady AI
         </Link>
         <div className="flex items-center gap-2">
-          <Link href="/tracks" className="text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            href="/tracks"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
             Tracks
           </Link>
-          <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            href="/pricing"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
             Pricing
           </Link>
-          {user ? (
-            <Link href="/dashboard">
-              <Button size="sm" variant="outline">
-                Dashboard
-              </Button>
-            </Link>
-          ) : (
-            <Link href="/login">
-              <Button size="sm">Sign in</Button>
-            </Link>
-          )}
+          <NavAuthButton />
         </div>
       </nav>
     </header>

@@ -8,15 +8,31 @@ Writes two files:
 - supabase/python_basics_seed.generated.sql  — inserts the track, modules, and 25 challenges
 - apps/web/src/lib/python-basics-config.generated.ts  — CHALLENGE_CONFIG entries
 
-The seed file is applied with `psql -f`; it uses ON CONFLICT DO UPDATE so re-running
-is idempotent. The TS file is imported into `featured-files.ts` so the runner has
-inline code/template/expected for each lesson.
+Each lesson follows a strict 4-part template so they're uniform across the
+track (60–80 words target):
+
+    **Concept.** One or two sentences in plain English.
+
+    **Example.**
+
+    ```python
+    short_example()
+    ```
+
+    **Your turn.** One sentence telling the learner what to type.
+    (predict-mode lessons replace this with "Predict the output of:")
+
+    **Expected.** `<single-line expected output>`
+
+The seed file is idempotent (ON CONFLICT DO UPDATE); the TS file is imported
+into featured-files.ts.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,19 +48,22 @@ class Module:
 
 @dataclass
 class Lesson:
-    n: int                 # 1..25
-    module: int            # 1..7
+    n: int
+    module: int
     title: str
     scenario: str
     learner_goal: str
-    instructions: str
-    mode: str              # 'predict' or 'fillblank'
-    # mode-specific payload:
-    code: str = ""             # predict
-    template: str = ""         # fillblank
+    mode: str  # 'predict' or 'fillblank'
+    # Structured instruction fields (replace the freeform `instructions` string).
+    concept: str
+    example_code: str  # multi-line is fine; we wrap in ```python```
+    your_turn: str  # for fillblank: "Replace ___ so it prints X"; for predict: "Predict the output."
+    # Mode-specific payload:
+    code: str = ""              # predict only — the snippet shown
+    template: str = ""          # fillblank only — Monaco's initial content
     expected_stdout: str = ""
-    prompt: str = ""           # predict only
-    hint: str = ""             # fillblank only
+    prompt: str = ""            # predict only — input label
+    hint: str = ""              # fillblank only
     skills: list[str] = field(default_factory=list)
 
     @property
@@ -54,8 +73,25 @@ class Lesson:
 
     @property
     def uuid(self) -> str:
-        # 0200..0218 for the 25 lessons
         return f"00000000-0000-0000-0000-{0x200 + (self.n - 1):012x}"
+
+    def instructions(self) -> str:
+        """Assemble the markdown instructions from the structured fields.
+        Same template for every lesson; only the `Your turn` wording differs
+        between predict and fillblank modes."""
+        lines = [f"**Concept.** {self.concept.strip()}", "", "**Example.**", ""]
+        lines.append("```python")
+        lines.append(self.example_code.strip("\n"))
+        lines.append("```")
+        lines.append("")
+        if self.mode == "predict":
+            lines.append(f"**Predict.** {self.your_turn.strip()}")
+        else:
+            lines.append(f"**Your turn.** {self.your_turn.strip()}")
+        lines.append("")
+        expected_one_line = self.expected_stdout.replace("\n", " · ")
+        lines.append(f"**Expected.** `{expected_one_line}`")
+        return "\n".join(lines)
 
 
 MODULES: list[Module] = [
@@ -86,18 +122,16 @@ def module_slug(idx: int) -> str:
     return f"python-basics-{titles[idx]}"
 
 
+# fmt: off
 LESSONS: list[Lesson] = [
-    # ---------------- Module 1 — First steps ----------------
+    # ============ Module 1 — First steps ============
     Lesson(
         n=1, module=1, title="Hello Python", mode="fillblank",
-        scenario="Welcome to Python. The simplest way to make Python do something visible is to use `print()`.",
-        learner_goal="Use `print()` to display text on screen.",
-        instructions=(
-            "Python has a built-in function called `print()`. It takes whatever you pass to it and shows it as output.\n\n"
-            "```python\nprint(\"Hello, world!\")\n```\n\n"
-            "The text inside quotes is called a **string**. Both single (`'`) and double (`\"`) quotes work the same way.\n\n"
-            "Your turn: replace the `___` so the program prints exactly `hello, Python!`."
-        ),
+        scenario="The simplest way to make Python do something visible is to call `print()`.",
+        learner_goal="Use `print()` to display text.",
+        concept="`print()` is a built-in function. Whatever you pass to it appears as output. Text in quotes is a **string**; single (`'`) or double (`\"`) both work.",
+        example_code='print("Hello, world!")',
+        your_turn="Replace `___` so the program prints `hello, Python!`.",
         template='___("hello, Python!")',
         expected_stdout="hello, Python!",
         hint="The function that shows text on screen.",
@@ -105,50 +139,35 @@ LESSONS: list[Lesson] = [
     ),
     Lesson(
         n=2, module=1, title="Variables", mode="fillblank",
-        scenario="Programs become useful when they remember things. Variables are how Python remembers values.",
+        scenario="Programs are useful when they remember things. A variable is how Python remembers a value.",
         learner_goal="Assign a value to a variable and print it back.",
-        instructions=(
-            "A **variable** is a name that holds a value:\n\n"
-            "```python\nname = \"Ada\"\nprint(name)  # Ada\n```\n\n"
-            "Reading `name` later gives you back `\"Ada\"` — Python remembers it.\n\n"
-            "Variable names should start with a letter, contain only letters/digits/underscores, "
-            "and avoid Python reserved words like `print`, `if`, or `for`.\n\n"
-            "Your turn: create a variable called `language` holding the string `\"Python\"`, then print it."
-        ),
+        concept="`name = value` stores `value` under the name `name`. Reading the name later gives you back the value. Names use letters/digits/underscores and avoid Python keywords like `print`.",
+        example_code='name = "Ada"\nprint(name)  # Ada',
+        your_turn="Create a variable called `language` holding `\"Python\"`, then print it.",
         template='___ = "Python"\nprint(language)',
         expected_stdout="Python",
-        hint="The variable name on the left of `=` should match the name used in `print()`.",
+        hint="The name on the left of `=` should match the one in `print()`.",
         skills=["python-basics", "variables"],
     ),
     Lesson(
         n=3, module=1, title="Strings and f-strings", mode="fillblank",
-        scenario="f-strings let you mix variables into text — far cleaner than gluing strings together with `+`.",
-        learner_goal="Use an f-string to embed a variable inside text.",
-        instructions=(
-            "Two ways to combine text:\n\n"
-            "```python\nname = \"Ada\"\n# Old way (works but clunky):\ngreeting = \"Hello, \" + name + \"!\"\n# f-string (clear):\ngreeting = f\"Hello, {name}!\"\nprint(greeting)\n```\n\n"
-            "In an f-string, anything inside `{}` is evaluated as Python code and inserted.\n\n"
-            "Your turn: build an f-string that prints `My favourite language is Python`."
-        ),
+        scenario="f-strings drop variables into text cleanly, without gluing strings with `+`.",
+        learner_goal="Use an f-string to embed a variable in text.",
+        concept="An f-string is a string prefixed with `f`. Anything inside `{}` is evaluated as Python and inserted: `f\"Hello, {name}!\"` becomes `\"Hello, Ada!\"` when `name = \"Ada\"`.",
+        example_code='name = "Ada"\nprint(f"Hello, {name}!")  # Hello, Ada!',
+        your_turn="Fill in `___` so the output is `My favourite language is Python`.",
         template='language = "Python"\nprint(f"My favourite language is {___}")',
         expected_stdout="My favourite language is Python",
-        hint="What variable name did the line above define?",
+        hint="The variable defined on the line above.",
         skills=["python-basics", "strings"],
     ),
     Lesson(
         n=4, module=1, title="Numbers and arithmetic", mode="predict",
-        scenario="Python can do maths the way you'd expect. The operators are the standard ones plus a few extras.",
+        scenario="Python supports the standard arithmetic operators plus a couple of extras.",
         learner_goal="Predict the output of an arithmetic expression.",
-        instructions=(
-            "Python supports:\n"
-            "- `+` add, `-` subtract, `*` multiply\n"
-            "- `/` divide (always returns a float)\n"
-            "- `//` integer division (drops the remainder)\n"
-            "- `%` modulo (the remainder)\n"
-            "- `**` power\n\n"
-            "```python\nprint(7 / 2)   # 3.5\nprint(7 // 2)  # 3\nprint(7 % 2)   # 1\nprint(2 ** 3)  # 8\n```\n\n"
-            "What does this print? Remember: `*` happens before `+`, like in normal maths."
-        ),
+        concept="`+ - * /` work as expected. `/` always returns a float. `//` is integer division (drops the remainder). `%` is the remainder. `**` is power. `*` happens before `+`, like normal maths.",
+        example_code="print(7 / 2)   # 3.5\nprint(7 // 2)  # 3\nprint(7 % 2)   # 1\nprint(2 ** 3)  # 8",
+        your_turn="What does this print?",
         code="print(10 + 3 * 2)",
         expected_stdout="16",
         prompt="What integer does this print?",
@@ -156,30 +175,24 @@ LESSONS: list[Lesson] = [
     ),
     Lesson(
         n=5, module=1, title="Type conversion", mode="fillblank",
-        scenario="Numbers entered by users often arrive as strings. Strings can't be added to numbers, so Python gives you `int()`, `float()`, and `str()` to convert.",
-        learner_goal="Convert a string to an integer so you can do maths with it.",
-        instructions=(
-            "These all do different things:\n\n"
-            "```python\nprint(2 + 3)         # 5  (number addition)\nprint(\"2\" + \"3\")     # 23 (string concatenation!)\nprint(int(\"2\") + 3)  # 5  (convert, then add)\n```\n\n"
-            "`int(x)`, `float(x)`, and `str(x)` return a NEW value — they don't change `x`.\n\n"
-            "Your turn: convert the string `\"42\"` to an integer and add 8."
-        ),
+        scenario="Numbers from users often arrive as strings — and strings won't add to numbers without converting.",
+        learner_goal="Convert a string to an int so you can do maths with it.",
+        concept="`int(x)`, `float(x)`, and `str(x)` return a NEW value of that type; they don't change `x`. `int(\"2\") + 3` is `5`, but `\"2\" + \"3\"` is `\"23\"`.",
+        example_code='print(2 + 3)         # 5  (number addition)\nprint("2" + "3")     # 23 (string concatenation!)\nprint(int("2") + 3)  # 5',
+        your_turn="Convert the string `\"42\"` to an integer and add 8.",
         template='age_string = "42"\nage_in_eight_years = ___(age_string) + 8\nprint(age_in_eight_years)',
         expected_stdout="50",
         hint="The function that turns a string of digits into an integer.",
         skills=["python-basics", "types"],
     ),
-    # ---------------- Module 2 — Making decisions ----------------
+    # ============ Module 2 — Making decisions ============
     Lesson(
         n=6, module=2, title="Booleans and comparisons", mode="predict",
-        scenario="Decisions in code come down to 'yes' or 'no' — `True` or `False` in Python.",
+        scenario="Decisions in code come down to `True` or `False`.",
         learner_goal="Predict whether a comparison is True or False.",
-        instructions=(
-            "Comparisons return a boolean:\n\n"
-            "```python\nprint(5 > 3)    # True\nprint(5 == 5)   # True (note: == not =)\nprint(5 != 4)   # True (not equal)\nprint(5 < 3)    # False\nprint(5 >= 5)   # True\n```\n\n"
-            "Common mistake: `=` is assignment (`x = 5`). `==` is comparison (`x == 5`).\n\n"
-            "What does this print?"
-        ),
+        concept="Comparisons return a boolean: `>` `<` `>=` `<=` `==` `!=`. Common mistake: `=` is assignment, `==` is comparison.",
+        example_code="print(5 > 3)    # True\nprint(5 == 5)   # True\nprint(5 != 4)   # True\nprint(5 < 3)    # False",
+        your_turn="What does this print?",
         code="print(7 != 8)",
         expected_stdout="True",
         prompt="Is `7 != 8` True or False?",
@@ -187,17 +200,11 @@ LESSONS: list[Lesson] = [
     ),
     Lesson(
         n=7, module=2, title="if elif else", mode="fillblank",
-        scenario="When a condition is true, run one block of code; otherwise run another.",
-        learner_goal="Write an if/else that picks one of two messages.",
-        instructions=(
-            "Basic shape:\n\n"
-            "```python\nage = 18\nif age >= 18:\n    print(\"Adult\")\nelif age >= 13:\n    print(\"Teenager\")\nelse:\n    print(\"Kid\")\n```\n\n"
-            "Notes:\n"
-            "- The `:` at the end of the `if` line is required.\n"
-            "- **Indentation matters.** Python uses indentation (4 spaces) to mark blocks.\n"
-            "- `elif` is 'else if'. `else` catches everything else.\n\n"
-            "Your turn: fill in the comparison so the program prints `cold`."
-        ),
+        scenario="`if` runs a block when a condition is true; `else` runs when it isn't.",
+        learner_goal="Pick one of two messages based on a comparison.",
+        concept="`if condition:` followed by an indented block. `elif` is \"else if\". `else` catches everything else. The `:` is required, and indentation (4 spaces) marks the block.",
+        example_code='age = 18\nif age >= 18:\n    print("Adult")\nelse:\n    print("Kid")',
+        your_turn="Fill in the comparison so the program prints `cold`.",
         template='temperature = 5\nif temperature ___ 10:\n    print("cold")\nelse:\n    print("warm")',
         expected_stdout="cold",
         hint="Pick the comparison operator that makes `5 _ 10` true.",
@@ -205,103 +212,85 @@ LESSONS: list[Lesson] = [
     ),
     Lesson(
         n=8, module=2, title="Logical operators", mode="predict",
-        scenario="Real-world checks are usually combinations of smaller conditions.",
+        scenario="Real conditions are usually combinations of smaller ones.",
         learner_goal="Predict the result of a compound boolean expression.",
-        instructions=(
-            "Three operators for combining booleans:\n"
-            "- `and` — both must be True\n"
-            "- `or` — at least one must be True\n"
-            "- `not` — flips True ↔ False\n\n"
-            "```python\nprint(True and False)    # False\nprint(True or False)     # True\nprint(not True)          # False\nprint(5 > 3 and 5 < 10)  # True\n```\n\n"
-            "Precedence: `not` > `and` > `or`. Use parens when unsure.\n\n"
-            "What does this print?"
-        ),
+        concept="`and` — both sides must be true. `or` — at least one. `not` — flips True/False. Precedence: `not` > `and` > `or`; use parens when unsure.",
+        example_code="print(True and False)    # False\nprint(True or False)     # True\nprint(5 > 3 and 5 < 10)  # True",
+        your_turn="What does this print?",
         code="print(10 > 5 or 10 > 100)",
         expected_stdout="True",
         prompt="Is at least one side True?",
         skills=["python-basics", "booleans"],
     ),
-    # ---------------- Module 3 — Doing things many times ----------------
+    # ============ Module 3 — Doing things many times ============
     Lesson(
         n=9, module=3, title="for loops with range", mode="fillblank",
-        scenario="When you want to do something a known number of times, `for i in range(n)` is the idiomatic way.",
-        learner_goal="Use a for loop with `range()` to print numbers.",
-        instructions=(
-            "```python\nfor i in range(5):\n    print(i)\n# prints 0, 1, 2, 3, 4 — NOT 5\n```\n\n"
-            "`range(5)` produces 0, 1, 2, 3, 4. `range(2, 7)` produces 2, 3, 4, 5, 6 (starts at 2, stops BEFORE 7).\n\n"
-            "Your turn: print the numbers 1 through 5 inclusive."
-        ),
-        template='for i in range(1, ___):\n    print(i)',
+        scenario="When you want to do something a fixed number of times, `for i in range(n)` is idiomatic.",
+        learner_goal="Use a `for` loop with `range()` to print numbers.",
+        concept="`range(n)` produces 0, 1, … n-1. `range(a, b)` produces a, a+1, … b-1 — it stops BEFORE `b`.",
+        example_code="for i in range(5):\n    print(i)\n# prints 0, 1, 2, 3, 4 (not 5)",
+        your_turn="Print the numbers 1 through 5 inclusive.",
+        template="for i in range(1, ___):\n    print(i)",
         expected_stdout="1\n2\n3\n4\n5",
-        hint="`range(start, stop)` stops BEFORE `stop`, so what number do you put to include 5?",
+        hint="`range(start, stop)` stops BEFORE `stop`. What includes 5?",
         skills=["python-basics", "loops"],
     ),
     Lesson(
         n=10, module=3, title="for loops over lists", mode="fillblank",
-        scenario="`for` can iterate over any sequence — lists, strings, dictionaries.",
+        scenario="`for` walks over any sequence — lists, strings, dictionaries — one item at a time.",
         learner_goal="Iterate over a list and print each item.",
-        instructions=(
-            "```python\nfruits = [\"apple\", \"banana\", \"cherry\"]\nfor fruit in fruits:\n    print(fruit)\n```\n\n"
-            "Each time through the loop, `fruit` takes the next value from the list.\n\n"
-            "Your turn: iterate over the list and print each name."
-        ),
+        concept="`for item in iterable:` binds `item` to each element in turn. The loop variable's name is yours to choose; it should describe one element.",
+        example_code='fruits = ["apple", "banana", "cherry"]\nfor fruit in fruits:\n    print(fruit)',
+        your_turn="Fill in the loop variable so each name prints.",
         template='names = ["Ada", "Linus", "Grace"]\nfor ___ in names:\n    print(name)',
         expected_stdout="Ada\nLinus\nGrace",
-        hint="The variable name in the `for` line should match the name used inside the loop.",
+        hint="The variable in `for ___ in names:` must match the one in `print(...)`.",
         skills=["python-basics", "loops", "lists"],
     ),
     Lesson(
         n=11, module=3, title="while loops", mode="fillblank",
-        scenario="`while` loops run as long as a condition is true. Use them when you don't know in advance how many iterations you'll need.",
-        learner_goal="Write a while loop that counts down.",
-        instructions=(
-            "```python\ncount = 3\nwhile count > 0:\n    print(count)\n    count = count - 1\nprint(\"Go!\")\n```\n\n"
-            "The condition is checked at the **top** of each loop. If it's never made false, you have an infinite loop — Python won't stop on its own.\n\n"
-            "Your turn: count down from 5 to 1, then print `Go!`."
-        ),
+        scenario="`while` runs as long as a condition is true. Use it when you don't know in advance how many iterations.",
+        learner_goal="Count down from 5 with a `while` loop.",
+        concept="The condition is checked at the TOP of each iteration. The loop must eventually make the condition false — otherwise it runs forever (the sandbox aborts at 200,000 steps with a clear error).",
+        example_code='count = 3\nwhile count > 0:\n    print(count)\n    count = count - 1\nprint("Go!")',
+        your_turn="Fill in the operator so `count` shrinks each iteration.",
         template='count = 5\nwhile count > 0:\n    print(count)\n    count = count ___ 1\nprint("Go!")',
         expected_stdout="5\n4\n3\n2\n1\nGo!",
-        hint="Each iteration needs to make `count` smaller — which operator?",
+        hint="Each iteration must make `count` smaller.",
         skills=["python-basics", "loops"],
     ),
     Lesson(
         n=12, module=3, title="break and continue", mode="predict",
-        scenario="`break` exits a loop immediately. `continue` skips the rest of the current iteration and starts the next one.",
+        scenario="`break` exits a loop immediately. `continue` skips to the next iteration.",
         learner_goal="Predict the output of a loop that breaks early.",
-        instructions=(
-            "```python\nfor i in range(10):\n    if i == 3:\n        break\n    print(i)\n# prints 0, 1, 2 (then breaks out)\n```\n\n"
-            "```python\nfor i in range(5):\n    if i == 2:\n        continue\n    print(i)\n# prints 0, 1, 3, 4 (skips 2)\n```\n\n"
-            "What does this print?"
-        ),
+        concept="`break` jumps out of the enclosing loop right away — no more iterations. `continue` jumps back to the loop header for the next iteration, skipping the rest of the body.",
+        example_code="for i in range(5):\n    if i == 2:\n        continue   # skips 2\n    print(i)",
+        your_turn="What does this print?",
         code="for i in range(5):\n    if i == 3:\n        break\n    print(i * 2)",
         expected_stdout="0\n2\n4",
         prompt="The loop breaks when `i == 3`. What does it print before that?",
         skills=["python-basics", "loops"],
     ),
-    # ---------------- Module 4 — Collections ----------------
+    # ============ Module 4 — Collections ============
     Lesson(
         n=13, module=4, title="Lists", mode="fillblank",
         scenario="A list holds an ordered collection of values. Index from 0 to access them.",
-        learner_goal="Index into a list to retrieve a specific item.",
-        instructions=(
-            "```python\ncolors = [\"red\", \"green\", \"blue\"]\nprint(colors[0])     # \"red\"\nprint(colors[2])     # \"blue\"\nprint(colors[-1])    # \"blue\" (last)\nprint(colors[1:3])   # [\"green\", \"blue\"] (slice)\n```\n\n"
-            "Negative indices count from the end. Slices use `start:end` (end is exclusive).\n\n"
-            "Your turn: print the second element of the list."
-        ),
-        template='scores = [95, 88, 76, 60]\nprint(scores[___])',
+        learner_goal="Read a specific element of a list by its index.",
+        concept="`my_list[0]` is the first element. `my_list[-1]` is the last. `my_list[a:b]` is a slice from index `a` (inclusive) to `b` (exclusive).",
+        example_code='colors = ["red", "green", "blue"]\nprint(colors[0])     # "red"\nprint(colors[-1])    # "blue"',
+        your_turn="Print the second element of `scores`.",
+        template="scores = [95, 88, 76, 60]\nprint(scores[___])",
         expected_stdout="88",
-        hint="The first element is at index 0, so the SECOND is at…?",
+        hint="Indexes start at 0. The second element is at…?",
         skills=["python-basics", "lists"],
     ),
     Lesson(
         n=14, module=4, title="List operations", mode="fillblank",
-        scenario="Lists are mutable. You can append, sort, and check membership.",
+        scenario="Lists are mutable: you can grow them, sort them, and check what's in them.",
         learner_goal="Append to a list and check its length.",
-        instructions=(
-            "```python\nnumbers = [3, 1, 4]\nnumbers.append(1)        # add to end → [3, 1, 4, 1]\nprint(len(numbers))      # 4\nprint(2 in numbers)      # False\nprint(sorted(numbers))   # [1, 1, 3, 4] — new list\nnumbers.sort()           # sort in place\n```\n\n"
-            "`append()` mutates the list. `sorted()` returns a new sorted list.\n\n"
-            "Your turn: append `\"strawberry\"` to the list, then print its length."
-        ),
+        concept="`my_list.append(x)` adds `x` to the end (in-place). `len(my_list)` returns how many elements it has. `x in my_list` checks membership.",
+        example_code='numbers = [3, 1, 4]\nnumbers.append(1)\nprint(len(numbers))  # 4',
+        your_turn="Append `\"strawberry\"` to `fruits`, then print its length.",
         template='fruits = ["apple", "banana"]\nfruits.___("strawberry")\nprint(len(fruits))',
         expected_stdout="3",
         hint="The list method that adds an item to the end.",
@@ -309,180 +298,157 @@ LESSONS: list[Lesson] = [
     ),
     Lesson(
         n=15, module=4, title="Dictionaries", mode="fillblank",
-        scenario="When you need to look something up by a label, use a dictionary.",
+        scenario="A dictionary maps keys to values — like a real-world index card.",
         learner_goal="Read a value from a dictionary by its key.",
-        instructions=(
-            "```python\nuser = {\"name\": \"Ada\", \"age\": 36, \"lang\": \"Python\"}\nprint(user[\"name\"])         # \"Ada\"\nuser[\"email\"] = \"ada@example.com\"  # add a key\nprint(len(user))            # 4\n```\n\n"
-            "Keys are usually strings. Looking up a missing key raises `KeyError`.\n\n"
-            "Your turn: print the value for the key `\"capital\"`."
-        ),
+        concept="`my_dict[key]` retrieves the value stored under `key`. Keys are usually strings. Looking up a missing key raises `KeyError`.",
+        example_code='user = {"name": "Ada", "age": 36}\nprint(user["name"])  # Ada',
+        your_turn="Print the value for the key `\"capital\"`.",
         template='country = {"name": "France", "capital": "Paris", "population": 67}\nprint(country[___])',
         expected_stdout="Paris",
-        hint="Use the key (as a string) inside square brackets.",
+        hint="Use the key — as a string — inside the square brackets.",
         skills=["python-basics", "dicts"],
     ),
     Lesson(
         n=16, module=4, title="Sets and tuples", mode="predict",
-        scenario="`set` is unordered and de-duplicates. `tuple` is like a list but immutable.",
-        learner_goal="Predict the size of a set after duplicates are removed.",
-        instructions=(
-            "```python\nunique = {1, 2, 2, 3, 3, 3}\nprint(unique)           # {1, 2, 3} — duplicates removed\n\npoint = (3, 4)\nprint(point[0])         # 3\n# point[0] = 99  → TypeError: tuples are immutable\n```\n\n"
-            "Sets are great for 'is X in this collection?' — much faster than lists for big data.\n\n"
-            "What does this print?"
-        ),
+        scenario="A `set` is unordered and de-duplicates. A `tuple` is like a list but immutable.",
+        learner_goal="Predict how many unique values are in a set.",
+        concept="`{1, 2, 2, 3}` becomes `{1, 2, 3}` — duplicates are removed. Sets are fast for membership checks. Tuples use `(...)`; their elements can't change.",
+        example_code="unique = {1, 2, 2, 3, 3, 3}\nprint(unique)  # {1, 2, 3}",
+        your_turn="What does this print?",
         code="print(len({1, 2, 2, 2, 3}))",
         expected_stdout="3",
-        prompt="Sets remove duplicates. How many unique values are there?",
+        prompt="How many unique values are in the set?",
         skills=["python-basics", "sets", "tuples"],
     ),
-    # ---------------- Module 5 — Functions ----------------
+    # ============ Module 5 — Functions ============
     Lesson(
         n=17, module=5, title="Defining functions", mode="fillblank",
-        scenario="Functions let you give a name to a block of code and reuse it.",
-        learner_goal="Define a function and call it.",
-        instructions=(
-            "```python\ndef greet():\n    print(\"Hello!\")\n\ngreet()  # prints Hello!\ngreet()  # prints Hello! again\n```\n\n"
-            "`def name():` defines; `name()` calls. The body is indented under `def`.\n\n"
-            "Your turn: define a function `say_python` that prints `Python rocks`, then call it twice."
-        ),
+        scenario="Functions give a name to a block of code so you can reuse it.",
+        learner_goal="Define a function with `def` and call it.",
+        concept="`def name():` defines a function. The body is indented under it. `name()` calls it — and you can call it as many times as you like.",
+        example_code='def greet():\n    print("Hello!")\n\ngreet()\ngreet()',
+        your_turn="Define `say_python` so calling it prints `Python rocks`, then call it twice.",
         template='def ___():\n    print("Python rocks")\n\nsay_python()\nsay_python()',
         expected_stdout="Python rocks\nPython rocks",
-        hint="The function name in `def NAME():` should match the call below.",
+        hint="The name in `def NAME():` must match the call below.",
         skills=["python-basics", "functions"],
     ),
     Lesson(
         n=18, module=5, title="Parameters", mode="fillblank",
-        scenario="Functions become useful when they accept inputs and act on them.",
-        learner_goal="Define a function with a parameter.",
-        instructions=(
-            "```python\ndef greet(name):\n    print(f\"Hello, {name}!\")\n\ngreet(\"Ada\")    # Hello, Ada!\ngreet(\"Linus\")  # Hello, Linus!\n```\n\n"
-            "Default values let callers skip arguments:\n\n"
-            "```python\ndef greet(name=\"friend\"):\n    print(f\"Hello, {name}!\")\n\ngreet()         # Hello, friend!\ngreet(\"Ada\")    # Hello, Ada!\n```\n\n"
-            "Your turn: define a function that takes a name and prints `Welcome, <name>`."
-        ),
+        scenario="Functions become useful when they take inputs.",
+        learner_goal="Define a function with one parameter.",
+        concept="`def greet(name):` — `name` is a parameter. Inside the body it holds whatever value the caller passes. Defaults work too: `def greet(name=\"friend\"):`.",
+        example_code='def greet(name):\n    print(f"Hello, {name}!")\n\ngreet("Ada")    # Hello, Ada!',
+        your_turn="Add the parameter `name` so the function prints `Welcome, Grace`.",
         template='def welcome(___):\n    print(f"Welcome, {name}")\n\nwelcome("Grace")',
         expected_stdout="Welcome, Grace",
-        hint="The parameter name in the parentheses should match the variable used inside the body.",
+        hint="The parameter name in `(...)` must match what's used inside the body.",
         skills=["python-basics", "functions"],
     ),
     Lesson(
         n=19, module=5, title="Return values", mode="fillblank",
         scenario="Most functions don't just print — they compute and return a value the caller uses.",
-        learner_goal="Write a function that returns a value, then use the return value.",
-        instructions=(
-            "```python\ndef double(n):\n    return n * 2\n\nresult = double(7)\nprint(result)        # 14\nprint(double(3) + 1) # 7 (return values can be used in expressions)\n```\n\n"
-            "`return` exits the function and sends the value back to the caller.\n\n"
-            "Your turn: complete the function so it returns the sum of its two arguments."
-        ),
-        template='def add(a, b):\n    return ___\n\nprint(add(2, 3))\nprint(add(10, 20))',
+        learner_goal="Write a function that returns its result.",
+        concept="`return expr` exits the function and sends `expr` back to the caller. The caller can store it (`x = f()`) or use it in an expression (`f() + 1`).",
+        example_code="def double(n):\n    return n * 2\n\nresult = double(7)\nprint(result)  # 14",
+        your_turn="Fill in the return expression so `add(a, b)` returns their sum.",
+        template="def add(a, b):\n    return ___\n\nprint(add(2, 3))\nprint(add(10, 20))",
         expected_stdout="5\n30",
-        hint="The expression that adds two numbers — using the parameter names `a` and `b`.",
+        hint="The expression that adds the two parameters.",
         skills=["python-basics", "functions"],
     ),
     Lesson(
         n=20, module=5, title="Local vs global scope", mode="predict",
-        scenario="Variables defined inside a function don't exist outside it. This is called local scope.",
-        learner_goal="Predict what gets printed given local vs global variables.",
-        instructions=(
-            "```python\nx = 10  # global\n\ndef show():\n    x = 20  # local — different variable!\n    print(x)\n\nshow()        # 20\nprint(x)      # 10 (global x unchanged)\n```\n\n"
-            "Inside a function, assigning to a name creates a LOCAL variable. The global with the same name is hidden, not modified.\n\n"
-            "What does this print?"
-        ),
-        code='count = 5\ndef add_one():\n    count = 100\n    print(count)\n\nadd_one()\nprint(count)',
+        scenario="Variables defined inside a function don't exist outside it — that's local scope.",
+        learner_goal="Predict what each `print` outputs.",
+        concept="Assigning to a name inside a function creates a LOCAL variable. The global with the same name is hidden, not modified. The outer global keeps its old value when the function returns.",
+        example_code="x = 10\ndef show():\n    x = 20  # local — different variable\n    print(x)\n\nshow()      # 20\nprint(x)    # 10",
+        your_turn="What does this print, one number per line?",
+        code="count = 5\ndef add_one():\n    count = 100\n    print(count)\n\nadd_one()\nprint(count)",
         expected_stdout="100\n5",
-        prompt="What does each `print` output, in order, separated by a newline?",
+        prompt="One number per line, in order.",
         skills=["python-basics", "functions", "scope"],
     ),
-    # ---------------- Module 6 — Real code ----------------
+    # ============ Module 6 — Real code ============
     Lesson(
         n=21, module=6, title="try and except", mode="fillblank",
-        scenario="Some operations can fail at runtime — dividing by zero, looking up a missing dict key. `try/except` lets you handle the failure instead of crashing.",
-        learner_goal="Wrap a risky operation in try/except.",
-        instructions=(
-            "```python\ntry:\n    result = 10 / 0\nexcept ZeroDivisionError:\n    result = \"infinity\"\nprint(result)  # infinity\n```\n\n"
-            "The `except` block runs only if the exception type matches. You can have multiple `except` blocks for different errors.\n\n"
-            "Your turn: handle the missing-key case so the program prints `unknown` instead of crashing."
-        ),
+        scenario="Some operations fail at runtime (dividing by zero, missing dict keys). `try/except` lets you handle the failure.",
+        learner_goal="Catch a `KeyError` so the program prints `unknown`.",
+        concept="`try:` runs its block. If an exception of a matching type is raised, control jumps to the matching `except`. The `except` keyword introduces the fallback.",
+        example_code='try:\n    result = 10 / 0\nexcept ZeroDivisionError:\n    result = "infinity"\nprint(result)  # infinity',
+        your_turn="Replace `___` with the keyword that starts the fallback block.",
         template='user = {"name": "Ada"}\ntry:\n    email = user["email"]\n___ KeyError:\n    email = "unknown"\nprint(email)',
         expected_stdout="unknown",
-        hint="The keyword that starts a fallback block when a `try` raises an error.",
+        hint="The keyword that starts a fallback block after `try`.",
         skills=["python-basics", "errors"],
     ),
     Lesson(
         n=22, module=6, title="List comprehensions", mode="fillblank",
-        scenario="List comprehensions are Python's compact way to build a new list by transforming each item.",
-        learner_goal="Use a list comprehension to build a list of squares.",
-        instructions=(
-            "```python\n# Long way:\nnumbers = [1, 2, 3, 4]\ndoubled = []\nfor n in numbers:\n    doubled.append(n * 2)\n# → [2, 4, 6, 8]\n\n# Comprehension:\ndoubled = [n * 2 for n in numbers]\n# → [2, 4, 6, 8]\n```\n\n"
-            "Shape: `[expression for item in iterable]`. You can add an `if`: `[n for n in numbers if n > 2]`.\n\n"
-            "Your turn: build a list of the squares of 1..5."
-        ),
-        template='squares = [n ___ 2 for n in range(1, 6)]\nprint(squares)',
+        scenario="List comprehensions build a new list by transforming each item — in one line.",
+        learner_goal="Build a list of the squares of 1..5.",
+        concept="The shape is `[expr for item in iterable]`. You can add an `if`: `[n for n in nums if n > 0]`. It's a compact replacement for a `for`-loop + `.append()` pattern.",
+        example_code="numbers = [1, 2, 3, 4]\ndoubled = [n * 2 for n in numbers]\nprint(doubled)  # [2, 4, 6, 8]",
+        your_turn="Fill in the operator so the comprehension produces squares.",
+        template="squares = [n ___ 2 for n in range(1, 6)]\nprint(squares)",
         expected_stdout="[1, 4, 9, 16, 25]",
         hint="The power operator in Python is two characters.",
         skills=["python-basics", "comprehensions"],
     ),
     Lesson(
         n=23, module=6, title="Imports and the standard library", mode="fillblank",
-        scenario="Python comes with batteries included — modules for math, dates, JSON, randomness, and more. You bring them in with `import`.",
-        learner_goal="Import a module and use one of its values.",
-        instructions=(
-            "```python\nimport math\nprint(math.sqrt(16))    # 4.0\nprint(math.pi)          # 3.141592653589793\n\n# Or import a specific name:\nfrom math import sqrt\nprint(sqrt(25))         # 5.0\n```\n\n"
-            "Other useful modules: `random`, `datetime`, `json`, `collections`.\n\n"
-            "Your turn: import the math module and print the value of pi rounded to two decimals."
-        ),
-        template='___ math\nprint(round(math.pi, 2))',
+        scenario="Python comes with batteries included — `import` pulls a module in.",
+        learner_goal="Import `math` and use one of its values.",
+        concept="`import math` makes the module available as `math`. Reach into it with a dot: `math.pi`, `math.sqrt(16)`. `from math import sqrt` imports just one name.",
+        example_code="import math\nprint(math.sqrt(16))  # 4.0\nprint(math.pi)        # 3.141592653589793",
+        your_turn="Add the keyword that pulls `math` into the program.",
+        template="___ math\nprint(round(math.pi, 2))",
         expected_stdout="3.14",
-        hint="The keyword that pulls a module into your file.",
+        hint="The keyword that brings a module into your file.",
         skills=["python-basics", "imports"],
     ),
-    # ---------------- Module 7 — Putting it together ----------------
+    # ============ Module 7 — Putting it together ============
     Lesson(
         n=24, module=7, title="Defining classes", mode="fillblank",
-        scenario="Classes bundle data and behaviour together. They're the foundation of object-oriented Python.",
-        learner_goal="Define a class with one attribute and one method.",
-        instructions=(
-            "```python\nclass Dog:\n    def __init__(self, name):\n        self.name = name\n\n    def bark(self):\n        print(f\"{self.name} says woof\")\n\nbuddy = Dog(\"Buddy\")\nbuddy.bark()    # Buddy says woof\n```\n\n"
-            "`__init__` is the constructor — runs when you do `Dog(...)`. `self` is the instance the method is called on.\n\n"
-            "Your turn: complete the constructor so the instance remembers its `name`."
-        ),
-        template='class Greeter:\n    def __init__(self, name):\n        self.___ = name\n\n    def greet(self):\n        print(f"Hello from {self.name}")\n\ng = Greeter("Python")\ng.greet()',
+        scenario="Classes bundle data and behaviour together — the foundation of object-oriented Python.",
+        learner_goal="Complete a class's constructor.",
+        concept="`__init__` is the constructor; it runs when you do `MyClass(...)`. `self` is the instance the method is called on. Attributes assigned to `self.x` are stored on the instance.",
+        example_code='class Dog:\n    def __init__(self, name):\n        self.name = name\n    def bark(self):\n        print(f"{self.name} says woof")',
+        your_turn="Set `self.name = name` so `greet()` reads `self.name` correctly.",
+        template='class Greeter:\n    def __init__(self, name):\n        self.___ = name\n    def greet(self):\n        print(f"Hello from {self.name}")\n\ng = Greeter("Python")\ng.greet()',
         expected_stdout="Hello from Python",
-        hint="The attribute name on `self` should match what `greet()` reads as `self.name`.",
+        hint="The attribute name on `self` must match what `greet()` reads.",
         skills=["python-basics", "classes"],
     ),
     Lesson(
         n=25, module=7, title="A tiny to-do list", mode="fillblank",
-        scenario="Time to combine functions, lists, and dictionaries. You'll complete a small to-do list that adds tasks and prints them with their completion status.",
-        learner_goal="Combine functions + lists + dicts to build a working to-do list.",
-        instructions=(
-            "You'll write the body of `add_task` so it appends a new task dictionary to the list.\n\n"
-            "A task is a dictionary with keys `title` (string) and `done` (bool, defaults to False).\n\n"
-            "Expected output:\n\n"
-            "```\n- [ ] Learn Python\n- [x] Drink coffee\n- [ ] Write a function\n```"
-        ),
+        scenario="Combine functions, lists, and dictionaries into a tiny to-do list.",
+        learner_goal="Make `add_task` actually add a task to the list.",
+        concept="A task is a dict with keys `title` and `done`. `add_task(title, done=False)` should append a new dict to the global `tasks` list. The list method `.append(item)` adds `item` to the end.",
+        example_code='tasks = []\ntasks.append({"title": "Learn Python", "done": False})\nprint(tasks[0]["title"])  # Learn Python',
+        your_turn="Replace `___` with the list method that adds an item to the end.",
         template=(
-            'tasks = []\n\n'
-            'def add_task(title, done=False):\n'
-            '    tasks.___({"title": title, "done": done})\n\n'
-            'def show_tasks():\n'
-            '    for task in tasks:\n'
-            '        mark = "x" if task["done"] else " "\n'
-            '        print(f"- [{mark}] {task[\'title\']}")\n\n'
+            "tasks = []\n\n"
+            "def add_task(title, done=False):\n"
+            "    tasks.___({\"title\": title, \"done\": done})\n\n"
+            "def show_tasks():\n"
+            "    for task in tasks:\n"
+            "        mark = \"x\" if task[\"done\"] else \" \"\n"
+            "        print(f\"- [{mark}] {task['title']}\")\n\n"
             'add_task("Learn Python")\n'
             'add_task("Drink coffee", done=True)\n'
             'add_task("Write a function")\n'
-            'show_tasks()'
+            "show_tasks()"
         ),
         expected_stdout="- [ ] Learn Python\n- [x] Drink coffee\n- [ ] Write a function",
-        hint="The list method that adds an item to the end of a list (you used it back in lesson 14).",
+        hint="The same list method you used back in lesson 14.",
         skills=["python-basics", "project"],
     ),
 ]
+# fmt: on
 
 
 def sql_escape(text: str) -> str:
-    """Escape a string for use inside a Postgres E'...' literal."""
+    """Escape for use inside a Postgres E'...' literal."""
     return text.replace("\\", "\\\\").replace("'", "''").replace("\n", "\\n")
 
 
@@ -491,9 +457,9 @@ def write_sql() -> Path:
     lines.append("-- AUTO-GENERATED by scripts/generate_python_basics.py")
     lines.append("-- Python Basics track: 1 track, 7 modules, 25 challenges.")
     lines.append("")
-
-    # Track
-    lines.append("insert into public.tracks (id, slug, title, description, difficulty, is_published)")
+    lines.append(
+        "insert into public.tracks (id, slug, title, description, difficulty, is_published)"
+    )
     lines.append("values (")
     lines.append(f"  '{TRACK_UUID}',")
     lines.append("  'python-basics',")
@@ -511,10 +477,10 @@ def write_sql() -> Path:
     lines.append("  difficulty = excluded.difficulty,")
     lines.append("  is_published = excluded.is_published;")
     lines.append("")
-
-    # Modules
     for idx, mod in enumerate(MODULES):
-        lines.append("insert into public.modules (id, track_id, slug, title, order_index)")
+        lines.append(
+            "insert into public.modules (id, track_id, slug, title, order_index)"
+        )
         lines.append("values (")
         lines.append(f"  '{module_uuid(mod.suffix)}',")
         lines.append(f"  '{TRACK_UUID}',")
@@ -527,11 +493,12 @@ def write_sql() -> Path:
         lines.append("  order_index = excluded.order_index;")
         lines.append("")
 
-    # Challenges
     for lesson in LESSONS:
         module_index = lesson.module - 1
         m_uuid = module_uuid(MODULES[module_index].suffix)
-        skills_array = "array[" + ", ".join(f"'{sql_escape(s)}'" for s in lesson.skills) + "]"
+        skills_array = (
+            "array[" + ", ".join(f"'{sql_escape(s)}'" for s in lesson.skills) + "]"
+        )
         lines.append(
             "insert into public.challenges (\n"
             "  id, module_id, slug, title, scenario, learner_goal, instructions,\n"
@@ -545,11 +512,13 @@ def write_sql() -> Path:
         lines.append(f"  E'{sql_escape(lesson.title)}',")
         lines.append(f"  E'{sql_escape(lesson.scenario)}',")
         lines.append(f"  E'{sql_escape(lesson.learner_goal)}',")
-        lines.append(f"  E'{sql_escape(lesson.instructions)}',")
-        lines.append("  null,")  # repo_template_url
-        lines.append("  null,")  # repo_branch
+        lines.append(f"  E'{sql_escape(lesson.instructions())}',")
+        lines.append("  null,")
+        lines.append("  null,")
         lines.append("  '{}',")
-        lines.append("  '{\"max_hint_level\": 2, \"do_not_reveal_solution\": false, \"encourage_tests_first\": false}',")
+        lines.append(
+            "  '{\"max_hint_level\": 2, \"do_not_reveal_solution\": false, \"encourage_tests_first\": false}',"
+        )
         lines.append(f"  {skills_array},")
         lines.append("  true,")
         lines.append(f"  {lesson.n}")
@@ -571,7 +540,6 @@ def write_sql() -> Path:
         )
         lines.append("")
 
-    # Skills graph additions
     used_skills = sorted({s for lesson in LESSONS for s in lesson.skills})
     titles = {
         "python-basics": "Python basics",
@@ -607,7 +575,6 @@ def write_sql() -> Path:
 
 
 def write_ts() -> Path:
-    """Emit a TS module exporting the 25 entries as a partial CHALLENGE_CONFIG."""
     entries: list[str] = []
     for lesson in LESSONS:
         if lesson.mode == "predict":
@@ -643,8 +610,20 @@ def write_ts() -> Path:
     return out_path
 
 
+def word_count_report() -> None:
+    """Print word counts so we can see distribution at a glance."""
+    print("\nInstruction word counts:")
+    for lesson in LESSONS:
+        text = lesson.instructions()
+        wc = len(text.split())
+        print(f"  {lesson.slug}: {wc} words")
+
+
 if __name__ == "__main__":
     sql_path = write_sql()
     ts_path = write_ts()
     print(f"Wrote {sql_path.relative_to(ROOT)}")
     print(f"Wrote {ts_path.relative_to(ROOT)}")
+    word_count_report()
+    # Unused import: textwrap is here in case we want to dedent example_code later.
+    _ = textwrap

@@ -19,7 +19,6 @@ import {
   getPyodide,
   resetPyodide,
   runPytest,
-  writeTree,
   type PytestResult,
   type TestStatus,
 } from "@/lib/pyodide";
@@ -370,16 +369,11 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
       setRunState({ kind: "running" });
       setExplainState({ kind: "idle" });
       try {
-        const pyodide = await getPyodide();
-        await ensurePytest(pyodide);
+        await getPyodide();
+        await ensurePytest();
         setPyodideState({ kind: "ready" });
-        const rooted: Record<string, string> = {};
-        for (const [p, body] of Object.entries(files)) {
-          rooted[`/home/pyodide/${p}`] = body;
-        }
-        writeTree(pyodide, rooted);
         const result = await runPytest(
-          pyodide,
+          files,
           config.tests.map((t) => t.id),
         );
         setRunState({ kind: "done", result });
