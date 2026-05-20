@@ -41,28 +41,39 @@ export function MentorMessage({ text, onJumpToCode }: Props) {
   }
 
   return (
-    <p className="whitespace-pre-wrap text-sm leading-relaxed">
-      {parts.map((part, i) =>
-        part.kind === "text" ? (
-          <Fragment key={i}>{part.value}</Fragment>
-        ) : onJumpToCode ? (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onJumpToCode(part.file, part.line)}
-            className="mx-0.5 inline rounded border border-blue-200 bg-blue-50 px-1 py-0.5 font-mono text-xs text-blue-700 hover:bg-blue-100"
-            title="Click to jump to this file in the editor"
-          >
-            {part.file}
-            {part.line !== null ? `:${part.line}` : ""}
-          </button>
-        ) : (
-          <code key={i} className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+    // <div> not <p>: the parts can include <button> which isn't valid inside
+    // <p>, and whitespace-pre-wrap behaves more consistently on a div.
+    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+      {parts.map((part, i) => {
+        // Content-based key so re-rendering with a different `text` doesn't
+        // mis-attribute DOM nodes by index.
+        const stableKey = `${part.kind}-${i}-${
+          part.kind === "text" ? part.value.slice(0, 16) : `${part.file}:${part.line ?? ""}`
+        }`;
+        if (part.kind === "text") {
+          return <Fragment key={stableKey}>{part.value}</Fragment>;
+        }
+        if (onJumpToCode) {
+          return (
+            <button
+              key={stableKey}
+              type="button"
+              onClick={() => onJumpToCode(part.file, part.line)}
+              className="mx-0.5 inline rounded border border-blue-200 bg-blue-50 px-1 py-0.5 font-mono text-xs text-blue-700 hover:bg-blue-100"
+              title="Click to jump to this file in the editor"
+            >
+              {part.file}
+              {part.line !== null ? `:${part.line}` : ""}
+            </button>
+          );
+        }
+        return (
+          <code key={stableKey} className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
             {part.file}
             {part.line !== null ? `:${part.line}` : ""}
           </code>
-        ),
-      )}
-    </p>
+        );
+      })}
+    </div>
   );
 }

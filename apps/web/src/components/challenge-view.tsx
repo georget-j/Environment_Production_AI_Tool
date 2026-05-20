@@ -68,11 +68,22 @@ export function ChallengeView({
         return;
       }
       const allFiles = filesRef.current;
+      // Guard: if files haven't loaded yet, refuse rather than POST {}
+      // (the model would otherwise produce a hallucination of "the answer"
+      //  with no context).
+      if (Object.keys(allFiles).length === 0) {
+        alert("Files are still loading — try again in a moment.");
+        return;
+      }
       const editable: Record<string, string> = {};
       const readonly: Record<string, string> = {};
       for (const [path, body] of Object.entries(allFiles)) {
         if (config.editable.includes(path)) editable[path] = body;
         else readonly[path] = body;
+      }
+      if (Object.keys(editable).length === 0) {
+        alert("This challenge has no editable files.");
+        return;
       }
       const response = await fetch(`${API_BASE_URL}/api/ai/show-answer`, {
         method: "POST",
@@ -100,10 +111,6 @@ export function ChallengeView({
       for (const f of data.fixed_files) next[f.path] = f.content;
       runnerRef.current?.applyFiles(next);
 
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(`prodready:answer-viewed:${challengeSlug}`, "1");
-      }
-
       mentorRef.current?.appendAssistantNotice(
         `Here's a working version. ${data.summary}\n\nClick Run tests to confirm it passes.`,
       );
@@ -112,7 +119,7 @@ export function ChallengeView({
     } finally {
       setShowAnswerPending(false);
     }
-  }, [challengeId, challengeSlug, config]);
+  }, [challengeId, config]);
 
   const runner =
     config?.mode === "pyodide" && repoTemplateUrl ? (

@@ -107,16 +107,25 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(function MentorCha
     await postChat(text, level);
   }
 
+  function maybeScrollMentorIntoView() {
+    // On lg+, the mentor is sticky-pinned and already in view — scrolling
+    // would jerk the page. Only scroll on smaller viewports where the
+    // mentor lives below the runner.
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   useImperativeHandle(
     ref,
     () => ({
       async askMentor(text: string, level: 1 | 2 | 3 = 2) {
         setHintLevel(level);
-        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        maybeScrollMentorIntoView();
         await postChat(text, level);
       },
       scrollIntoView() {
-        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        maybeScrollMentorIntoView();
       },
       appendAssistantNotice(text: string) {
         setTurns((prev) => [

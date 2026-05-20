@@ -171,7 +171,7 @@ def explain_tests_endpoint(
 
 class ShowAnswerRequest(BaseModel):
     challenge_id: UUID
-    editable_files: dict[str, str]
+    editable_files: dict[str, str] = Field(..., min_length=1)
     readonly_files: dict[str, str] = Field(default_factory=dict)
     test_output: str | None = None
 
@@ -200,7 +200,7 @@ def show_answer_endpoint(
     readonly = {p: (body.readonly_files.get(p) or "")[:4000] for p in body.readonly_files}
 
     try:
-        payload, _metadata = answer(
+        payload, metadata = answer(
             AnswerInput(
                 challenge_title=challenge.title,
                 scenario=challenge.scenario,
@@ -213,9 +213,26 @@ def show_answer_endpoint(
     except RuntimeError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
 
+    summary = payload.get("summary", "")
+    if summary:
+        # Persist a server-side record so the show-answer summary survives
+        # page reload and admins can audit usage. Tagged via metadata_json.
+        db.add(
+            AIMessage(
+                user_id=user.id,
+                challenge_id=challenge.id,
+                role="assistant",
+                content=f"Here's a working version. {summary}",
+                hint_level=None,
+                prompt_sha=metadata.get("prompt_sha"),
+                metadata_json={**metadata, "source": "show_answer"},
+            )
+        )
+        db.commit()
+
     return ShowAnswerResponse(
         fixed_files=[FixedFile(**f) for f in payload.get("fixed_files", [])],
-        summary=payload.get("summary", ""),
+        summary=summary,
     )
 
 
