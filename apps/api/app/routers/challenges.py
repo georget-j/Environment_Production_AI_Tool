@@ -54,6 +54,7 @@ def get_challenge(slug: str, db: Session = Depends(get_db)) -> ChallengeDetail:
         order_index=challenge.order_index,
         is_free=challenge.is_free,
         skills=challenge.skills,
+        module_id=challenge.module_id,
         scenario=challenge.scenario,
         learner_goal=challenge.learner_goal,
         instructions=challenge.instructions,
