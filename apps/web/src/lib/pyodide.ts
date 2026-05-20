@@ -31,8 +31,29 @@ declare global {
 // Module-scope singletons. Next.js soft navigation (clicking <Link> for the
 // next lesson) preserves the module — so these survive page transitions
 // without re-paying the ~5s Pyodide warm-up. A full reload resets them.
+// `resetPyodide()` invalidates both so the next getPyodide() builds a fresh
+// instance — used when a learner's code corrupts global state (deletes
+// `print`, overrides `sys.stdout`, etc.) and recovery is needed.
 let pyodidePromise: Promise<PyodideInterface> | null = null;
 let pytestPromise: Promise<void> | null = null;
+
+export function resetPyodide(): void {
+  pyodidePromise = null;
+  pytestPromise = null;
+}
+
+/**
+ * Pyodide has no stdin, so calling `input()` blocks the main thread forever.
+ * Detect the common patterns and bail before we run.
+ */
+const INPUT_CALL_RE = /(^|\W)input\s*\(/m;
+
+export function detectUnsupportedFeatures(code: string): string | null {
+  if (INPUT_CALL_RE.test(code)) {
+    return "This sandbox doesn't support `input()` — there's no terminal to type into. Replace `input(...)` with a hard-coded value (e.g. `name = \"Ada\"`) and click Run again.";
+  }
+  return null;
+}
 
 function injectLoaderScript(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -215,21 +236,47 @@ function parseVerboseOutput(text: string): {
  * Run a Python string and return what it printed to stdout.
  * No pytest, no test discovery, no file system writes — used by the
  * Python Basics `predict` and `fillblank` lesson modes.
+ *
+ * Resilient by design: any exception (pyodide throw, syntax error, infinite
+ * recursion, corrupted globals) is captured into the `error` field. We also
+ * restore stdout/stderr to their defaults after each run so a learner who
+ * does `sys.stdout = None` doesn't poison the next call.
  */
 export async function runPythonStdout(
   pyodide: PyodideInterface,
   code: string,
 ): Promise<{ stdout: string; error: string | null }> {
+  const unsupported = detectUnsupportedFeatures(code);
+  if (unsupported) return { stdout: "", error: unsupported };
+
   const lines: string[] = [];
   const errLines: string[] = [];
-  pyodide.setStdout({ batched: (s) => lines.push(s) });
-  pyodide.setStderr({ batched: (s) => errLines.push(s) });
+  try {
+    pyodide.setStdout({ batched: (s) => lines.push(s) });
+    pyodide.setStderr({ batched: (s) => errLines.push(s) });
+  } catch (exc) {
+    return {
+      stdout: "",
+      error: `Couldn't attach stdout: ${exc instanceof Error ? exc.message : String(exc)}. Try the Reset Python button.`,
+    };
+  }
   try {
     await pyodide.runPythonAsync(code);
     return { stdout: lines.join("\n"), error: errLines.join("\n") || null };
   } catch (exc) {
     const message = exc instanceof Error ? exc.message : String(exc);
     return { stdout: lines.join("\n"), error: message };
+  } finally {
+    // Best-effort: restore Python's default stdout/stderr so learner code
+    // that reassigned them doesn't break the NEXT run.
+    try {
+      await pyodide.runPythonAsync(
+        "import sys; sys.stdout = sys.__stdout__; sys.stderr = sys.__stderr__",
+      );
+    } catch {
+      // If even this fails, the instance is irrecoverable — the UI will
+      // surface a Reset button via the error returned above.
+    }
   }
 }
 
@@ -238,8 +285,18 @@ export async function runPytest(
   pytestArgs: string[],
 ): Promise<PytestResult> {
   const lines: string[] = [];
-  pyodide.setStdout({ batched: (s) => lines.push(s) });
-  pyodide.setStderr({ batched: (s) => lines.push(s) });
+  try {
+    pyodide.setStdout({ batched: (s) => lines.push(s) });
+    pyodide.setStderr({ batched: (s) => lines.push(s) });
+  } catch (exc) {
+    return {
+      exitCode: -1,
+      output: `Couldn't attach stdout: ${exc instanceof Error ? exc.message : String(exc)}`,
+      tests: [],
+      summary: "Runner error — try Reset Python",
+      failureLocations: {},
+    };
+  }
 
   const argsLiteral = JSON.stringify([
     "-v",
@@ -248,7 +305,8 @@ export async function runPytest(
     ...pytestArgs,
   ]);
 
-  const exit = await pyodide.runPythonAsync(`
+  try {
+    const exit = await pyodide.runPythonAsync(`
 import sys, os
 sys.path.insert(0, "/home/pyodide")
 os.chdir("/home/pyodide")
@@ -256,17 +314,33 @@ import pytest
 exit_code = pytest.main(${argsLiteral})
 int(exit_code)
 `);
-
-  const output = lines.join("\n");
-  const { tests, summary, failureLocations } = parseVerboseOutput(output);
-
-  return {
-    exitCode: Number(exit),
-    output,
-    tests,
-    summary:
-      summary ||
-      (Number(exit) === 0 ? "All tests passed" : "Some tests failed"),
-    failureLocations,
-  };
+    const output = lines.join("\n");
+    const { tests, summary, failureLocations } = parseVerboseOutput(output);
+    return {
+      exitCode: Number(exit),
+      output,
+      tests,
+      summary:
+        summary ||
+        (Number(exit) === 0 ? "All tests passed" : "Some tests failed"),
+      failureLocations,
+    };
+  } catch (exc) {
+    const message = exc instanceof Error ? exc.message : String(exc);
+    return {
+      exitCode: -1,
+      output: `${lines.join("\n")}\n\n[runner threw before pytest could finish]\n${message}`,
+      tests: [],
+      summary: "Runner error — try Reset Python",
+      failureLocations: {},
+    };
+  } finally {
+    try {
+      await pyodide.runPythonAsync(
+        "import sys; sys.stdout = sys.__stdout__; sys.stderr = sys.__stderr__",
+      );
+    } catch {
+      // see runPythonStdout
+    }
+  }
 }

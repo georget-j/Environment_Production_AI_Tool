@@ -14,8 +14,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
+  detectUnsupportedFeatures,
   ensurePytest,
   getPyodide,
+  resetPyodide,
   runPytest,
   writeTree,
   type PytestResult,
@@ -345,6 +347,26 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     );
 
     const handleRun = useCallback(async () => {
+      // Pre-flight: any user file calling `input()` will hang Pyodide
+      // (no stdin in the browser). Surface a clean explanation instead.
+      for (const [path, body] of Object.entries(files)) {
+        if (config.editable.includes(path)) {
+          const issue = detectUnsupportedFeatures(body);
+          if (issue) {
+            setRunState({
+              kind: "done",
+              result: {
+                exitCode: -1,
+                output: `In ${path}: ${issue}`,
+                tests: [],
+                summary: "Unsupported in the in-browser sandbox",
+                failureLocations: {},
+              },
+            });
+            return;
+          }
+        }
+      }
       setRunState({ kind: "running" });
       setExplainState({ kind: "idle" });
       try {
@@ -562,13 +584,33 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  resetPyodide();
+                  setPyodideState({ kind: "warming" });
+                  void getPyodide()
+                    .then(() => setPyodideState({ kind: "ready" }))
+                    .catch((exc) =>
+                      setPyodideState({
+                        kind: "error",
+                        message:
+                          exc instanceof Error ? exc.message : String(exc),
+                      }),
+                    );
+                }}
+                className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                title="Wipe the Python sandbox if it gets stuck"
+              >
+                Reset Python
+              </button>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={handleReset}
                 disabled={Object.keys(files).length === 0}
               >
-                Reset
+                Reset code
               </Button>
               <Button
                 size="sm"

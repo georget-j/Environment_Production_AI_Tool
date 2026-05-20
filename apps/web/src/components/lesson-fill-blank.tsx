@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { celebrate } from "@/lib/celebrate";
 import type { FillBlankLessonConfig } from "@/lib/featured-files";
-import { getPyodide, runPythonStdout } from "@/lib/pyodide";
+import { getPyodide, resetPyodide, runPythonStdout } from "@/lib/pyodide";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -121,6 +121,15 @@ export function LessonFillBlank({ config, nextSlug }: Props) {
     setRunState({ kind: "idle" });
   }
 
+  /** Wipe the Pyodide singleton and re-warm. Used when the runtime has
+   * gotten into a bad state — e.g. learner code overrode `print` or
+   * `sys.stdout`. Cheap: ~3–5s to spin up a fresh instance. */
+  function resetRuntime() {
+    resetPyodide();
+    setPyodideState({ kind: "cold" });
+    setRunState({ kind: "idle" });
+  }
+
   const runDisabled =
     pyodideState.kind !== "ready" || runState.kind === "running";
 
@@ -129,8 +138,16 @@ export function LessonFillBlank({ config, nextSlug }: Props) {
       <header className="flex flex-none items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Replace the blanks</h3>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={resetRuntime}
+            className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+            title="Wipe the Python sandbox if it gets stuck"
+          >
+            Reset Python
+          </button>
           <Button type="button" variant="outline" size="sm" onClick={reset}>
-            Reset
+            Reset code
           </Button>
           <Button type="button" size="sm" onClick={run} disabled={runDisabled}>
             {runState.kind === "running"
