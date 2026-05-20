@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookiePayload = { name: string; value: string; options?: CookieOptions };
 
-const PROTECTED_PREFIXES = ["/dashboard", "/tracks", "/challenges"];
+// /tracks and /tracks/[slug] are public — they're the curriculum browser and a
+// key piece of marketing. /challenges/[slug] stays gated because the in-page
+// AI calls require an authenticated session anyway.
+const PROTECTED_PREFIXES = ["/dashboard", "/challenges"];
 const AUTH_PAGES = ["/login"];
 
 export async function updateSession(request: NextRequest) {
