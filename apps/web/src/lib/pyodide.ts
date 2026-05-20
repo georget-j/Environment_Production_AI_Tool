@@ -20,6 +20,10 @@ type PyodideInterface = {
   pyimport(name: string): { install(deps: string[]): Promise<void> };
   setStdout(opts: { batched: (s: string) => void }): void;
   setStderr(opts: { batched: (s: string) => void }): void;
+  globals: {
+    set(name: string, value: unknown): void;
+    delete(name: string): boolean;
+  };
 };
 
 declare global {
@@ -232,15 +236,54 @@ function parseVerboseOutput(text: string): {
   return { tests, summary, failureLocations };
 }
 
+// Step budget for the lesson-mode iteration watchdog. 200k Python steps
+// is plenty for any legitimate Python Basics exercise; an infinite loop
+// hits the ceiling and aborts in a fraction of a second.
+const WATCHDOG_MAX_STEPS = 200_000;
+
+/**
+ * Wrap user code so `sys.settrace` counts executed lines and raises after
+ * WATCHDOG_MAX_STEPS. The user's code is passed in via `pyodide.globals`
+ * to avoid any string-escape pitfalls.
+ */
+const WATCHDOG_WRAPPER = `
+import sys as _pyodide_sys
+
+_pyodide_step_count = [0]
+_PYODIDE_MAX_STEPS = ${WATCHDOG_MAX_STEPS}
+
+def _pyodide_watchdog(frame, event, arg):
+    if event == 'line':
+        _pyodide_step_count[0] += 1
+        if _pyodide_step_count[0] > _PYODIDE_MAX_STEPS:
+            raise RuntimeError(
+                "Aborted after %d steps — this looks like an infinite loop. "
+                "Check your loop condition: does it actually become False eventually? "
+                "(For example, in a 'while count > 0' loop, count needs to get smaller.)"
+                % _PYODIDE_MAX_STEPS
+            )
+    return _pyodide_watchdog
+
+_pyodide_sys.settrace(_pyodide_watchdog)
+try:
+    exec(compile(_pyodide_user_code, '<lesson>', 'exec'), {'__name__': '__main__'})
+finally:
+    _pyodide_sys.settrace(None)
+`;
+
 /**
  * Run a Python string and return what it printed to stdout.
  * No pytest, no test discovery, no file system writes — used by the
  * Python Basics `predict` and `fillblank` lesson modes.
  *
- * Resilient by design: any exception (pyodide throw, syntax error, infinite
- * recursion, corrupted globals) is captured into the `error` field. We also
- * restore stdout/stderr to their defaults after each run so a learner who
- * does `sys.stdout = None` doesn't poison the next call.
+ * Resilient by design:
+ * - Any exception (pyodide throw, syntax error, infinite recursion, corrupted
+ *   globals) is captured into the `error` field.
+ * - stdout/stderr are restored to defaults after each run so a learner who
+ *   does `sys.stdout = None` doesn't poison the next call.
+ * - User code runs under a step-count watchdog (`sys.settrace`) that aborts
+ *   infinite loops after WATCHDOG_MAX_STEPS executed lines, so a bad while
+ *   loop returns a clear error instead of freezing the browser tab.
  */
 export async function runPythonStdout(
   pyodide: PyodideInterface,
@@ -261,21 +304,26 @@ export async function runPythonStdout(
     };
   }
   try {
-    await pyodide.runPythonAsync(code);
+    pyodide.globals.set("_pyodide_user_code", code);
+    await pyodide.runPythonAsync(WATCHDOG_WRAPPER);
     return { stdout: lines.join("\n"), error: errLines.join("\n") || null };
   } catch (exc) {
     const message = exc instanceof Error ? exc.message : String(exc);
     return { stdout: lines.join("\n"), error: message };
   } finally {
-    // Best-effort: restore Python's default stdout/stderr so learner code
-    // that reassigned them doesn't break the NEXT run.
+    // Best-effort cleanup. If any of this fails the next run will still
+    // recover via Reset Python.
+    try {
+      pyodide.globals.delete("_pyodide_user_code");
+    } catch {
+      // ignore
+    }
     try {
       await pyodide.runPythonAsync(
         "import sys; sys.stdout = sys.__stdout__; sys.stderr = sys.__stderr__",
       );
     } catch {
-      // If even this fails, the instance is irrecoverable — the UI will
-      // surface a Reset button via the error returned above.
+      // see above
     }
   }
 }
