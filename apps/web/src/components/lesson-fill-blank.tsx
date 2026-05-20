@@ -2,18 +2,28 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { celebrate } from "@/lib/celebrate";
 import type { FillBlankLessonConfig } from "@/lib/featured-files";
 import { getPyodide, runPythonStdout } from "@/lib/pyodide";
+import { useResponsiveHeight } from "@/lib/use-responsive-height";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
-  loading: () => <p className="p-6 text-center text-xs text-muted-foreground">Loading editor…</p>,
+  loading: () => (
+    <p className="p-6 text-center text-xs text-muted-foreground">
+      Loading editor…
+    </p>
+  ),
 });
 
 type Props = {
   config: FillBlankLessonConfig;
+  nextSlug: string | null;
 };
+
+const AUTO_ADVANCE_MS = 1500;
 
 type Pyodide = Awaited<ReturnType<typeof getPyodide>>;
 
@@ -33,10 +43,30 @@ function normalise(s: string): string {
   return s.replace(/\s+$/g, "").trimStart();
 }
 
-export function LessonFillBlank({ config }: Props) {
+export function LessonFillBlank({ config, nextSlug }: Props) {
+  const router = useRouter();
+  const editorHeight = useResponsiveHeight(180, 240);
   const [code, setCode] = useState(config.template);
-  const [pyodideState, setPyodideState] = useState<PyodideState>({ kind: "cold" });
+  const [pyodideState, setPyodideState] = useState<PyodideState>({
+    kind: "cold",
+  });
   const [runState, setRunState] = useState<RunState>({ kind: "idle" });
+  const [autoCancelled, setAutoCancelled] = useState(false);
+
+  // Celebrate the first time the run state flips to pass.
+  useEffect(() => {
+    if (runState.kind === "pass") void celebrate();
+  }, [runState.kind]);
+
+  // Auto-advance to the next lesson 1.5s after pass, unless cancelled.
+  useEffect(() => {
+    if (runState.kind !== "pass" || !nextSlug || autoCancelled) return;
+    const id = window.setTimeout(
+      () => router.push(`/challenges/${nextSlug}`),
+      AUTO_ADVANCE_MS,
+    );
+    return () => window.clearTimeout(id);
+  }, [runState.kind, nextSlug, autoCancelled, router]);
 
   useEffect(() => {
     if (pyodideState.kind !== "cold") return;
@@ -68,13 +98,23 @@ export function LessonFillBlank({ config }: Props) {
     setRunState({ kind: "running" });
     const { stdout, error } = await runPythonStdout(pyodideState.pyodide, code);
     if (error) {
-      setRunState({ kind: "fail", stdout, expected: config.expected_stdout, error });
+      setRunState({
+        kind: "fail",
+        stdout,
+        expected: config.expected_stdout,
+        error,
+      });
       return;
     }
     if (normalise(stdout) === normalise(config.expected_stdout)) {
       setRunState({ kind: "pass", stdout });
     } else {
-      setRunState({ kind: "fail", stdout, expected: config.expected_stdout, error: null });
+      setRunState({
+        kind: "fail",
+        stdout,
+        expected: config.expected_stdout,
+        error: null,
+      });
     }
   }
 
@@ -83,7 +123,8 @@ export function LessonFillBlank({ config }: Props) {
     setRunState({ kind: "idle" });
   }
 
-  const runDisabled = pyodideState.kind !== "ready" || runState.kind === "running";
+  const runDisabled =
+    pyodideState.kind !== "ready" || runState.kind === "running";
 
   return (
     <section className="flex h-full flex-col gap-3 rounded-lg border border-border bg-background p-4">
@@ -105,7 +146,7 @@ export function LessonFillBlank({ config }: Props) {
 
       <div className="overflow-hidden rounded-md border border-border">
         <MonacoEditor
-          height="240px"
+          height={`${editorHeight}px`}
           defaultLanguage="python"
           theme="vs-dark"
           value={code}
@@ -133,8 +174,45 @@ export function LessonFillBlank({ config }: Props) {
       )}
 
       {runState.kind === "pass" && (
-        <div className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
-          ✓ Output matches. Use the lesson navigation to move on.
+        <div
+          onPointerEnter={() => setAutoCancelled(true)}
+          onFocusCapture={() => setAutoCancelled(true)}
+          className="space-y-3 rounded-md border border-green-300 bg-green-50 px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-green-900">
+            ✓ Output matches. Nice work.
+          </p>
+          {nextSlug ? (
+            <>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => router.push(`/challenges/${nextSlug}`)}
+              >
+                Next lesson →
+              </Button>
+              {!autoCancelled ? (
+                <p className="text-center text-[11px] text-green-900/70">
+                  Auto-advancing in {Math.round(AUTO_ADVANCE_MS / 1000)}s …{" "}
+                  <button
+                    type="button"
+                    onClick={() => setAutoCancelled(true)}
+                    className="underline hover:no-underline"
+                  >
+                    Stay on this lesson
+                  </button>
+                </p>
+              ) : (
+                <p className="text-center text-[11px] text-green-900/70">
+                  Take your time — click Next when you&apos;re ready.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-green-900">
+              You&apos;ve finished the last lesson of this track 🎉
+            </p>
+          )}
         </div>
       )}
 

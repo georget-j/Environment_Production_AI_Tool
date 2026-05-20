@@ -28,7 +28,11 @@ declare global {
   }
 }
 
+// Module-scope singletons. Next.js soft navigation (clicking <Link> for the
+// next lesson) preserves the module — so these survive page transitions
+// without re-paying the ~5s Pyodide warm-up. A full reload resets them.
 let pyodidePromise: Promise<PyodideInterface> | null = null;
+let pytestPromise: Promise<void> | null = null;
 
 function injectLoaderScript(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -40,10 +44,14 @@ function injectLoaderScript(): Promise<void> {
       resolve();
       return;
     }
-    const existing = document.querySelector<HTMLScriptElement>("script[data-pyodide]");
+    const existing = document.querySelector<HTMLScriptElement>(
+      "script[data-pyodide]",
+    );
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Pyodide loader failed")));
+      existing.addEventListener("error", () =>
+        reject(new Error("Pyodide loader failed")),
+      );
       return;
     }
     const script = document.createElement("script");
@@ -51,11 +59,18 @@ function injectLoaderScript(): Promise<void> {
     script.async = true;
     script.dataset.pyodide = "1";
     script.addEventListener("load", () => resolve());
-    script.addEventListener("error", () => reject(new Error("Pyodide loader failed")));
+    script.addEventListener("error", () =>
+      reject(new Error("Pyodide loader failed")),
+    );
     document.head.appendChild(script);
   });
 }
 
+/**
+ * Bare Pyodide — no pytest, no micropip work. Used by the Python Basics
+ * `fillblank` runner (which only needs `runPythonStdout`) and as the base
+ * the pytest-mode runners extend via `ensurePytest()`.
+ */
 export async function getPyodide(): Promise<PyodideInterface> {
   if (pyodidePromise) return pyodidePromise;
 
@@ -64,11 +79,7 @@ export async function getPyodide(): Promise<PyodideInterface> {
     if (!window.loadPyodide) {
       throw new Error("loadPyodide not exposed after script load");
     }
-    const pyodide = await window.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
-    await pyodide.loadPackage(["micropip"]);
-    const micropip = pyodide.pyimport("micropip");
-    await micropip.install(["pytest"]);
-    return pyodide;
+    return window.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
   })().catch((exc) => {
     pyodidePromise = null;
     throw exc;
@@ -78,10 +89,31 @@ export async function getPyodide(): Promise<PyodideInterface> {
 }
 
 /**
+ * Install pytest on top of bare Pyodide, exactly once. Subsequent calls
+ * return the cached promise so the FastAPI runner can call this on every
+ * `handleRun` without paying the install cost twice.
+ */
+export async function ensurePytest(pyodide: PyodideInterface): Promise<void> {
+  if (pytestPromise) return pytestPromise;
+  pytestPromise = (async () => {
+    await pyodide.loadPackage(["micropip"]);
+    const micropip = pyodide.pyimport("micropip");
+    await micropip.install(["pytest"]);
+  })().catch((exc) => {
+    pytestPromise = null;
+    throw exc;
+  });
+  return pytestPromise;
+}
+
+/**
  * Write a tree of files into Pyodide's in-memory filesystem.
  * Coerces every path to absolute so writes don't depend on cwd.
  */
-export function writeTree(pyodide: PyodideInterface, files: Record<string, string>): void {
+export function writeTree(
+  pyodide: PyodideInterface,
+  files: Record<string, string>,
+): void {
   for (const [rawPath, body] of Object.entries(files)) {
     const abs = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
     const segments = abs.split("/").filter(Boolean);
@@ -118,7 +150,8 @@ export type PytestResult = {
 };
 
 // "tests/test_orders.py::test_compute_total_without_coupon PASSED  [ 14%]"
-const VERBOSE_LINE_RE = /^(.+?::[\w[\]\-.]+)\s+(PASSED|FAILED|ERROR|SKIPPED)\b/i;
+const VERBOSE_LINE_RE =
+  /^(.+?::[\w[\]\-.]+)\s+(PASSED|FAILED|ERROR|SKIPPED)\b/i;
 // Short traceback line: "app/orders.py:24: in compute_total" or "app/orders.py:24:"
 const TB_LOCATION_RE = /^([\w./-]+\.py):(\d+):/;
 
@@ -208,7 +241,12 @@ export async function runPytest(
   pyodide.setStdout({ batched: (s) => lines.push(s) });
   pyodide.setStderr({ batched: (s) => lines.push(s) });
 
-  const argsLiteral = JSON.stringify(["-v", "--tb=short", "--no-header", ...pytestArgs]);
+  const argsLiteral = JSON.stringify([
+    "-v",
+    "--tb=short",
+    "--no-header",
+    ...pytestArgs,
+  ]);
 
   const exit = await pyodide.runPythonAsync(`
 import sys, os
@@ -226,7 +264,9 @@ int(exit_code)
     exitCode: Number(exit),
     output,
     tests,
-    summary: summary || (Number(exit) === 0 ? "All tests passed" : "Some tests failed"),
+    summary:
+      summary ||
+      (Number(exit) === 0 ? "All tests passed" : "Some tests failed"),
     failureLocations,
   };
 }

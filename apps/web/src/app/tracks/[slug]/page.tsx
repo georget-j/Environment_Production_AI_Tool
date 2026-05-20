@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch, type ChallengeSummary, type TrackDetail } from "@/lib/api";
+import { PyodidePrewarm } from "@/components/pyodide-prewarm";
 
 type Params = Promise<{ slug: string }>;
 
@@ -26,12 +27,17 @@ export default async function TrackDetailPage({ params }: { params: Params }) {
   // fall back to "everything goes under the first module" so older tracks
   // still render.
   const firstModuleId = track.modules[0]?.id;
-  if (firstModuleId && challengesByModule.size === 0 && track.challenges.length > 0) {
+  if (
+    firstModuleId &&
+    challengesByModule.size === 0 &&
+    track.challenges.length > 0
+  ) {
     challengesByModule.set(firstModuleId, [...track.challenges]);
   }
 
   return (
     <div className="space-y-10 py-8">
+      <PyodidePrewarm />
       <header className="space-y-3">
         <h1 className="text-3xl font-semibold">{track.title}</h1>
         {track.description && (
@@ -78,7 +84,9 @@ export default async function TrackDetailPage({ params }: { params: Params }) {
                           )}
                         </div>
                         {c.is_free ? (
-                          <span className="rounded-full bg-muted px-2 py-1 text-xs">Free</span>
+                          <span className="rounded-full bg-muted px-2 py-1 text-xs">
+                            Free
+                          </span>
                         ) : (
                           <span className="rounded-full bg-primary px-2 py-1 text-xs text-primary-foreground">
                             Pro

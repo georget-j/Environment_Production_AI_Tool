@@ -5,8 +5,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AiReview } from "@/components/ai-review";
+import { celebrate } from "@/lib/celebrate";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 type Submission = {
   id: string;
@@ -26,6 +28,15 @@ export default function SubmissionPage({ params }: { params: Params }) {
   const { id } = use(params);
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [celebrated, setCelebrated] = useState(false);
+
+  // Confetti the moment the submission lands and we see it passed.
+  useEffect(() => {
+    if (submission?.passed && !celebrated) {
+      void celebrate();
+      setCelebrated(true);
+    }
+  }, [submission?.passed, celebrated]);
 
   useEffect(() => {
     let active = true;
@@ -69,10 +80,32 @@ export default function SubmissionPage({ params }: { params: Params }) {
   }, [id]);
 
   if (error) return <p className="py-8 text-sm text-red-600">{error}</p>;
-  if (!submission) return <p className="py-8 text-sm text-muted-foreground">Loading…</p>;
+  if (!submission)
+    return <p className="py-8 text-sm text-muted-foreground">Loading…</p>;
 
   return (
     <div className="space-y-8 py-8">
+      {submission.passed && (
+        <div className="rounded-lg border border-green-300 bg-green-50 px-5 py-4 text-green-900">
+          <p className="text-lg font-semibold">🎉 You shipped it.</p>
+          <p className="mt-1 text-sm">
+            All tests passed. The AI code review is{" "}
+            {submission.ai_review_json &&
+            Object.keys(submission.ai_review_json).length > 0
+              ? "ready below."
+              : "generating below — usually 5–10 seconds."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/tracks">
+              <Button>Pick the next challenge →</Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button variant="outline">Dashboard</Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">
           {submission.passed ? "Tests passed" : "Tests failed"}
@@ -89,7 +122,10 @@ export default function SubmissionPage({ params }: { params: Params }) {
           </a>{" "}
           {submission.commit_sha && (
             <>
-              @ <code className="font-mono text-xs">{submission.commit_sha.slice(0, 7)}</code>
+              @{" "}
+              <code className="font-mono text-xs">
+                {submission.commit_sha.slice(0, 7)}
+              </code>
             </>
           )}
         </p>
@@ -104,7 +140,8 @@ export default function SubmissionPage({ params }: { params: Params }) {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold">AI review</h2>
-        {submission.ai_review_json && Object.keys(submission.ai_review_json).length > 0 ? (
+        {submission.ai_review_json &&
+        Object.keys(submission.ai_review_json).length > 0 ? (
           <AiReview raw={submission.ai_review_json} />
         ) : (
           <p className="text-sm text-muted-foreground">Generating…</p>

@@ -4,10 +4,15 @@ import { Markdown } from "@/components/markdown";
 import { CHALLENGE_CONFIG } from "@/lib/featured-files";
 import { ChallengeView } from "@/components/challenge-view";
 import { LessonNav } from "@/components/lesson-nav";
+import { LessonProgressBar } from "@/components/lesson-progress-bar";
 
 type Params = Promise<{ slug: string }>;
 
-export default async function ChallengeDetailPage({ params }: { params: Params }) {
+export default async function ChallengeDetailPage({
+  params,
+}: {
+  params: Params;
+}) {
   const { slug } = await params;
   let challenge: ChallengeDetail;
   try {
@@ -20,20 +25,30 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
 
   return (
     <div className="space-y-8 py-6">
-      <LessonNav
-        previous={challenge.previous}
-        next={challenge.next}
-        position={challenge.position_in_track}
-        total={challenge.total_in_track}
-      />
+      <div className="space-y-2">
+        <LessonNav
+          previous={challenge.previous}
+          next={challenge.next}
+          position={challenge.position_in_track}
+          total={challenge.total_in_track}
+        />
+        <LessonProgressBar
+          position={challenge.position_in_track}
+          total={challenge.total_in_track}
+        />
+      </div>
 
       {/* Hero: full-width title + scenario + goal */}
       <header className="space-y-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {challenge.module.title}
         </p>
-        <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">{challenge.title}</h1>
-        <p className="max-w-3xl text-base leading-relaxed text-foreground">{challenge.scenario}</p>
+        <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+          {challenge.title}
+        </h1>
+        <p className="max-w-3xl text-base leading-relaxed text-foreground">
+          {challenge.scenario}
+        </p>
 
         <div className="max-w-3xl rounded-md border-l-4 border-primary bg-muted/40 px-4 py-3 text-sm leading-relaxed">
           <span className="font-semibold">Your goal: </span>
@@ -58,6 +73,7 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
         repoTemplateUrl={challenge.repo_template_url}
         repoBranch={challenge.repo_branch}
         config={config}
+        nextSlug={challenge.next?.slug ?? null}
       />
 
       {/* Footer: skills + quick reference */}
@@ -78,12 +94,15 @@ export default async function ChallengeDetailPage({ params }: { params: Params }
           </div>
         </div>
         <details className="text-muted-foreground">
-          <summary className="cursor-pointer text-xs hover:text-foreground">How this works</summary>
+          <summary className="cursor-pointer text-xs hover:text-foreground">
+            How this works
+          </summary>
           <div className="mt-2 max-w-md rounded-md border border-border bg-muted/10 p-3 text-xs leading-relaxed">
-            Edit the unlocked files in the workspace. Click <strong>Run tests</strong> — Python
-            runs entirely inside your browser. The mentor on the right gives hints; click{" "}
-            <strong>Show me the answer</strong> if you&apos;re truly stuck. Submit when all tests
-            pass.
+            Edit the unlocked files in the workspace. Click{" "}
+            <strong>Run tests</strong> — Python runs entirely inside your
+            browser. The mentor on the right gives hints; click{" "}
+            <strong>Show me the answer</strong> if you&apos;re truly stuck.
+            Submit when all tests pass.
           </div>
         </details>
       </footer>

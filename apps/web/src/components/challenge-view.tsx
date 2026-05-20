@@ -14,9 +14,13 @@ import { ShowAnswerModal } from "@/components/show-answer-modal";
 import { createClient } from "@/lib/supabase/client";
 import type { ChallengeRunnerConfig } from "@/lib/featured-files";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-type ShowAnswerError = { kind: "auth" | "loading" | "no-editable" | "api"; message: string };
+type ShowAnswerError = {
+  kind: "auth" | "loading" | "no-editable" | "api";
+  message: string;
+};
 
 type Props = {
   challengeId: string;
@@ -24,6 +28,8 @@ type Props = {
   repoTemplateUrl: string | null;
   repoBranch: string | null;
   config: ChallengeRunnerConfig | undefined;
+  /** Slug of the next lesson in the same track, for auto-advance on success. */
+  nextSlug: string | null;
 };
 
 /**
@@ -40,13 +46,15 @@ export function ChallengeView({
   repoTemplateUrl,
   repoBranch,
   config,
+  nextSlug,
 }: Props) {
   const mentorRef = useRef<MentorChatHandle | null>(null);
   const runnerRef = useRef<ChallengeRunnerHandle | null>(null);
   const filesRef = useRef<Record<string, string>>({});
   const [showAnswerOpen, setShowAnswerOpen] = useState(false);
   const [showAnswerPending, setShowAnswerPending] = useState(false);
-  const [showAnswerError, setShowAnswerError] = useState<ShowAnswerError | null>(null);
+  const [showAnswerError, setShowAnswerError] =
+    useState<ShowAnswerError | null>(null);
 
   const handleStuck = useCallback((message: string) => {
     void mentorRef.current?.askMentor(message, 2);
@@ -70,7 +78,10 @@ export function ChallengeView({
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        setShowAnswerError({ kind: "auth", message: "Sign in to use Show me the answer." });
+        setShowAnswerError({
+          kind: "auth",
+          message: "Sign in to use Show me the answer.",
+        });
         return;
       }
       const allFiles = filesRef.current;
@@ -154,10 +165,10 @@ export function ChallengeView({
       );
       break;
     case "predict":
-      runner = <LessonPredict config={config} />;
+      runner = <LessonPredict config={config} nextSlug={nextSlug} />;
       break;
     case "fillblank":
-      runner = <LessonFillBlank config={config} />;
+      runner = <LessonFillBlank config={config} nextSlug={nextSlug} />;
       break;
     case "reading":
     default:
@@ -179,10 +190,27 @@ export function ChallengeView({
           ref={mentorRef}
           challengeId={challengeId}
           onJumpToCode={handleJumpToCode}
-          onShowAnswer={config?.mode === "pyodide" ? () => setShowAnswerOpen(true) : undefined}
+          onShowAnswer={
+            config?.mode === "pyodide"
+              ? () => setShowAnswerOpen(true)
+              : undefined
+          }
           showAnswerPending={showAnswerPending}
         />
       </aside>
+
+      {/* Mobile-only: floating "Ask the mentor" jump button. The mentor
+       * panel lives below the runner on small screens; this gives a
+       * one-tap shortcut so the learner doesn't have to scroll past the
+       * entire editor to reach it. Hidden on lg+ where the mentor is
+       * already pinned in the sidebar. */}
+      <button
+        type="button"
+        onClick={() => mentorRef.current?.scrollIntoView()}
+        className="fixed bottom-4 right-4 z-40 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg hover:bg-primary/90 lg:hidden"
+      >
+        Ask the mentor ↓
+      </button>
 
       <ShowAnswerModal
         open={showAnswerOpen}
