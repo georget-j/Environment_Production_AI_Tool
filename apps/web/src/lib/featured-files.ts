@@ -41,7 +41,7 @@ export type ChallengeRunnerConfig =
 export const CHALLENGE_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "fastapi-commerce-run-and-explore": {
     mode: "reading",
-    readonly: ["README.md", "app/main.py", "tests/test_orders.py"],
+    readonly: ["app/main.py", "app/orders.py", "tests/test_orders.py"],
   },
 
   "fastapi-commerce-fix-failing-test": {

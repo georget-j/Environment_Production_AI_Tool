@@ -1,7 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
 
-from app.main import app
 from app.models import store
 from app.orders import compute_total, create_order
 
@@ -42,6 +40,13 @@ def test_invalid_quantity_rejected(seeded_products) -> None:
 
 
 def test_orders_endpoint_smoke(seeded_products) -> None:
+    """Server-level smoke test. FastAPI is imported lazily so test
+    collection works in environments without FastAPI (e.g. Pyodide).
+    """
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
     p1, _ = seeded_products
     client = TestClient(app)
     response = client.post(
