@@ -399,7 +399,7 @@ LESSONS: list[Lesson] = [
             "print(np.isclose(var_manual, x.var()))"
         ),
         your_turn="Replace `___` with the operator that elementwise-squares the deviations.",
-        expected_stdout="0.000408 0.000408\nTrue",
+        expected_stdout="0.000398 0.000398\nTrue",
         hint="Two asterisks.",
         skills=["quant", "numpy", "statistics"],
     ),
@@ -620,7 +620,7 @@ LESSONS: list[Lesson] = [
 
     # ============ Stage 2 — Pandas & Statistics (10 lessons) ============
     Lesson(
-        n=11, stage=2, mode="fillblank",
+        n=14, stage=2, mode="fillblank",
         title="DataFrames from CSV",
         scenario="A DataFrame is the workhorse of every research notebook. Loading 10 years of SPY prices takes one call.",
         learner_goal="Load the bundled SPY CSV into a DataFrame and report its shape.",
@@ -642,7 +642,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=12, stage=2, mode="predict",
+        n=15, stage=2, mode="predict",
         title="Loc versus iloc",
         scenario="`.loc` indexes by label, `.iloc` indexes by position. Mixing them up is the most common pandas bug.",
         learner_goal="Predict the values returned by .iloc and .loc on a small frame.",
@@ -663,7 +663,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "pandas"],
     ),
     Lesson(
-        n=13, stage=2, mode="fillblank",
+        n=16, stage=2, mode="fillblank",
         title="Boolean filtering on real prices",
         scenario="`(df['close'] > df['open'])` returns a boolean Series. Pass it to `df[...]` and you've filtered the frame — vectorised, fast, idiomatic.",
         learner_goal="Count the SPY days where the close was above the open.",
@@ -687,7 +687,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=14, stage=2, mode="matplot",
+        n=17, stage=2, mode="matplot",
         title="Daily and log returns",
         scenario="Two ways to express returns: simple `(p_t / p_{t-1}) - 1` and log `ln(p_t / p_{t-1})`. They're nearly identical for small moves and additively neat for the log version.",
         learner_goal="Compute simple and log returns from SPY adj_close and plot a histogram of each.",
@@ -717,7 +717,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=15, stage=2, mode="matplot",
+        n=18, stage=2, mode="matplot",
         title="Rolling volatility",
         scenario="A 30-day rolling standard deviation of returns, annualised, is the canonical 'realised vol' a strategy gates on.",
         learner_goal="Compute SPY's 30-day rolling vol and plot it against time.",
@@ -747,7 +747,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=16, stage=2, mode="fillblank",
+        n=19, stage=2, mode="fillblank",
         title="Groupby year",
         scenario="Pandas groupby is split-apply-combine. Group by calendar year and you can answer 'how did each year score?' in two lines.",
         learner_goal="Compute SPY's mean daily return by calendar year.",
@@ -773,7 +773,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=17, stage=2, mode="fillblank",
+        n=20, stage=2, mode="fillblank",
         title="Aligning two series",
         scenario="Real research mixes tickers with different calendars (BTC trades weekends; SPY doesn't). Aligning on a shared index is the first step of any cross-asset analysis.",
         learner_goal="Merge SPY and AAPL on the date column and confirm row count.",
@@ -799,7 +799,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy", "aapl"],
     ),
     Lesson(
-        n=18, stage=2, mode="matplot",
+        n=21, stage=2, mode="matplot",
         title="Fitting a normal to returns",
         scenario="Daily returns look gaussian-ish until you check the tails. Plotting a normal pdf over the empirical histogram makes the mismatch visible.",
         learner_goal="Fit a normal to SPY's daily returns and overlay it on the histogram.",
@@ -835,7 +835,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=19, stage=2, mode="fillblank",
+        n=22, stage=2, mode="fillblank",
         title="OLS beta of AAPL on SPY",
         scenario="Beta of a single stock to the market is the simplest factor regression. statsmodels reports an inference summary — coefficient, std error, p-value, R².",
         learner_goal="Run OLS of AAPL returns on SPY returns and read the slope coefficient.",
@@ -865,7 +865,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy", "aapl"],
     ),
     Lesson(
-        n=20, stage=2, mode="predict",
+        n=23, stage=2, mode="predict",
         title="Stationarity preview",
         scenario="An ARIMA model needs stationary input. The Augmented Dickey-Fuller test gives a p-value: small p → reject 'unit root' → series is stationary.",
         learner_goal="Read an ADF p-value on SPY prices vs returns and predict which is stationary.",
@@ -895,7 +895,7 @@ LESSONS: list[Lesson] = [
 
     # ============ Stage 3 — Financial Foundations / Options (10 lessons) ============
     Lesson(
-        n=21, stage=3, mode="fillblank",
+        n=24, stage=3, mode="fillblank",
         title="Present value of a single cash flow",
         scenario="A pound tomorrow is worth less than a pound today. Discounting is the simplest version of every pricing model in finance.",
         learner_goal="Compute the present value of £1000 received in 5 years at a 4% discount rate.",
@@ -916,7 +916,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options"],
     ),
     Lesson(
-        n=22, stage=3, mode="fillblank",
+        n=25, stage=3, mode="fillblank",
         title="Bond yield to maturity",
         scenario="The YTM of a bond is the rate `r` that makes the discounted cash flows equal the price. There's no closed-form solution — you solve it numerically.",
         learner_goal="Find the YTM of a 5-year bond paying a 5% coupon, priced at par (face=100).",
@@ -943,7 +943,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options"],
     ),
     Lesson(
-        n=23, stage=3, mode="matplot",
+        n=26, stage=3, mode="matplot",
         title="Option payoff diagrams",
         scenario="A call's payoff at expiry is `max(S - K, 0)`. A put's is `max(K - S, 0)`. Plot them and you've drawn every derivatives textbook's first figure.",
         learner_goal="Plot the payoff of a long call with strike 100 over spot prices 60..140.",
@@ -974,7 +974,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options", "matplotlib"],
     ),
     Lesson(
-        n=24, stage=3, mode="fillblank",
+        n=27, stage=3, mode="fillblank",
         title="Put-call parity",
         scenario="Put-call parity says `C - P = S - K * exp(-r*T)`. It's a no-arbitrage identity — if it breaks, someone is leaving money on the table.",
         learner_goal="Verify put-call parity numerically using the Black-Scholes prices.",
@@ -997,7 +997,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options"],
     ),
     Lesson(
-        n=25, stage=3, mode="fillblank",
+        n=28, stage=3, mode="fillblank",
         title="Black-Scholes from scratch",
         scenario="The Black-Scholes call price is `S*N(d1) - K*exp(-r*T)*N(d2)` where `d1 = (ln(S/K) + (r + σ²/2)*T) / (σ*sqrt(T))` and `d2 = d1 - σ*sqrt(T)`.",
         learner_goal="Implement the Black-Scholes call price and verify against a textbook example.",
@@ -1026,7 +1026,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options", "black-scholes"],
     ),
     Lesson(
-        n=26, stage=3, mode="fillblank",
+        n=29, stage=3, mode="fillblank",
         title="Greeks: delta of a call",
         scenario="Delta is `dC/dS` — how much the option price moves when the underlying moves £1. For a Black-Scholes call, delta is just `N(d1)`.",
         learner_goal="Compute the delta of an at-the-money call.",
@@ -1053,7 +1053,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options", "greeks"],
     ),
     Lesson(
-        n=27, stage=3, mode="fillblank",
+        n=30, stage=3, mode="fillblank",
         title="Binomial tree pricer",
         scenario="The CRR (Cox-Ross-Rubinstein) tree builds N steps of up/down moves and prices the option by backward induction. With enough steps it converges to Black-Scholes.",
         learner_goal="Price a European call with a 50-step binomial tree.",
@@ -1086,7 +1086,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options", "black-scholes"],
     ),
     Lesson(
-        n=28, stage=3, mode="matplot",
+        n=31, stage=3, mode="matplot",
         title="Monte Carlo option pricing",
         scenario="Simulate many terminal stock prices under risk-neutral dynamics; average the discounted payoffs. The estimate converges as `1 / sqrt(N)` — plot to see it.",
         learner_goal="Price a European call by Monte Carlo and plot the running estimate's convergence.",
@@ -1123,7 +1123,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options", "monte-carlo"],
     ),
     Lesson(
-        n=29, stage=3, mode="matplot",
+        n=32, stage=3, mode="matplot",
         title="Mean-variance frontier",
         scenario="Markowitz's efficient frontier is the locus of minimum-variance portfolios for each target return. Plot it for SPY + AAPL + TLT and you've recreated the most-cited chart in finance.",
         learner_goal="Sweep target returns and plot the resulting min-variance volatilities.",
@@ -1159,7 +1159,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy", "aapl", "tlt"],
     ),
     Lesson(
-        n=30, stage=3, mode="fillblank",
+        n=33, stage=3, mode="fillblank",
         title="Sharpe, max drawdown",
         scenario="The Sharpe ratio is mean return divided by standard deviation, annualised. Max drawdown is the worst peak-to-trough on the equity curve.",
         learner_goal="Compute SPY's annualised Sharpe ratio and max drawdown.",
@@ -1191,7 +1191,7 @@ LESSONS: list[Lesson] = [
 
     # ============ Stage 4 — Machine Learning for Finance (6 lessons) ============
     Lesson(
-        n=31, stage=4, mode="fillblank",
+        n=34, stage=4, mode="fillblank",
         title="sklearn fit and predict",
         scenario="scikit-learn's API is the same for every estimator: `.fit(X, y)` learns, `.predict(X)` infers, `.score(X, y)` reports R² or accuracy.",
         learner_goal="Train a linear regression on a toy dataset and verify the perfect fit.",
@@ -1218,7 +1218,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "machine-learning", "regression"],
     ),
     Lesson(
-        n=32, stage=4, mode="predict",
+        n=35, stage=4, mode="predict",
         title="Lookahead bias",
         scenario="In finance ML the order of your rows matters. A random `train_test_split` lets the model see the future — and inflates your Sharpe spectacularly.",
         learner_goal="Recognise why a chronological split is the honest baseline.",
@@ -1243,7 +1243,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "machine-learning", "backtesting"],
     ),
     Lesson(
-        n=33, stage=4, mode="fillblank",
+        n=36, stage=4, mode="fillblank",
         title="Momentum signal regression",
         scenario="A 5-day momentum is a classic feature: did the stock go up over the last week? Regressing next-day return on this is the smallest non-trivial ML model in finance.",
         learner_goal="Fit a linear regression of next-day SPY return on lagged 5-day return; report the R².",
@@ -1277,7 +1277,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=34, stage=4, mode="fillblank",
+        n=37, stage=4, mode="fillblank",
         title="Random forest direction classifier",
         scenario="A forest of decision trees can spot non-linear patterns a linear model would miss — at the cost of being a black box.",
         learner_goal="Train a 100-tree random forest to predict next-day direction from 5-day momentum and rolling volatility.",
@@ -1319,7 +1319,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=35, stage=4, mode="fillblank",
+        n=38, stage=4, mode="fillblank",
         title="Time-series cross-validation",
         scenario="`TimeSeriesSplit` slices a chronological frame into expanding-window CV folds. Every test fold starts after its train fold — no leakage.",
         learner_goal="Run a 5-fold time-series CV on a linear model and average the fold scores.",
@@ -1353,7 +1353,7 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=36, stage=4, mode="predict",
+        n=39, stage=4, mode="predict",
         title="The p-hacked Sharpe trap",
         scenario="Try 1000 random strategies; the best one will look brilliant by chance. Lopez de Prado calls this 'backtest overfitting' and warns it dwarfs every other risk in quant ML.",
         learner_goal="Predict the maximum Sharpe of 1000 pure-noise strategies — and feel why a 'great' backtest in isolation is meaningless.",
@@ -1380,7 +1380,7 @@ LESSONS: list[Lesson] = [
 
     # ============ Stage 5 — Performance & C (12 lessons) ============
     Lesson(
-        n=37, stage=5, mode="cwasm",
+        n=40, stage=5, mode="cwasm",
         title="Why C",
         scenario="Python is where research lives. C is where the inner loop of a matching engine runs a billion times a day. The latency budget is the difference.",
         learner_goal="Read a real C limit-order-book node and see it execute.",
@@ -1436,7 +1436,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language", "low-latency"],
     ),
     Lesson(
-        n=38, stage=5, mode="cscript",
+        n=41, stage=5, mode="cscript",
         title="Hello C",
         scenario="The simplest C program — `printf` plus `return 0`. Same shape every C program in the world has at its core.",
         learner_goal="Print 'hello, C!' from a C program.",
@@ -1461,7 +1461,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language"],
     ),
     Lesson(
-        n=39, stage=5, mode="cscript",
+        n=42, stage=5, mode="cscript",
         title="Types and arithmetic",
         scenario="C has explicit types: `int` is integer, `double` is 8-byte float. Mixing them follows promotion rules — division is the most surprising.",
         learner_goal="Print the integer division of 7/2 and the floating-point division of 7.0/2.0.",
@@ -1486,7 +1486,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language"],
     ),
     Lesson(
-        n=40, stage=5, mode="cscript",
+        n=43, stage=5, mode="cscript",
         title="Conditionals and loops",
         scenario="C's `for` loop has three parts: init, test, increment. Same idea as Python but with explicit types and braces.",
         learner_goal="Print the first 5 squares using a for-loop.",
@@ -1517,7 +1517,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language"],
     ),
     Lesson(
-        n=41, stage=5, mode="cscript",
+        n=44, stage=5, mode="cscript",
         title="Arrays and pointers",
         scenario="In C, an array's name decays to a pointer to its first element. Pointer arithmetic walks the array byte-by-byte — `*(p + 2)` is the same as `p[2]`.",
         learner_goal="Use pointer arithmetic to print the third element of an array.",
@@ -1546,7 +1546,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language", "memory"],
     ),
     Lesson(
-        n=42, stage=5, mode="cscript",
+        n=45, stage=5, mode="cscript",
         title="Structs",
         scenario="A struct groups related fields. Every market-data tick, every order, every position in a quant system is a struct.",
         learner_goal="Define a Bond struct and print its fields.",
@@ -1585,7 +1585,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language", "memory"],
     ),
     Lesson(
-        n=43, stage=5, mode="cscript",
+        n=46, stage=5, mode="cscript",
         title="Function pointers",
         scenario="A function pointer lets you pass behaviour, not just data. C's `qsort` takes one — every C program that sorts a struct uses this pattern.",
         learner_goal="Pass a comparison function to `apply` and print the result.",
@@ -1614,7 +1614,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language"],
     ),
     Lesson(
-        n=44, stage=5, mode="cscript",
+        n=47, stage=5, mode="cscript",
         title="malloc and free",
         scenario="C makes you allocate and free memory yourself. Forgetting `free` is a leak; freeing twice is a crash. Modern languages hide this; C surfaces it.",
         learner_goal="Allocate a 3-int buffer with malloc, write to it, print it, then free it.",
@@ -1647,7 +1647,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language", "memory"],
     ),
     Lesson(
-        n=45, stage=5, mode="cwasm",
+        n=48, stage=5, mode="cwasm",
         title="C ring buffer",
         scenario="A ring buffer wraps a fixed-size array with head/tail indices. Every HFT feed handler has one. Same pattern: push when not full, pop when not empty.",
         learner_goal="Read a fixed-size ring buffer in C and run it to see push/pop in action.",
@@ -1702,7 +1702,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "c-language", "low-latency", "memory"],
     ),
     Lesson(
-        n=46, stage=5, mode="fillblank",
+        n=49, stage=5, mode="fillblank",
         title="The same ring buffer in Python",
         scenario="The Python translation works. It's also slow. Same algorithm, same memory pattern — what's missing is the compiled inner loop.",
         learner_goal="Implement a fixed-size ring buffer in Python and time it.",
@@ -1753,7 +1753,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "performance", "memory"],
     ),
     Lesson(
-        n=47, stage=5, mode="predict",
+        n=50, stage=5, mode="predict",
         title="Cython preview",
         scenario="Cython is Python with C type annotations. Add `cdef int` to a hot loop and you've trimmed most of the interpreter overhead — same code shape, 50–100× speedup.",
         learner_goal="Read a Cython-style snippet and recognise the type annotations.",
@@ -1783,7 +1783,7 @@ LESSONS: list[Lesson] = [
         skills=["quant", "performance", "c-language"],
     ),
     Lesson(
-        n=48, stage=5, mode="predict",
+        n=51, stage=5, mode="predict",
         title="cffi preview",
         scenario="cffi lets Python call functions from a `.so` you compiled yourself. The same loop in a C library, called from Python, is what numpy does internally for every ufunc.",
         learner_goal="Recognise the cffi binding pattern — declare the function signature, load the shared object, call it.",

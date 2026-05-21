@@ -6,65 +6,83 @@ import type { ChallengeRunnerConfig } from "@/lib/featured-files";
 export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "quant-01-why-numpy": {
   "mode": "predict",
-  "code": "import numpy as np, time\nn = 1_000_000\nxs = list(range(n))\narr = np.arange(n)\nprint(sum(xs) == int(arr.sum()))",
+  "code": "import numpy as np\nn = 1_000_000\nxs = list(range(n))\narr = np.arange(n)\nprint(sum(xs) == int(arr.sum()))",
   "expected_stdout": "True",
   "prompt": "True or False?"
 },
   "quant-02-creating-arrays": {
   "mode": "fillblank",
-  "template": "import numpy as np\na = np.array([1.0, 2.0, 3.0])\nb = np.___(3)\nc = np.___(0, 1, 5)\nprint(a, b, c, sep=' | ')",
-  "expected_stdout": "[1. 2. 3.] | [0. 0. 0.] | [0.   0.25 0.5  0.75 1.  ]",
-  "hint": "One blank is `zeros`, the other is `linspace`."
+  "template": "import numpy as np\ncoupons = np.array([0.025, 0.032, 0.041])\nsignals = np.___(252)\nstrikes = np.___(80, 120, 5)\nprint(coupons, signals[:3], strikes, sep=' | ')",
+  "expected_stdout": "[0.025 0.032 0.041] | [0. 0. 0.] | [ 80.  90. 100. 110. 120.]",
+  "hint": "One is `zeros`, the other is `linspace`."
 },
-  "quant-03-broadcasting": {
+  "quant-03-broadcasting-basics": {
   "mode": "predict",
-  "code": "import numpy as np\nM = np.zeros((4, 3))\nrow = np.array([10, 20, 30])\nprint((M + row)[0])",
-  "expected_stdout": "[10. 20. 30.]",
-  "prompt": "Type the row exactly as numpy prints it."
+  "code": "import numpy as np\nraw = np.full((4, 3), 0.012)\nrf = np.array([0.0001, 0.0001, 0.0002])\nexcess = raw - rf\nprint(excess[0])",
+  "expected_stdout": "[0.0119 0.0119 0.0118]",
+  "prompt": "Type the row as numpy prints it."
 },
-  "quant-04-boolean-masks": {
+  "quant-04-broadcasting-gotchas": {
+  "mode": "predict",
+  "code": "import numpy as np\nraw = np.full((4, 3), 0.01)\nweights = np.array([1.0, 0.5, 2.0, 1.5])\nscaled = raw * weights.reshape(4, 1)\nprint(scaled[:, 0])",
+  "expected_stdout": "[0.01  0.005 0.02  0.015]",
+  "prompt": "Type the column as numpy prints it."
+},
+  "quant-05-boolean-masks": {
   "mode": "fillblank",
-  "template": "import numpy as np\nr = np.array([-0.02, 0.01, -0.005, 0.015, 0.0, 0.03])\npositive = r[r ___ 0]\nprint(positive)",
-  "expected_stdout": "[0.01  0.015 0.03 ]",
+  "template": "import numpy as np\nr = np.array([-0.02, 0.01, -0.005, 0.015, 0.0, 0.03])\nup_only = r[r ___ 0]\nprint(up_only)\nprint(f'kept {len(up_only)} of {len(r)} minutes')",
+  "expected_stdout": "[0.01  0.015 0.03 ]\nkept 3 of 6 minutes",
   "hint": "Strictly positive \u2014 zero doesn't count."
 },
-  "quant-05-covariance-via-matrix-algebra": {
+  "quant-06-variance-from-scratch": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nrng = np.random.default_rng(0)\nx = rng.normal(loc=0.0, scale=0.02, size=10_000)\nmu = x.mean()\ndeviations = x - mu\nvar_manual = (deviations ___ 2).mean()\nprint(round(var_manual, 6), round(x.var(), 6))\nprint(np.isclose(var_manual, x.var()))",
+  "expected_stdout": "0.000398 0.000398\nTrue",
+  "hint": "Two asterisks."
+},
+  "quant-07-covariance-via-matrix-algebra": {
   "mode": "fillblank",
   "template": "import numpy as np\nrng = np.random.default_rng(0)\nX = rng.normal(size=(1000, 2))\nXd = X - X.mean(axis=0)\ncov = Xd.___ @ Xd / X.shape[0]\nprint(np.round(cov, 2))",
   "expected_stdout": "[[ 1.04 -0.02]\n [-0.02  0.96]]",
   "hint": "Two-letter attribute on every numpy array."
 },
-  "quant-06-reproducible-random-numbers": {
+  "quant-08-reproducible-random-numbers": {
   "mode": "fillblank",
-  "template": "import numpy as np\na = np.random.default_rng(___).normal(size=3)\nb = np.random.default_rng(42).normal(size=3)\nprint(np.array_equal(a, b))",
-  "expected_stdout": "True",
-  "hint": "Use 42."
+  "template": "import numpy as np\nalice = np.random.default_rng(___).normal(size=3)\nbob   = np.random.default_rng(42).normal(size=3)\nprint('alice:', alice)\nprint('bob:  ', bob)\nprint('identical:', np.array_equal(alice, bob))",
+  "expected_stdout": "alice: [ 0.30471708 -1.03998411  0.7504512 ]\nbob:   [ 0.30471708 -1.03998411  0.7504512 ]\nidentical: True",
+  "hint": "Match the integer Bob used."
 },
-  "quant-07-statistical-reductions": {
+  "quant-09-statistical-reductions": {
   "mode": "fillblank",
-  "template": "import numpy as np\nrng = np.random.default_rng(0)\nr = rng.normal(loc=0.001, scale=0.02, size=10_000)\nprint(round(r.___(), 4), round(r.___(), 4), round(np.___(r, 95), 4))",
-  "expected_stdout": "0.0011 0.02 0.0338",
+  "template": "import numpy as np\nrng = np.random.default_rng(0)\nr = rng.normal(loc=0.001, scale=0.02, size=10_000)\nmu    = r.___()\nsigma = r.___()\np95   = np.___(r, 95)\nprint(f'mean  = {mu:.4f}')\nprint(f'std   = {sigma:.4f}')\nprint(f'p95   = {p95:.4f}')",
+  "expected_stdout": "mean  = 0.0011\nstd   = 0.0200\np95   = 0.0338",
   "hint": "Two methods, one function. All three are short, common names."
 },
-  "quant-08-why-numpy-is-fast": {
+  "quant-10-why-numpy-is-fast": {
   "mode": "predict",
   "code": "import numpy as np\nx = np.arange(1_000_000)\nprint(int(x.sum()))",
   "expected_stdout": "499999500000",
   "prompt": "Type the integer."
 },
-  "quant-09-vectorising-a-rolling-mean": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nx = np.array([1, 2, 3, 4, 5, 6], dtype=float)\nw = 3\nc = np.concatenate(([0], np.___(x)))\nroll = (c[w:] - c[:-w]) / w\nprint(roll)",
-  "expected_stdout": "[2. 3. 4. 5.]",
-  "hint": "It's literally called the cumulative sum."
+  "quant-11-the-slow-python-rolling-mean": {
+  "mode": "predict",
+  "code": "x = [1, 2, 3, 4, 5, 6]\nw = 3\nrolling = []\nfor i in range(w - 1, len(x)):\n    s = 0\n    for j in range(i - w + 1, i + 1):\n        s += x[j]\n    rolling.append(s / w)\nprint(rolling)",
+  "expected_stdout": "[2.0, 3.0, 4.0, 5.0]",
+  "prompt": "Type the list as Python prints it."
 },
-  "quant-10-plot-a-price-path": {
+  "quant-12-vectorising-with-cumsum": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nx = np.array([1, 2, 3, 4, 5, 6], dtype=float)\nw = 3\nc = np.concatenate(([0], np.___(x)))\nrolling = (c[w:] - c[:-w]) / w\nprint(rolling)",
+  "expected_stdout": "[2. 3. 4. 5.]",
+  "hint": "Three letters then `sum`."
+},
+  "quant-13-plot-a-price-path": {
   "mode": "matplot",
-  "template": "import numpy as np, matplotlib.pyplot as plt\nrng = np.random.default_rng(0)\nshocks = rng.normal(0, 0.01, 252)\nprice = 100 * np.exp(np.cumsum(shocks))\nplt.plot(___)\nplt.title('Simulated price path'); plt.xlabel('day'); plt.ylabel('price')\nprint('plotted')",
+  "template": "import numpy as np, matplotlib.pyplot as plt\nrng = np.random.default_rng(0)\nshocks = rng.normal(0, 0.01, 252)\nprice = 100 * np.exp(np.cumsum(shocks))\nplt.plot(___)\nplt.title('Simulated price path')\nplt.xlabel('trading day')\nplt.ylabel('price (USD)')\nprint('plotted')",
   "expected_stdout": "plotted",
   "hint": "It's a single variable name."
 },
-  "quant-11-dataframes-from-csv": {
+  "quant-14-dataframes-from-csv": {
   "mode": "fillblank",
   "template": "import pandas as pd\ndf = pd.___('/data/quant/spy.csv')\nprint(df.shape)",
   "expected_stdout": "(2766, 7)",
@@ -73,13 +91,13 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-12-loc-versus-iloc": {
+  "quant-15-loc-versus-iloc": {
   "mode": "predict",
   "code": "import pandas as pd\ndf = pd.DataFrame({'price': [100, 101, 99]}, index=['a', 'b', 'c'])\nprint(df.iloc[0]['price'], df.loc['b', 'price'])",
   "expected_stdout": "100 101",
   "prompt": "Two space-separated numbers."
 },
-  "quant-13-boolean-filtering-on-real-prices": {
+  "quant-16-boolean-filtering-on-real-prices": {
   "mode": "fillblank",
   "template": "import pandas as pd\ndf = pd.read_csv('/data/quant/spy.csv')\nup = (df['close'] ___ df['open']).sum()\nprint(up)",
   "expected_stdout": "1487",
@@ -88,7 +106,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-14-daily-and-log-returns": {
+  "quant-17-daily-and-log-returns": {
   "mode": "matplot",
   "template": "import pandas as pd, numpy as np, matplotlib.pyplot as plt\ndf = pd.read_csv('/data/quant/spy.csv')\nsimple = df['adj_close'].___().dropna()\nlog_r = np.log(df['adj_close'] / df['adj_close'].shift(1)).dropna()\nplt.hist(log_r, bins=60)\nplt.title('SPY log returns'); plt.xlabel('return'); plt.ylabel('count')\nprint(round(simple.std(), 4), round(log_r.std(), 4))",
   "expected_stdout": "0.0112 0.0112",
@@ -97,7 +115,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-15-rolling-volatility": {
+  "quant-18-rolling-volatility": {
   "mode": "matplot",
   "template": "import pandas as pd, numpy as np, matplotlib.pyplot as plt\ndf = pd.read_csv('/data/quant/spy.csv')\nr = df['adj_close'].pct_change()\nvol = r.rolling(30).___() * np.sqrt(252)\nplt.plot(vol)\nplt.title('SPY 30-day rolling vol'); plt.xlabel('day'); plt.ylabel('annualised vol')\nprint(round(vol.max(), 3))",
   "expected_stdout": "0.821",
@@ -106,7 +124,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-16-groupby-year": {
+  "quant-19-groupby-year": {
   "mode": "fillblank",
   "template": "import pandas as pd\ndf = pd.read_csv('/data/quant/spy.csv')\ndf['year'] = pd.to_datetime(df['date']).dt.year\nby_year = df.___('year')['adj_close'].apply(lambda s: s.pct_change().mean())\nprint(round(by_year[2020], 5))",
   "expected_stdout": "0.00085",
@@ -115,7 +133,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-17-aligning-two-series": {
+  "quant-20-aligning-two-series": {
   "mode": "fillblank",
   "template": "import pandas as pd\nspy = pd.read_csv('/data/quant/spy.csv')\naapl = pd.read_csv('/data/quant/aapl.csv')\njoined = pd.merge(spy, aapl, on='date', how='___', suffixes=('_spy', '_aapl'))\nprint(joined.shape)",
   "expected_stdout": "(2766, 13)",
@@ -125,7 +143,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "aapl"
   ]
 },
-  "quant-18-fitting-a-normal-to-returns": {
+  "quant-21-fitting-a-normal-to-returns": {
   "mode": "matplot",
   "template": "import pandas as pd, numpy as np, matplotlib.pyplot as plt\nfrom scipy.stats import norm\ndf = pd.read_csv('/data/quant/spy.csv')\nr = df['adj_close'].pct_change().dropna()\nmu, sigma = norm.___(r)\nxs = np.linspace(r.min(), r.max(), 200)\nplt.hist(r, bins=80, density=True, alpha=0.6)\nplt.plot(xs, norm.pdf(xs, mu, sigma))\nplt.title('SPY daily returns vs normal fit')\nprint(round(sigma, 4))",
   "expected_stdout": "0.0112",
@@ -134,7 +152,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-19-ols-beta-of-aapl-on-spy": {
+  "quant-22-ols-beta-of-aapl-on-spy": {
   "mode": "fillblank",
   "template": "import pandas as pd, statsmodels.api as sm\nspy = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\naapl = pd.read_csv('/data/quant/aapl.csv')['adj_close'].pct_change()\ndf = pd.concat([spy, aapl], axis=1).dropna()\nX = sm.add_constant(df.iloc[:, 0])\nres = sm.___(df.iloc[:, 1], X).fit()\nprint(round(res.params.iloc[1], 2))",
   "expected_stdout": "1.21",
@@ -144,61 +162,61 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "aapl"
   ]
 },
-  "quant-20-stationarity-preview": {
+  "quant-23-stationarity-preview": {
   "mode": "predict",
   "code": "import pandas as pd\nfrom statsmodels.tsa.stattools import adfuller\ndf = pd.read_csv('/data/quant/spy.csv')\np_price = adfuller(df['adj_close'])[1]\np_ret = adfuller(df['adj_close'].pct_change().dropna())[1]\nprint(p_price > 0.05, p_ret < 0.05)",
   "expected_stdout": "True True",
   "prompt": "Two booleans."
 },
-  "quant-21-present-value-of-a-single-cash-flow": {
+  "quant-24-present-value-of-a-single-cash-flow": {
   "mode": "fillblank",
   "template": "cf, r, t = 1000, 0.04, 5\npv = cf / (1 + r)___t\nprint(round(pv, 2))",
   "expected_stdout": "821.93",
   "hint": "Two asterisks."
 },
-  "quant-22-bond-yield-to-maturity": {
+  "quant-25-bond-yield-to-maturity": {
   "mode": "fillblank",
   "template": "from scipy.optimize import brentq\nface, coupon, n, price = 100, 5, 5, 100\ndef npv(r):\n    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\nytm = ___(npv, 0.0001, 0.5)\nprint(round(ytm, 4))",
   "expected_stdout": "0.05",
   "hint": "Imported above. Six letters."
 },
-  "quant-23-option-payoff-diagrams": {
+  "quant-26-option-payoff-diagrams": {
   "mode": "matplot",
   "template": "import numpy as np, matplotlib.pyplot as plt\nS = np.linspace(60, 140, 81)\nK, premium = 100, 5\npayoff = np.___(S - K, 0) - premium\nplt.plot(S, payoff)\nplt.title('Long call (K=100)'); plt.xlabel('spot'); plt.ylabel('profit')\nplt.axhline(0, color='gray', lw=0.5)\nprint(round(payoff[-1], 1))",
   "expected_stdout": "35.0",
   "hint": "It's `maximum`, not `max`."
 },
-  "quant-24-put-call-parity": {
+  "quant-27-put-call-parity": {
   "mode": "fillblank",
   "template": "import numpy as np\nS, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\nP_from_parity = C - S + K * np.exp(___ * T)\nprint(round(P_from_parity, 2))",
   "expected_stdout": "5.68",
   "hint": "The exponent should be negative."
 },
-  "quant-25-black-scholes-from-scratch": {
+  "quant-28-black-scholes-from-scratch": {
   "mode": "fillblank",
   "template": "import numpy as np\nfrom scipy.stats import norm\nS, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\nd1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\nd2 = d1 - sigma*np.sqrt(T)\nC = S*norm.___(d1) - K*np.exp(-r*T)*norm.___(d2)\nprint(round(C, 4))",
   "expected_stdout": "10.4506",
   "hint": "Three letters \u2014 cumulative distribution function."
 },
-  "quant-26-greeks-delta-of-a-call": {
+  "quant-29-greeks-delta-of-a-call": {
   "mode": "fillblank",
   "template": "import numpy as np\nfrom scipy.stats import norm\nS, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\nd1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\ndelta = ___.cdf(d1)\nprint(round(delta, 4))",
   "expected_stdout": "0.6368",
   "hint": "Four letters."
 },
-  "quant-27-binomial-tree-pricer": {
+  "quant-30-binomial-tree-pricer": {
   "mode": "fillblank",
   "template": "import numpy as np\nS, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\ndt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\np = (np.exp(r*dt) - d)/(u - d)\nST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\nvals = np.maximum(ST - K, 0)\nfor _ in range(N):\n    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[___])\nprint(round(vals[0], 4))",
   "expected_stdout": "10.4107",
   "hint": "Two-character slice."
 },
-  "quant-28-monte-carlo-option-pricing": {
+  "quant-31-monte-carlo-option-pricing": {
   "mode": "matplot",
   "template": "import numpy as np, matplotlib.pyplot as plt\nS0, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50_000\nrng = np.random.default_rng(0)\nZ = rng.standard_normal(N)\nST = S0 * np.exp((r - sigma**2/2)*T + sigma*np.sqrt(T)*Z)\npayoffs = np.exp(-r*T) * np.maximum(ST - K, 0)\nrunning = np.___(payoffs) / np.arange(1, N+1)\nplt.plot(running)\nplt.axhline(10.4506, color='red', lw=0.5, label='Black-Scholes')\nplt.legend(); plt.title('MC call price convergence')\nprint(round(running[-1], 3))",
   "expected_stdout": "10.48",
   "hint": "Cumulative sum."
 },
-  "quant-29-mean-variance-frontier": {
+  "quant-32-mean-variance-frontier": {
   "mode": "matplot",
   "template": "import pandas as pd, numpy as np, matplotlib.pyplot as plt\ndef ret(t): return pd.read_csv(f'/data/quant/{t}.csv')['adj_close'].pct_change().dropna().values[-1000:]\nR = np.column_stack([ret('spy'), ret('aapl'), ret('tlt')])\nmu, S = R.mean(axis=0), np.cov(R, ___=False)\nSinv = np.linalg.inv(S); ones = np.ones(3)\na = ones @ Sinv @ ones; b = mu @ Sinv @ ones; c = mu @ Sinv @ mu\ntargets = np.linspace(mu.min(), mu.max(), 50)\nvars_ = (a*targets**2 - 2*b*targets + c) / (a*c - b**2)\nplt.plot(np.sqrt(vars_), targets); plt.xlabel('vol'); plt.ylabel('return')\nprint(round(float(np.sqrt(vars_).min()), 4))",
   "expected_stdout": "0.0079",
@@ -209,7 +227,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "tlt"
   ]
 },
-  "quant-30-sharpe-max-drawdown": {
+  "quant-33-sharpe-max-drawdown": {
   "mode": "fillblank",
   "template": "import pandas as pd, numpy as np\ndf = pd.read_csv('/data/quant/spy.csv')\nr = df['adj_close'].pct_change().dropna()\nsharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\neq = (1 + r).cumprod()\ndd = (eq / eq.___() - 1).min()\nprint(round(sharpe, 2), round(dd, 3))",
   "expected_stdout": "0.8 -0.337",
@@ -218,19 +236,19 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-31-sklearn-fit-and-predict": {
+  "quant-34-sklearn-fit-and-predict": {
   "mode": "fillblank",
   "template": "import numpy as np\nfrom sklearn.linear_model import LinearRegression\nX = np.arange(10).reshape(-1, 1)\ny = 2 * X.ravel() + 3\nmodel = LinearRegression().___(X, y)\nprint(round(model.score(X, y), 4))",
   "expected_stdout": "1.0",
   "hint": "Three letters."
 },
-  "quant-32-lookahead-bias": {
+  "quant-35-lookahead-bias": {
   "mode": "predict",
   "code": "from sklearn.model_selection import train_test_split\nimport numpy as np\nX = np.arange(10).reshape(-1, 1); y = np.arange(10)\n_, X_test, _, _ = train_test_split(X, y, test_size=0.2, shuffle=False)\nprint(X_test.ravel().tolist())",
   "expected_stdout": "[8, 9]",
   "prompt": "Type the list as Python prints it."
 },
-  "quant-33-momentum-signal-regression": {
+  "quant-36-momentum-signal-regression": {
   "mode": "fillblank",
   "template": "import pandas as pd, numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import train_test_split\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\nX = df[['mom']].values; y = df['next'].values\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, ___=False)\nscore = LinearRegression().fit(Xtr, ytr).score(Xte, yte)\nprint(round(score, 4))",
   "expected_stdout": "0.0049",
@@ -239,7 +257,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-34-random-forest-direction-classifier": {
+  "quant-37-random-forest-direction-classifier": {
   "mode": "fillblank",
   "template": "import pandas as pd, numpy as np\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import train_test_split\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({\n    'mom': r.shift(1).rolling(5).sum(),\n    'vol': r.shift(1).rolling(20).std(),\n    'next': np.sign(r),\n}).dropna()\nX = df[['mom','vol']].values; y = df['next'].values\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\nscore = RandomForestClassifier(n_estimators=100, random_state=0).___(Xtr, ytr).score(Xte, yte)\nprint(round(score, 3))",
   "expected_stdout": "0.526",
@@ -248,7 +266,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-35-time-series-cross-validation": {
+  "quant-38-time-series-cross-validation": {
   "mode": "fillblank",
   "template": "import pandas as pd, numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import TimeSeriesSplit, cross_val_score\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\nX = df[['mom']].values; y = df['next'].values\ntscv = ___(n_splits=5)\nscores = cross_val_score(LinearRegression(), X, y, cv=tscv)\nprint(round(scores.mean(), 4))",
   "expected_stdout": "0.0",
@@ -257,81 +275,81 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
-  "quant-36-the-p-hacked-sharpe-trap": {
+  "quant-39-the-p-hacked-sharpe-trap": {
   "mode": "predict",
   "code": "import numpy as np\nrng = np.random.default_rng(42)\nR = rng.normal(0, 0.01, size=(1000, 1000))\nsharpe = R.mean(axis=1) / R.std(axis=1) * np.sqrt(252)\nprint(round(sharpe.max(), 2) > 1.5)",
   "expected_stdout": "True",
   "prompt": "True or False?"
 },
-  "quant-37-why-c": {
+  "quant-40-why-c": {
   "mode": "cwasm",
   "source": "#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct Order {\n    int order_id;\n    double price;\n    int qty;\n    struct Order *next;\n} Order;\n\n/* Insert sorted descending by price (best bid at head). */\nstatic Order *insert_bid(Order *head, int id, double price, int qty) {\n    Order *n = malloc(sizeof *n);\n    n->order_id = id; n->price = price; n->qty = qty; n->next = NULL;\n    if (head == NULL || price > head->price) {\n        n->next = head;\n        return n;\n    }\n    Order *cur = head;\n    while (cur->next != NULL && cur->next->price >= price) cur = cur->next;\n    n->next = cur->next;\n    cur->next = n;\n    return head;\n}\n\nint main(void) {\n    Order *bids = NULL;\n    bids = insert_bid(bids, 1, 100.05, 5);\n    bids = insert_bid(bids, 2, 100.10, 3);\n    bids = insert_bid(bids, 3, 99.95, 8);\n    bids = insert_bid(bids, 4, 100.10, 2);\n    bids = insert_bid(bids, 5, 100.07, 1);\n    printf(\"bids: \"); for (Order *c = bids; c; c = c->next)\n        printf(\"[#%d %.2f x %d] \", c->order_id, c->price, c->qty);\n    printf(\"\\nbest bid: %.2f (qty %d)\\n\", bids->price, bids->qty);\n    return 0;\n}\n",
   "wasm_demo": "lob_node",
   "expected_stdout_contains": "best bid: 100.10",
   "hint": "The best bid should win on price, then time priority."
 },
-  "quant-38-hello-c": {
+  "quant-41-hello-c": {
   "mode": "cscript",
   "template": "#include <stdio.h>\nint main() {\n    printf(\"___\\n\");\n    return 0;\n}",
   "expected_stdout": "hello, C!",
   "hint": "No quotes \u2014 those come from the surrounding code."
 },
-  "quant-39-types-and-arithmetic": {
+  "quant-42-types-and-arithmetic": {
   "mode": "cscript",
   "template": "#include <stdio.h>\nint main() {\n    printf(\"%d %.1f\\n\", 7 / 2, 7.0 / ___);\n    return 0;\n}",
   "expected_stdout": "3 3.5",
   "hint": "A single digit."
 },
-  "quant-40-conditionals-and-loops": {
+  "quant-43-conditionals-and-loops": {
   "mode": "cscript",
   "template": "#include <stdio.h>\nint main() {\n    for (int i = 1; i <= 5; ___) {\n        printf(\"%d \", i * i);\n    }\n    printf(\"\\n\");\n    return 0;\n}",
   "expected_stdout": "1 4 9 16 25",
   "hint": "Two characters."
 },
-  "quant-41-arrays-and-pointers": {
+  "quant-44-arrays-and-pointers": {
   "mode": "cscript",
   "template": "#include <stdio.h>\nint main() {\n    int a[5] = {10, 20, 30, 40, 50};\n    int *p = a;\n    printf(\"%d\\n\", *(p + ___));\n    return 0;\n}",
   "expected_stdout": "30",
   "hint": "Arrays are zero-indexed."
 },
-  "quant-42-structs": {
+  "quant-45-structs": {
   "mode": "cscript",
   "template": "#include <stdio.h>\nstruct Bond {\n    double face;\n    int years;\n};\nint main() {\n    struct Bond b;\n    b.face = 1000.0;\n    b.years = 5;\n    printf(\"face=%.2f years=%d\\n\", b.face, b.___);\n    return 0;\n}",
   "expected_stdout": "face=1000.00 years=5",
   "hint": "It's right above \u2014 five letters."
 },
-  "quant-43-function-pointers": {
+  "quant-46-function-pointers": {
   "mode": "cscript",
   "template": "#include <stdio.h>\nint square(int x) { return x * x; }\nint apply(int (*f)(int), int x) { return f(x); }\nint main() {\n    printf(\"%d\\n\", apply(___, 7));\n    return 0;\n}",
   "expected_stdout": "49",
   "hint": "It's the function defined above main."
 },
-  "quant-44-malloc-and-free": {
+  "quant-47-malloc-and-free": {
   "mode": "cscript",
   "template": "#include <stdio.h>\n#include <stdlib.h>\nint main() {\n    int *p = (int *) malloc(3 * sizeof(int));\n    p[0] = 7; p[1] = 8; p[2] = 9;\n    printf(\"%d %d %d\\n\", p[0], p[1], p[2]);\n    ___(p);\n    return 0;\n}",
   "expected_stdout": "7 8 9",
   "hint": "Opposite of malloc \u2014 four letters."
 },
-  "quant-45-c-ring-buffer": {
+  "quant-48-c-ring-buffer": {
   "mode": "cwasm",
   "source": "#include <stdio.h>\n#include <stdbool.h>\n\n#define CAP 4\n\ntypedef struct {\n    int slots[CAP];\n    int head, tail, count;\n} RingBuffer;\n\nstatic bool rb_push(RingBuffer *rb, int x) {\n    if (rb->count == CAP) return false;\n    rb->slots[rb->head] = x;\n    rb->head = (rb->head + 1) % CAP;\n    rb->count++;\n    return true;\n}\n\nstatic bool rb_pop(RingBuffer *rb, int *out) {\n    if (rb->count == 0) return false;\n    *out = rb->slots[rb->tail];\n    rb->tail = (rb->tail + 1) % CAP;\n    rb->count--;\n    return true;\n}\n\nint main(void) {\n    RingBuffer rb = {0};\n    for (int i = 1; i <= 6; i++)\n        printf(\"push(%d) %s  count=%d\\n\",\n               i * 10, rb_push(&rb, i * 10) ? \"ok\" : \"FULL\", rb.count);\n    int v;\n    while (rb_pop(&rb, &v))\n        printf(\"pop -> %d  count=%d\\n\", v, rb.count);\n    return 0;\n}\n",
   "wasm_demo": "ring_buffer",
   "expected_stdout_contains": "push(50) FULL",
   "hint": "One push will fail; pops drain in FIFO order."
 },
-  "quant-46-the-same-ring-buffer-in-python": {
+  "quant-49-the-same-ring-buffer-in-python": {
   "mode": "fillblank",
   "template": "import time\nclass RingBuffer:\n    def __init__(self, cap):\n        self.slots = [0]*cap; self.cap = cap; self.head = self.tail = self.count = 0\n    def push(self, x):\n        if self.count == self.cap: return False\n        self.slots[self.head] = x; self.head = (self.head + 1) % self.cap; self.count += 1\n        return True\n    def pop(self):\n        if self.count == 0: return None\n        v = self.slots[self.tail]; self.tail = (self.tail + 1) % self.cap; self.count -= 1\n        return v\nrb = RingBuffer(4)\nfor i in (10, 20, 30, 40, 50): rb.___(i)\nout = []\nwhile (v := rb.pop()) is not None:\n    out.append(v)\nprint(out)",
   "expected_stdout": "[10, 20, 30, 40]",
   "hint": "Same name as the C version."
 },
-  "quant-47-cython-preview": {
+  "quant-50-cython-preview": {
   "mode": "predict",
   "code": "def cy_sum(arr):\n    total = 0\n    for i in range(len(arr)):\n        total += arr[i]\n    return total\nprint(cy_sum(list(range(100))))",
   "expected_stdout": "4950",
   "prompt": "Type the integer."
 },
-  "quant-48-cffi-preview": {
+  "quant-51-cffi-preview": {
   "mode": "predict",
   "code": "def c_sum_simulated(arr, n):\n    return sum(arr[:n])\nprint(c_sum_simulated(list(range(50)), 50))",
   "expected_stdout": "1225",
