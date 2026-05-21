@@ -22,7 +22,9 @@
  */
 
 const PICOC_VERSION = "1.0.12";
-const PICOC_UMD_URL = `https://cdn.jsdelivr.net/npm/picoc-js@${PICOC_VERSION}/dist/bundle.umd.js`;
+// Self-hosted UMD bundle (vendored under apps/web/public/vendor/). We
+// avoid CDN dependencies at runtime — same trade-off as our WASM C demos.
+const PICOC_UMD_URL = "/vendor/picoc.umd.js";
 const RUNTIME_TIMEOUT_MS = 2500;
 const SETTLE_DELAY_MS = 200;
 const ERROR_LINE_RE = /^file\.c:\d+:\d+\s/m;
@@ -57,34 +59,49 @@ function loadPicoc(): Promise<PicocApi> {
   const w = window as typeof window & { picocjs?: PicocApi };
   if (w.picocjs?.runC) return Promise.resolve(w.picocjs);
   picocPromise = new Promise<PicocApi>((resolve, reject) => {
-    const existing = document.querySelector(
-      `script[data-picoc="${PICOC_VERSION}"]`,
-    ) as HTMLScriptElement | null;
-    const script = existing ?? document.createElement("script");
-    if (!existing) {
-      script.src = PICOC_UMD_URL;
-      script.async = true;
-      script.dataset.picoc = PICOC_VERSION;
-      document.head.appendChild(script);
-    }
     const settle = () => {
       const picoc = (window as typeof window & { picocjs?: PicocApi }).picocjs;
       if (picoc?.runC) resolve(picoc);
       else
         reject(
-          new Error("picoc-js script loaded but window.picocjs is missing"),
+          new Error(
+            "picoc-js script loaded but window.picocjs is missing — vendored bundle may be corrupt",
+          ),
         );
     };
+    const existing = document.querySelector(
+      `script[data-picoc="${PICOC_VERSION}"]`,
+    ) as HTMLScriptElement | null;
     if (existing) {
-      // Race: another caller is already loading. Wait a microtask then check.
-      setTimeout(settle, 0);
-    } else {
-      script.onload = settle;
-      script.onerror = () => {
-        picocPromise = null;
-        reject(new Error("Couldn't fetch picoc-js from the CDN"));
-      };
+      // Another caller already kicked off the load. If the global is set,
+      // resolve now; otherwise wait for the in-flight script's load event.
+      if ((window as typeof window & { picocjs?: PicocApi }).picocjs?.runC) {
+        settle();
+        return;
+      }
+      existing.addEventListener("load", settle, { once: true });
+      existing.addEventListener(
+        "error",
+        () => {
+          picocPromise = null;
+          reject(new Error("Couldn't load the C runtime"));
+        },
+        { once: true },
+      );
+      return;
     }
+    const script = document.createElement("script");
+    // Attach handlers BEFORE src — avoids a race where a cached script
+    // can execute before onload is attached (rare but real on warm reloads).
+    script.onload = settle;
+    script.onerror = () => {
+      picocPromise = null;
+      reject(new Error("Couldn't load /vendor/picoc.umd.js"));
+    };
+    script.async = true;
+    script.dataset.picoc = PICOC_VERSION;
+    script.src = PICOC_UMD_URL;
+    document.head.appendChild(script);
   }).catch((exc) => {
     picocPromise = null;
     throw exc;
