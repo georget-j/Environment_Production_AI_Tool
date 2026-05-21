@@ -622,12 +622,15 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=14, stage=2, mode="fillblank",
         title="DataFrames from CSV",
-        scenario="A DataFrame is the workhorse of every research notebook. Loading 10 years of SPY prices takes one call.",
+        scenario="Citadel's day-1 onboarding stub sends the new researcher a notebook: load five tickers, line them up by date, draw a chart. Step one is always `pd.read_csv`. The bundled SPY tape here is 10 years of daily OHLCV — same shape you'd land at any prop shop, modulo field names.",
         learner_goal="Load the bundled SPY CSV into a DataFrame and report its shape.",
-        concept="`pd.read_csv(path)` returns a DataFrame. `df.shape` gives `(rows, cols)`. The bundled file `/data/quant/spy.csv` has daily OHLCV bars 2015–2025.",
+        concept="`pd.read_csv(path)` returns a DataFrame — pandas's tabular workhorse. `df.shape` gives `(rows, cols)`. The bundled file `/data/quant/spy.csv` carries daily bars from 2015-01-01 through 2025-12-31, seven columns: date, open, high, low, close, volume, adj_close. About 2,766 rows — almost exactly 252 × 11.",
         example_code=(
             "import pandas as pd\n"
+            "# Bundled tape: SPY 2015-01-01 → 2025-12-31, daily OHLCV.\n"
+            "# 7 columns: date, open, high, low, close, volume, adj_close.\n"
             "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "# Almost exactly 252 trading days × 11 years.\n"
             "print(df.shape)"
         ),
         template=(
@@ -644,12 +647,15 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=15, stage=2, mode="predict",
         title="Loc versus iloc",
-        scenario="`.loc` indexes by label, `.iloc` indexes by position. Mixing them up is the most common pandas bug.",
+        scenario="The most common bug juniors at any prop shop ship in a pandas notebook: a `.loc` where they meant `.iloc`, or vice versa. The strategy returns the wrong row, the backtest looks great, the strategy live-trades and loses money. Five seconds to learn the difference, then it's automatic for the rest of your career.",
         learner_goal="Predict the values returned by .iloc and .loc on a small frame.",
-        concept="`.iloc[0]` is always the first row. `.loc[0]` is the row labelled `0` — usually the same, until you sort or filter, then the label and the position diverge.",
+        concept="`.iloc[i]` is *position* — always the i-th physical row, no matter how the frame is labelled or sorted. `.loc[label]` is *label* — looks up by the index value. For an unsorted, integer-indexed frame they coincide. After a sort or filter, they diverge — and that's when wrong-row bugs ship.",
         example_code=(
             "import pandas as pd\n"
+            "# Tiny 3-row frame with custom labels a/b/c, not the default 0/1/2.\n"
             "df = pd.DataFrame({'price': [100, 101, 99]}, index=['a', 'b', 'c'])\n"
+            "# .iloc[0] is the first physical row → price 100.\n"
+            "# .loc['b','price'] is the row LABELLED 'b' → price 101.\n"
             "print(df.iloc[0]['price'], df.loc['b', 'price'])"
         ),
         code=(
@@ -665,12 +671,14 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=16, stage=2, mode="fillblank",
         title="Boolean filtering on real prices",
-        scenario="`(df['close'] > df['open'])` returns a boolean Series. Pass it to `df[...]` and you've filtered the frame — vectorised, fast, idiomatic.",
+        scenario="First analytic anyone runs against a new tape at a mid-frequency shop: 'how many up-days in this window?' If your data has a hidden corruption — duplicated date, mis-aligned column — this 30-second sanity check usually catches it before you build a strategy on top.",
         learner_goal="Count the SPY days where the close was above the open.",
-        concept="A comparison between two Series returns a boolean Series the same length. Using it as `df[mask]` keeps only rows where the mask is True. The number of up-days is `mask.sum()`.",
+        concept="Comparing two pandas Series returns a boolean Series the same length. Use it as `df[mask]` and you've filtered rows where the mask is True — vectorised, no Python loop, runs in C under the hood. `.sum()` on a bool Series counts the Trues. The same one-liner pattern scans for gap-ups, breakouts, or any condition that's expressible as a comparison.",
         example_code=(
             "import pandas as pd\n"
             "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "# Boolean Series, one entry per row, True when close > open.\n"
+            "# Summing booleans in pandas counts the Trues — vectorised, no loop.\n"
             "up = (df['close'] > df['open']).sum()\n"
             "print(up)"
         ),
@@ -689,16 +697,19 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=17, stage=2, mode="matplot",
         title="Daily and log returns",
-        scenario="Two ways to express returns: simple `(p_t / p_{t-1}) - 1` and log `ln(p_t / p_{t-1})`. They're nearly identical for small moves and additively neat for the log version.",
+        scenario="Risk team at AQR uses log returns for everything that sums (multi-period returns add up cleanly). The strategy team uses simple returns because the P&L sheet expects them. The numbers match to 4 decimals on any single day — pick whichever the downstream consumer needs. Mismatch them and the year-end attribution is off by the convexity correction.",
         learner_goal="Compute simple and log returns from SPY adj_close and plot a histogram of each.",
-        concept="`series.pct_change()` is the simple return. Log returns are `np.log(p / p.shift(1))`. Plot histograms with `plt.hist(series.dropna(), bins=50)`.",
+        concept="`series.pct_change()` is the simple return `(p_t / p_{t-1}) - 1`. Log returns are `np.log(p / p.shift(1))` — equal to `log(1 + simple)`. For small moves (say |r| < 5%) they agree to three or four decimals; the log version is preferred in research notebooks because `log(p_T/p_0) = sum(log_returns)`, which makes multi-period maths a sum instead of a product.",
         example_code=(
             "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
             "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "# pct_change: (p_t / p_{t-1}) - 1  — strategy-team convention.\n"
             "simple = df['adj_close'].pct_change().dropna()\n"
+            "# log(p_t / p_{t-1}) — risk/research convention because it sums.\n"
             "log_r = np.log(df['adj_close'] / df['adj_close'].shift(1)).dropna()\n"
             "plt.hist(log_r, bins=60)\n"
             "plt.title('SPY log returns'); plt.xlabel('return'); plt.ylabel('count')\n"
+            "# Same stdev to 4 decimals — convexity correction is small at daily horizon.\n"
             "print(round(simple.std(), 4), round(log_r.std(), 4))"
         ),
         template=(
@@ -719,16 +730,18 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=18, stage=2, mode="matplot",
         title="Rolling volatility",
-        scenario="A 30-day rolling standard deviation of returns, annualised, is the canonical 'realised vol' a strategy gates on.",
+        scenario="Every long-only fund has a vol-targeting overlay: scale exposure up when realised vol drops below target, cut when it spikes. 30-day rolling std of daily returns annualised by √252 is the canonical input. The chart you'll draw here is what risk dashboards at Bridgewater, AHL, and every other systematic shop plot in real time.",
         learner_goal="Compute SPY's 30-day rolling vol and plot it against time.",
-        concept="`r.rolling(window).std()` is the rolling std. Annualise daily vol with `* np.sqrt(252)`. The first 29 rows are NaN — that's expected.",
+        concept="`r.rolling(window).std()` builds a rolling-window std Series. Multiply by `np.sqrt(252)` to annualise daily vol (252 trading days per year, std scales with √n). The first 29 values are NaN because there's no 30-day window yet — pandas handles that automatically; downstream consumers expect it.",
         example_code=(
             "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
             "df = pd.read_csv('/data/quant/spy.csv')\n"
             "r = df['adj_close'].pct_change()\n"
+            "# Rolling 30-day std, scaled by √252 → annualised vol.\n"
             "vol = r.rolling(30).std() * np.sqrt(252)\n"
             "plt.plot(vol)\n"
             "plt.title('SPY 30-day rolling vol'); plt.xlabel('day'); plt.ylabel('annualised vol')\n"
+            "# Peak realised vol over the 11-year window — likely COVID-March-2020.\n"
             "print(round(vol.max(), 3))"
         ),
         template=(
@@ -749,14 +762,17 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=19, stage=2, mode="fillblank",
         title="Groupby year",
-        scenario="Pandas groupby is split-apply-combine. Group by calendar year and you can answer 'how did each year score?' in two lines.",
+        scenario="Year-end performance attribution at any fund: 'how did we do per calendar year?' Three pandas lines — `to_datetime`, `groupby('year')`, a reduction. Same pattern works for by-month (monthly attribution), by-quarter (board-deck format), or by-regime (vol-bucket attribution). Once you internalise split-apply-combine, half of pandas is the same shape.",
         learner_goal="Compute SPY's mean daily return by calendar year.",
-        concept="`pd.to_datetime(df['date']).dt.year` extracts the year. `df.groupby(year_series)['adj_close'].pct_change().mean()` then averages within each group. Use `.agg(...)` or a single reduction.",
+        concept="`pd.to_datetime(col).dt.year` extracts the calendar year. `df.groupby(year)['adj_close']` splits the frame into one slice per year. `.apply(lambda s: s.pct_change().mean())` computes the mean daily return inside each slice and combines back into a Series indexed by year. Split → apply → combine.",
         example_code=(
             "import pandas as pd\n"
             "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "# Add a year column so groupby has something to split on.\n"
             "df['year'] = pd.to_datetime(df['date']).dt.year\n"
+            "# For each year, compute pct_change inside that year's slice, then mean.\n"
             "by_year = df.groupby('year')['adj_close'].apply(lambda s: s.pct_change().mean())\n"
+            "# 2020 was the COVID year — mean daily return survived to slightly positive.\n"
             "print(round(by_year[2020], 5))"
         ),
         template=(
@@ -775,14 +791,17 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=20, stage=2, mode="fillblank",
         title="Aligning two series",
-        scenario="Real research mixes tickers with different calendars (BTC trades weekends; SPY doesn't). Aligning on a shared index is the first step of any cross-asset analysis.",
+        scenario="Crypto trades 24/7; equities don't. Cross-asset research at a global-macro shop spends half its time aligning calendars — BTC vs SPY, US vs Europe, holidays vs sessions. `pd.merge(..., how='inner')` is the safest default: only days both sides have a print. Outer joins are sometimes right (carry forward holidays), but inner is the easier mental model and far less likely to leak.",
         learner_goal="Merge SPY and AAPL on the date column and confirm row count.",
-        concept="`pd.merge(a, b, on='date', how='inner')` keeps rows where both have data. The result has all the columns of both frames, suffixed `_x` and `_y` when names collide.",
+        concept="`pd.merge(a, b, on='date', how='inner')` keeps only rows where both frames have a date in common. The result has all columns of both — colliding names get the suffixes you pass. SPY and AAPL share the US equity calendar so the inner join keeps the full 2,766 rows; with BTC on one side, the inner result would lose every weekend.",
         example_code=(
             "import pandas as pd\n"
             "spy = pd.read_csv('/data/quant/spy.csv')\n"
             "aapl = pd.read_csv('/data/quant/aapl.csv')\n"
+            "# Inner join on date — keep only days both tickers traded.\n"
+            "# Suffixes disambiguate the colliding column names (open, high, …).\n"
             "joined = pd.merge(spy, aapl, on='date', how='inner', suffixes=('_spy', '_aapl'))\n"
+            "# SPY + AAPL share the US equity calendar, so all 2766 rows survive.\n"
             "print(joined.shape)"
         ),
         template=(
@@ -801,19 +820,22 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=21, stage=2, mode="matplot",
         title="Fitting a normal to returns",
-        scenario="Daily returns look gaussian-ish until you check the tails. Plotting a normal pdf over the empirical histogram makes the mismatch visible.",
+        scenario="Risk team's first question on a new strategy: 'are these returns Gaussian enough for VaR?' Quick answer: fit a normal, overlay it, look at the tails. The body of SPY returns looks gaussian; the tails are 5× what the normal predicts — exactly the gap the 2008 risk-management literature was written about. That mismatch is why VaR alone isn't enough.",
         learner_goal="Fit a normal to SPY's daily returns and overlay it on the histogram.",
-        concept="`scipy.stats.norm.fit(data)` returns `(mu, sigma)`. Generate the pdf with `norm.pdf(xs, mu, sigma)` and overlay with `plt.plot(xs, pdf)`. Set `plt.hist(..., density=True)` so the histogram is on the same scale.",
+        concept="`scipy.stats.norm.fit(data)` does an MLE — returns `(mu, sigma)` of the best-fit normal. Generate the pdf at a grid of x values with `norm.pdf(xs, mu, sigma)`, plot. Use `plt.hist(..., density=True)` so the histogram is a density (area = 1), not raw counts, and the two are on the same scale.",
         example_code=(
             "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
             "from scipy.stats import norm\n"
             "df = pd.read_csv('/data/quant/spy.csv')\n"
             "r = df['adj_close'].pct_change().dropna()\n"
+            "# MLE fit of a normal — gives (mean, std) of the best-fit Gaussian.\n"
             "mu, sigma = norm.fit(r)\n"
             "xs = np.linspace(r.min(), r.max(), 200)\n"
+            "# density=True scales the histogram so it sits on the pdf's y-axis.\n"
             "plt.hist(r, bins=80, density=True, alpha=0.6)\n"
             "plt.plot(xs, norm.pdf(xs, mu, sigma))\n"
             "plt.title('SPY daily returns vs normal fit')\n"
+            "# Best-fit daily std — about 1.1%, in line with quoted index vol.\n"
             "print(round(sigma, 4))"
         ),
         template=(
@@ -837,16 +859,19 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=22, stage=2, mode="fillblank",
         title="OLS beta of AAPL on SPY",
-        scenario="Beta of a single stock to the market is the simplest factor regression. statsmodels reports an inference summary — coefficient, std error, p-value, R².",
+        scenario="Beta is the simplest factor: how much does a stock move per unit of market move? Single-stock beta is a one-line OLS that any risk system will check before sizing a position. Hedge-fund risk reports lead with the desk's gross beta, net beta, and beta-to-VIX. The arithmetic of all three starts here.",
         learner_goal="Run OLS of AAPL returns on SPY returns and read the slope coefficient.",
-        concept="`statsmodels.api.OLS(y, X).fit()` returns a result. `X` must include a constant (use `sm.add_constant`). `.params` is the coefficient vector; the slope is index 1.",
+        concept="`statsmodels.api.OLS(y, X).fit()` runs ordinary least squares and returns a results object. The X matrix needs a column of ones for the intercept — `sm.add_constant` adds it. `.params` is the coefficient vector with the intercept at index 0 and the slope (beta) at index 1. AAPL's beta to SPY tends to be 1.1–1.3 across recent decades.",
         example_code=(
             "import pandas as pd, statsmodels.api as sm\n"
             "spy = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
             "aapl = pd.read_csv('/data/quant/aapl.csv')['adj_close'].pct_change()\n"
+            "# Concat side-by-side, drop the first NaN row from pct_change.\n"
             "df = pd.concat([spy, aapl], axis=1).dropna()\n"
+            "# OLS needs an explicit constant column for the intercept term.\n"
             "X = sm.add_constant(df.iloc[:, 0])\n"
             "res = sm.OLS(df.iloc[:, 1], X).fit()\n"
+            "# params[0] = intercept (alpha), params[1] = slope (beta).\n"
             "print(round(res.params.iloc[1], 2))"
         ),
         template=(
@@ -867,14 +892,16 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=23, stage=2, mode="predict",
         title="Stationarity preview",
-        scenario="An ARIMA model needs stationary input. The Augmented Dickey-Fuller test gives a p-value: small p → reject 'unit root' → series is stationary.",
+        scenario="Before any time-series team at a stat-arb fund fits an ARIMA or runs a mean-reversion strategy, they ADF-test the input. Small p-value → reject 'this looks like a random walk' → ok to fit a stationary model. Big p → the series wanders, and a mean-reverting strategy on it will blow up the first time the wander goes far. Prices wander; returns don't. Fit on returns, not prices.",
         learner_goal="Read an ADF p-value on SPY prices vs returns and predict which is stationary.",
-        concept="`statsmodels.tsa.stattools.adfuller(s)` returns a tuple; element `[1]` is the p-value. Price series usually have p ≈ 1 (random walk, non-stationary); returns usually have p << 0.05.",
+        concept="`statsmodels.tsa.stattools.adfuller(s)` runs the Augmented Dickey-Fuller test and returns a tuple — element `[1]` is the p-value. Price series almost always have p ≈ 1 (it's effectively a random walk — non-stationary by construction). Daily returns almost always have p << 0.05 — they reject the unit-root null overwhelmingly. This is the cleanest one-pager of why returns, not prices, are the modelling target.",
         example_code=(
             "import pandas as pd\n"
             "from statsmodels.tsa.stattools import adfuller\n"
             "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "# Test the price series — should fail to reject (p > 0.05): non-stationary.\n"
             "p_price = adfuller(df['adj_close'])[1]\n"
+            "# Test the daily returns — should reject (p << 0.05): stationary.\n"
             "p_ret = adfuller(df['adj_close'].pct_change().dropna())[1]\n"
             "print(p_price > 0.05, p_ret < 0.05)"
         ),
@@ -897,11 +924,13 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=24, stage=3, mode="fillblank",
         title="Present value of a single cash flow",
-        scenario="A pound tomorrow is worth less than a pound today. Discounting is the simplest version of every pricing model in finance.",
+        scenario="A pound tomorrow is worth less than a pound today. Discounting is the simplest version of every pricing model in finance — bond pricing, DCF valuation, option pricing, all of it starts with PV. Junior analysts at a rates desk derive this once on a whiteboard, then never think about it again. Today's your whiteboard.",
         learner_goal="Compute the present value of £1000 received in 5 years at a 4% discount rate.",
-        concept="`PV = CF / (1 + r)**t` for a single cash flow. With continuous compounding the formula is `PV = CF * exp(-r*t)`. Either is fine; pick the one the textbook is using.",
+        concept="`PV = CF / (1 + r)**t` for a single cash flow, discrete compounding. With continuous compounding it's `PV = CF * exp(-r*t)`. Both are economically equivalent for the right `r`; conventions just differ by desk. Equity desks tend to use discrete; rates desks and option pricers use continuous.",
         example_code=(
+            "# £1000 received in 5 years at a 4% discrete-compounding discount rate.\n"
             "cf, r, t = 1000, 0.04, 5\n"
+            "# Discount factor 1/(1+r)**t shrinks the cashflow back to today.\n"
             "pv = cf / (1 + r)**t\n"
             "print(round(pv, 2))"
         ),
@@ -918,15 +947,19 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=25, stage=3, mode="fillblank",
         title="Bond yield to maturity",
-        scenario="The YTM of a bond is the rate `r` that makes the discounted cash flows equal the price. There's no closed-form solution — you solve it numerically.",
+        scenario="The Treasury desk at a primary dealer quotes prices, the buy-side asks for YTMs. There's no closed-form for YTM — you solve `price = sum_of_discounted_cashflows(r)` for `r` numerically. Every desk uses `brentq` or Newton-Raphson under the hood; the bond math doesn't care which.",
         learner_goal="Find the YTM of a 5-year bond paying a 5% coupon, priced at par (face=100).",
-        concept="The price of an annual-coupon bond is `sum(c / (1+r)**t for t in 1..N) + face / (1+r)**N`. When the bond trades at par, YTM equals the coupon rate by definition. `scipy.optimize.brentq` finds the root.",
+        concept="An annual-coupon bond's fair price is `sum(c / (1+r)**t for t in 1..N) + face / (1+r)**N` — coupons plus principal, all discounted at YTM `r`. `scipy.optimize.brentq(f, lo, hi)` does a robust bisection that needs `f(lo)` and `f(hi)` to straddle zero. At par (price = face) the YTM exactly equals the coupon rate — useful sanity check.",
         example_code=(
             "from scipy.optimize import brentq\n"
+            "# 5-year coupon bond, 5% annual coupon, face 100, priced at par.\n"
             "face, coupon, n, price = 100, 5, 5, 100\n"
+            "# NPV(r) = PV of all cash flows minus the price — zero at the YTM.\n"
             "def npv(r):\n"
             "    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\n"
+            "# brentq bisects between 0.01% and 50% — finds the root reliably.\n"
             "ytm = brentq(npv, 0.0001, 0.5)\n"
+            "# At par, YTM == coupon rate exactly.\n"
             "print(round(ytm, 4))"
         ),
         template=(
@@ -945,17 +978,20 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=26, stage=3, mode="matplot",
         title="Option payoff diagrams",
-        scenario="A call's payoff at expiry is `max(S - K, 0)`. A put's is `max(K - S, 0)`. Plot them and you've drawn every derivatives textbook's first figure.",
+        scenario="Hull's chapter 9 opens with the hockey-stick payoff diagram, and so does every derivatives interview at a market-maker. Trader's first question to a junior: 'draw the payoff at expiry of a long call'. If you can sketch this in 10 seconds you'll do fine; if you stall, you won't. Five minutes of plotting now to lock it in.",
         learner_goal="Plot the payoff of a long call with strike 100 over spot prices 60..140.",
-        concept="`np.maximum(S - K, 0)` is the vectorised call payoff. Subtract the premium to get profit. `plt.plot(S, payoff)` does the rest.",
+        concept="A call's terminal payoff is `max(S - K, 0)` — zero below the strike, linearly increasing above. Subtract the premium paid to get profit. `np.maximum(S - K, 0)` is the vectorised form (`np.max` collapses to a single scalar — wrong function here). The break-even point is `S = K + premium`.",
         example_code=(
             "import numpy as np, matplotlib.pyplot as plt\n"
+            "# Spot prices from 60 to 140 in 81 steps (one per unit).\n"
             "S = np.linspace(60, 140, 81)\n"
             "K, premium = 100, 5\n"
+            "# Vectorised hockey-stick: max(S - K, 0) per element, minus premium.\n"
             "payoff = np.maximum(S - K, 0) - premium\n"
             "plt.plot(S, payoff)\n"
             "plt.title('Long call (K=100)'); plt.xlabel('spot'); plt.ylabel('profit')\n"
             "plt.axhline(0, color='gray', lw=0.5)\n"
+            "# At S=140 the payoff is 140-100 minus 5 premium = 35.\n"
             "print(round(payoff[-1], 1))"
         ),
         template=(
@@ -976,12 +1012,14 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=27, stage=3, mode="fillblank",
         title="Put-call parity",
-        scenario="Put-call parity says `C - P = S - K * exp(-r*T)`. It's a no-arbitrage identity — if it breaks, someone is leaving money on the table.",
+        scenario="Put-call parity is the model-free no-arbitrage relation that every options market-maker checks intuitively on every quote. If the relationship breaks by more than the bid-offer spread, that's free money — and the market-makers' algos snap it up in microseconds. A junior who can derive it has demonstrated they understand derivatives. One who can't, hasn't.",
         learner_goal="Verify put-call parity numerically using the Black-Scholes prices.",
-        concept="From parity, given a call price, the matching put is `P = C - S + K * exp(-r*T)`. Compute both sides and they should match to machine precision.",
+        concept="Parity: `C - P = S - K * exp(-r*T)`. It comes from a no-arbitrage portfolio argument that needs no distributional assumption — it holds for any model, any vol surface, any underlying. Rearranged: given a call price, the matching put is `P = C - S + K * exp(-r*T)`. Memorise the sign convention: the `-r*T` term goes inside the exp.",
         example_code=(
             "import numpy as np\n"
+            "# Spot=100, Strike=100, rate=4%, T=1y, call=9.6 (textbook example).\n"
             "S, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\n"
+            "# Parity-implied put price — should match a direct BS put calc.\n"
             "P_from_parity = C - S + K * np.exp(-r * T)\n"
             "print(round(P_from_parity, 2))"
         ),
@@ -999,16 +1037,20 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=28, stage=3, mode="fillblank",
         title="Black-Scholes from scratch",
-        scenario="The Black-Scholes call price is `S*N(d1) - K*exp(-r*T)*N(d2)` where `d1 = (ln(S/K) + (r + σ²/2)*T) / (σ*sqrt(T))` and `d2 = d1 - σ*sqrt(T)`.",
+        scenario="In any options interview at a market-maker — Citadel Securities, IMC, Optiver — you will be asked to derive or implement Black-Scholes from first principles. It's the equivalent of FizzBuzz for derivatives engineers. Today you implement it once, by hand, no library, and verify against Hull's textbook example. Twenty years from now it'll still be one of the five formulas you remember cold.",
         learner_goal="Implement the Black-Scholes call price and verify against a textbook example.",
-        concept="`scipy.stats.norm.cdf` is N(). Hull's example: S=100, K=100, r=5%, σ=20%, T=1 gives C ≈ 10.45. Match it.",
+        concept="Call price = `S·N(d1) − K·exp(−rT)·N(d2)` where `d1 = (ln(S/K) + (r + σ²/2)·T) / (σ·√T)` and `d2 = d1 − σ·√T`. `N(·)` is the standard normal CDF — `scipy.stats.norm.cdf`. Intuition: `N(d1)` is the risk-neutral delta (probability-weighted exposure); `N(d2)` is the risk-neutral probability of finishing in the money. Hull's example (S=K=100, r=5%, σ=20%, T=1y) gives C ≈ 10.45.",
         example_code=(
             "import numpy as np\n"
             "from scipy.stats import norm\n"
+            "# Hull's canonical example, used to verify any new BS implementation.\n"
             "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
+            "# d1 and d2 are the standardised log-moneyness terms.\n"
             "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
             "d2 = d1 - sigma*np.sqrt(T)\n"
+            "# Call = spot * N(d1) - PV(strike) * N(d2). N(·) is the standard normal CDF.\n"
             "C = S*norm.cdf(d1) - K*np.exp(-r*T)*norm.cdf(d2)\n"
+            "# Hull p.299: C ≈ 10.45. Verify to 4 dp.\n"
             "print(round(C, 4))"
         ),
         template=(
@@ -1028,15 +1070,18 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=29, stage=3, mode="fillblank",
         title="Greeks: delta of a call",
-        scenario="Delta is `dC/dS` — how much the option price moves when the underlying moves £1. For a Black-Scholes call, delta is just `N(d1)`.",
+        scenario="The vol-trading desk at any market-maker runs a 'delta-neutral' book — for every short option they're long the corresponding delta in the underlying. The system recomputes the desk's net delta many times a second from positions × Black-Scholes Greeks. A trader who can't quote N(d1) on a whiteboard hasn't earned the seat. Today: compute it.",
         learner_goal="Compute the delta of an at-the-money call.",
-        concept="From the BS derivation, `Δ_call = N(d1)`. For an at-the-money option (S=K), d1 ≈ 0.35 at typical parameters, so delta ≈ 0.64.",
+        concept="Delta is `∂C/∂S` — the change in option value per unit change in spot. Take the partial derivative of the BS formula and the terms collapse: `Δ_call = N(d1)`, exactly. At-the-money (S = K), d1 ≈ 0.35 for typical parameters, so delta ≈ 0.64. Out-of-the-money calls have low delta (small N(d1)); deep-in-the-money calls have delta near 1 (large N(d1)).",
         example_code=(
             "import numpy as np\n"
             "from scipy.stats import norm\n"
+            "# Same parameters as Hull's BS example.\n"
             "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
             "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
+            "# Δ_call = N(d1) — falls straight out of the BS derivation.\n"
             "delta = norm.cdf(d1)\n"
+            "# ATM call delta ≈ 0.64 — not 0.5, because of the (r + σ²/2)·T drift.\n"
             "print(round(delta, 4))"
         ),
         template=(
@@ -1055,18 +1100,23 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=30, stage=3, mode="fillblank",
         title="Binomial tree pricer",
-        scenario="The CRR (Cox-Ross-Rubinstein) tree builds N steps of up/down moves and prices the option by backward induction. With enough steps it converges to Black-Scholes.",
+        scenario="Before Black-Scholes' PDE became standard in vol-desk software, the CRR (Cox-Ross-Rubinstein) tree was *the* pricing algorithm. It still is for American options — early exercise needs a backward induction that the closed-form BS can't do. Every Hull chapter on exotic options starts here; every options engineer can sketch the recurrence on a whiteboard.",
         learner_goal="Price a European call with a 50-step binomial tree.",
-        concept="Set `u = exp(σ * sqrt(dt))`, `d = 1/u`, risk-neutral probability `p = (exp(r*dt) - d)/(u - d)`. Build terminal payoffs, then walk back to t=0 discounting at each step.",
+        concept="Set `u = exp(σ·√dt)`, `d = 1/u` (Cox-Ross-Rubinstein parameterisation, multiplicatively symmetric). Risk-neutral up-probability `p = (exp(r·dt) − d) / (u − d)`. Build terminal payoffs at expiry, then walk back to t=0: at each node, value = `exp(−r·dt) · (p·V_up + (1−p)·V_down)`. As N → ∞ the price converges to Black-Scholes.",
         example_code=(
             "import numpy as np\n"
+            "# 50-step CRR tree on Hull's BS example.\n"
             "S, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\n"
+            "# Up/down factors and risk-neutral probability.\n"
             "dt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\n"
             "p = (np.exp(r*dt) - d)/(u - d)\n"
+            "# Terminal prices at expiry: S * u^i * d^(N-i) for i = 0..N.\n"
             "ST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\n"
             "vals = np.maximum(ST - K, 0)\n"
+            "# Backward induction — discount + risk-neutral average at each step.\n"
             "for _ in range(N):\n"
             "    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[:-1])\n"
+            "# vals[0] is t=0. Compare to BS 10.4506 — convergence is monotonic in N.\n"
             "print(round(vals[0], 4))"
         ),
         template=(
@@ -1088,9 +1138,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=31, stage=3, mode="matplot",
         title="Monte Carlo option pricing",
-        scenario="Simulate many terminal stock prices under risk-neutral dynamics; average the discounted payoffs. The estimate converges as `1 / sqrt(N)` — plot to see it.",
+        scenario="Path-dependent and high-dimensional payoffs (basket options, Asian options, callable structured notes) defeat both Black-Scholes and trees — but Monte Carlo handles them with one tweak per payoff function. Every quant library (QuantLib, py_vollib) ships MC pricers; the exotics desk at every major bank lives on them. The downside: convergence at `1/√N`, which is *slow*. Plot it once and you'll never forget.",
         learner_goal="Price a European call by Monte Carlo and plot the running estimate's convergence.",
-        concept="Under risk-neutral GBM, `S_T = S0 * exp((r - σ²/2)*T + σ*sqrt(T)*Z)` with `Z ~ N(0,1)`. Average `exp(-r*T) * max(S_T - K, 0)`. As N grows, the running mean settles on the BS price.",
+        concept="Under risk-neutral GBM, `S_T = S₀·exp((r − σ²/2)·T + σ·√T·Z)` with `Z ~ N(0,1)`. The call price is the discounted expected payoff: `exp(−r·T) · E[max(S_T − K, 0)]`. Replace `E[·]` with the sample mean of N draws. The running mean's standard error shrinks as `σ/√N` — quadrupling N halves the error, but never faster.",
         example_code=(
             "import numpy as np, matplotlib.pyplot as plt\n"
             "S0, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50_000\n"
@@ -1125,9 +1175,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=32, stage=3, mode="matplot",
         title="Mean-variance frontier",
-        scenario="Markowitz's efficient frontier is the locus of minimum-variance portfolios for each target return. Plot it for SPY + AAPL + TLT and you've recreated the most-cited chart in finance.",
+        scenario="Markowitz's efficient frontier is the most-cited chart in finance, full stop. Every multi-asset allocator at every pension fund, family office, and asset manager produces some version of it before sizing a portfolio. The closed-form version below sidesteps the numerical optimiser entirely — three matrix-algebra constants, one sweep, done. Then you can argue with an econometrician about whether the inputs are stationary (spoiler: they're not).",
         learner_goal="Sweep target returns and plot the resulting min-variance volatilities.",
-        concept="With covariance `Σ` and means `μ`, the closed-form min-variance frontier uses constants `a = 1ᵀΣ⁻¹1`, `b = μᵀΣ⁻¹1`, `c = μᵀΣ⁻¹μ`. Variance at target `t` is `(a·t² − 2bt + c) / (ac − b²)`. No optimisation loop — one pass.",
+        concept="Given covariance Σ and means μ, the closed-form min-variance portfolio at target return `t` uses three constants: `a = 1ᵀΣ⁻¹1`, `b = μᵀΣ⁻¹1`, `c = μᵀΣ⁻¹μ`. Variance at target `t` is `(a·t² − 2bt + c) / (a·c − b²)`. No optimiser, no constraints — just linear algebra. Adding a no-short constraint would force you back to a numerical solver.",
         example_code=(
             "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
             "def ret(t): return pd.read_csv(f'/data/quant/{t}.csv')['adj_close'].pct_change().dropna().values[-1000:]\n"
@@ -1161,16 +1211,19 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=33, stage=3, mode="fillblank",
         title="Sharpe, max drawdown",
-        scenario="The Sharpe ratio is mean return divided by standard deviation, annualised. Max drawdown is the worst peak-to-trough on the equity curve.",
+        scenario="The two numbers every allocator asks about a strategy before reading the deck: 'what's the Sharpe and what's the max drawdown?' Sharpe summarises risk-adjusted return; max drawdown summarises the worst the investor would have felt holding it. Compute them in one cell — every backtest framework (vectorbt, zipline, bt) gives them to you, but every quant has at some point implemented them by hand on a whiteboard during an interview.",
         learner_goal="Compute SPY's annualised Sharpe ratio and max drawdown.",
-        concept="Annualised Sharpe = `(r.mean() * 252) / (r.std() * sqrt(252))` for daily data. Max drawdown is `(equity / equity.cummax() - 1).min()`. Both are scalar — print them rounded.",
+        concept="Annualised Sharpe for daily returns: `(mean × 252) / (std × √252)` — the 252 in the numerator turns daily mean to annual, the √252 in the denominator turns daily std to annual. Max drawdown: build the cumulative equity curve, take running max, divide — the minimum of that ratio minus 1 is the worst peak-to-trough loss as a fraction.",
         example_code=(
             "import pandas as pd, numpy as np\n"
             "df = pd.read_csv('/data/quant/spy.csv')\n"
             "r = df['adj_close'].pct_change().dropna()\n"
+            "# Annualised Sharpe: scale mean by 252, std by √252.\n"
             "sharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\n"
+            "# Equity curve = compounded returns. cummax tracks the running peak.\n"
             "eq = (1 + r).cumprod()\n"
             "dd = (eq / eq.cummax() - 1).min()\n"
+            "# SPY 2015-2025: Sharpe ≈ 0.8, max DD ≈ -34% (COVID March 2020).\n"
             "print(round(sharpe, 2), round(dd, 3))"
         ),
         template=(
@@ -1193,15 +1246,19 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=34, stage=4, mode="fillblank",
         title="sklearn fit and predict",
-        scenario="scikit-learn's API is the same for every estimator: `.fit(X, y)` learns, `.predict(X)` infers, `.score(X, y)` reports R² or accuracy.",
+        scenario="Whether you're at Renaissance fitting a 200-feature tree ensemble or at a quant fund prototyping a single-feature ridge, the sklearn API is the same: `.fit(X, y)` learns, `.predict(X_new)` infers, `.score(X, y)` evaluates. The reason every research group settles on sklearn isn't that it's the fastest — it's that the uniform API makes every model swappable for any other in three lines.",
         learner_goal="Train a linear regression on a toy dataset and verify the perfect fit.",
-        concept="Every sklearn estimator inherits `fit/predict/score`. With perfectly linear data, `LinearRegression` recovers the coefficient exactly and `.score` returns 1.0.",
+        concept="Every sklearn estimator implements `fit/predict/score` (regressors return R², classifiers return accuracy). With perfectly linear synthetic data (`y = 2x + 3`), `LinearRegression` recovers the coefficient exactly and `.score` returns 1.0. Anything below 1.0 on a clean linear dataset means a bug in your feature matrix.",
         example_code=(
             "import numpy as np\n"
             "from sklearn.linear_model import LinearRegression\n"
+            "# X must be 2D for sklearn — even a single feature gets reshape(-1, 1).\n"
             "X = np.arange(10).reshape(-1, 1)\n"
+            "# Perfectly linear target: y = 2x + 3.\n"
             "y = 2 * X.ravel() + 3\n"
+            "# Chainable .fit returns the model so you can score in one line.\n"
             "model = LinearRegression().fit(X, y)\n"
+            "# R² == 1.0 confirms a perfect fit.\n"
             "print(round(model.score(X, y), 4))"
         ),
         template=(
@@ -1220,13 +1277,15 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=35, stage=4, mode="predict",
         title="Lookahead bias",
-        scenario="In finance ML the order of your rows matters. A random `train_test_split` lets the model see the future — and inflates your Sharpe spectacularly.",
+        scenario="The single biggest source of fake-Sharpe in junior quants' backtests: shuffled cross-validation on time series. A random `train_test_split` lets the model train on day t+1 and test on day t — peeking into the future. Sharpe goes up, paper looks brilliant, strategy lives, loses money in production. Lopez de Prado wrote an entire book about this (*Advances in Financial Machine Learning*). The fix is one keyword: `shuffle=False`.",
         learner_goal="Recognise why a chronological split is the honest baseline.",
-        concept="`sklearn.model_selection.train_test_split(shuffle=False)` keeps order intact. The first 80% becomes training, last 20% becomes test. Anything else for time series is a bug.",
+        concept="`train_test_split(..., shuffle=False)` keeps the original row order: first 80% becomes training, last 20% becomes test. For time series this is non-negotiable. The 'right' way is `TimeSeriesSplit` (next lesson) — but if you only do one thing right, do `shuffle=False`.",
         example_code=(
             "from sklearn.model_selection import train_test_split\n"
             "import numpy as np\n"
+            "# Ordered range 0..9 — pretend each integer is a date.\n"
             "X = np.arange(10).reshape(-1, 1); y = np.arange(10)\n"
+            "# shuffle=False keeps the original order — last 20% is the test set.\n"
             "_, X_test, _, _ = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
             "print(X_test.ravel().tolist())"
         ),
@@ -1245,9 +1304,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=36, stage=4, mode="fillblank",
         title="Momentum signal regression",
-        scenario="A 5-day momentum is a classic feature: did the stock go up over the last week? Regressing next-day return on this is the smallest non-trivial ML model in finance.",
+        scenario="Time-series momentum (TSMOM) is the most-documented anomaly in finance — Asness, Moskowitz, Pedersen wrote the canonical paper at AQR. The naive form: 5-day past return predicts next-day return. Reality: at the daily horizon on a single liquid index, R² is essentially zero. Trend-following on TSMOM works at *much* longer horizons and across diverse markets, not on one daily SPY series — but you have to feel the small-sample noise before you can size a real strategy honestly.",
         learner_goal="Fit a linear regression of next-day SPY return on lagged 5-day return; report the R².",
-        concept="`mom_5 = r.shift(1).rolling(5).sum()`. Drop NaNs, split chronologically with shuffle=False, fit `LinearRegression`. R² near zero is *expected* — markets are hard.",
+        concept="Build a momentum feature: `mom = r.shift(1).rolling(5).sum()` — sum of the prior 5 days' returns, lagged by 1 so it uses only past info. Target: next day's return. Drop NaNs, split chronologically, fit. R² near zero on this single-feature, single-asset version is the honest answer; *don't* believe a positive R² on the same data with shuffled splitting.",
         example_code=(
             "import pandas as pd, numpy as np\n"
             "from sklearn.linear_model import LinearRegression\n"
@@ -1279,9 +1338,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=37, stage=4, mode="fillblank",
         title="Random forest direction classifier",
-        scenario="A forest of decision trees can spot non-linear patterns a linear model would miss — at the cost of being a black box.",
+        scenario="WorldQuant, Two Sigma, Renaissance — the ML-heavy shops moved from linear models to gradient boosting and forests in the 2010s for one reason: real markets have interaction effects that linear models can't capture (vol × momentum, momentum × yield-curve). A random forest is the simplest non-linear ML model that's still interpretable enough to put in production. Accuracy ~53% on a two-feature daily classifier is unremarkable — that's the point. The 'magic' is in feature engineering, not model complexity.",
         learner_goal="Train a 100-tree random forest to predict next-day direction from 5-day momentum and rolling volatility.",
-        concept="`RandomForestClassifier(n_estimators=100)` builds 100 trees. Two features: 5-day momentum and 20-day rolling std. The label is `np.sign(next_return)`. Score is accuracy on a chronological test split.",
+        concept="`RandomForestClassifier(n_estimators=100)` builds 100 decision trees on bootstrap samples of the training data; the ensemble vote becomes the prediction. Features here: 5-day momentum and 20-day rolling std (a vol proxy). Label: `sign(next_return)`. Use `random_state=0` so results are reproducible across re-runs.",
         example_code=(
             "import pandas as pd, numpy as np\n"
             "from sklearn.ensemble import RandomForestClassifier\n"
@@ -1321,9 +1380,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=38, stage=4, mode="fillblank",
         title="Time-series cross-validation",
-        scenario="`TimeSeriesSplit` slices a chronological frame into expanding-window CV folds. Every test fold starts after its train fold — no leakage.",
+        scenario="Honest cross-validation on financial time series uses expanding-window splits: train on `[0..t1]`, test on `(t1..t2]`, then train on `[0..t2]`, test on `(t2..t3]`, and so on. Every test fold sits strictly after its train fold — no leakage, no peeking. Lopez de Prado's `purgedKFold` adds embargo gaps for serial-correlated labels; `TimeSeriesSplit` is the entry-level version that catches the worst sins.",
         learner_goal="Run a 5-fold time-series CV on a linear model and average the fold scores.",
-        concept="`TimeSeriesSplit(n_splits=5)` yields five (train_idx, test_idx) pairs. Loop, fit on train_idx, score on test_idx, average. Use `cross_val_score(...)` for the one-liner.",
+        concept="`TimeSeriesSplit(n_splits=5)` yields five (train_idx, test_idx) tuples where every test starts after the previous train ends. `cross_val_score(model, X, y, cv=tscv)` runs them and returns a 5-element array of fold R²s — average to get the headline number. For honest backtests, this is the *minimum* bar.",
         example_code=(
             "import pandas as pd, numpy as np\n"
             "from sklearn.linear_model import LinearRegression\n"
@@ -1355,9 +1414,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=39, stage=4, mode="predict",
         title="The p-hacked Sharpe trap",
-        scenario="Try 1000 random strategies; the best one will look brilliant by chance. Lopez de Prado calls this 'backtest overfitting' and warns it dwarfs every other risk in quant ML.",
+        scenario="Bailey, Lopez de Prado et al published 'The Probability of Backtest Overfitting' (PBO) — a paper every quant risk team treats as required reading. The headline result: if you try 1,000 strategies, the best one's reported Sharpe is meaningless unless you correct for the multiple-testing. This lesson recreates the basic intuition: 1000 pure-noise strategies, the *best* one has annualised Sharpe > 1.5, by chance alone. That's why fund managers grill quants on 'how many alternatives did you try?'.",
         learner_goal="Predict the maximum Sharpe of 1000 pure-noise strategies — and feel why a 'great' backtest in isolation is meaningless.",
-        concept="Generate 1000 random return series with mean 0 and σ=0.01. Compute each one's annualised Sharpe. The MAX across them is several standard deviations above zero — pure chance, not skill.",
+        concept="Generate 1000 independent return series, each with mean 0 and σ=0.01. Compute each one's annualised Sharpe (mean/std × √252). The max across the 1000 is several standard deviations above zero — that's the extremum of 1000 draws from a roughly-zero-mean distribution. None of the strategies has any edge; the *best* still looks brilliant. The fix: report Lopez de Prado's *Deflated Sharpe Ratio*, which accounts for the number of trials.",
         example_code=(
             "import numpy as np\n"
             "rng = np.random.default_rng(42)\n"
@@ -1382,9 +1441,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=40, stage=5, mode="cwasm",
         title="Why C",
-        scenario="Python is where research lives. C is where the inner loop of a matching engine runs a billion times a day. The latency budget is the difference.",
+        scenario="The Citadel Securities matching engine, Jane Street's trading core, every market-maker's pricing loop — all C or C++. Python is where research happens; C is where the inner loop runs a billion times a day. The latency budget for a US equity option quote is ~10µs end-to-end; a single Python attribute lookup costs ~0.1µs. The maths doesn't work in Python. That's why the next 12 lessons exist.",
         learner_goal="Read a real C limit-order-book node and see it execute.",
-        concept="The demo below is a small sorted-list LOB written in C, compiled to WASM at `-O3`. Even this tiny example is faster than the equivalent pure-Python: no per-element interpreter overhead, no object headers, just contiguous memory and direct pointer chasing.",
+        concept="The demo below is a sorted-list limit-order-book in C, compiled to WASM at `-O3`. The C version's edge over a pure-Python equivalent isn't from cleverer algorithm — it's the absence of per-element interpreter overhead, the contiguous-memory layout of structs, and the direct pointer chasing the compiler turns into one or two instructions per dereference. Same algorithm, ~100× faster.",
         example_code=(
             "/* Sorted-insert LOB in C — see c-demos/lob_node.c */\n"
             "insert_bid(&book, 1, 100.05, 5);\n"
@@ -1438,9 +1497,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=41, stage=5, mode="cscript",
         title="Hello C",
-        scenario="The simplest C program — `printf` plus `return 0`. Same shape every C program in the world has at its core.",
+        scenario="K&R's *The C Programming Language* opens with this exact program in chapter 1. So does every undergraduate systems course at every CS programme. The shape — `#include`, `int main`, `printf`, `return 0` — is older than the World Wide Web and unchanged in every C compiler shipped since. Type it once, and you've started learning the language that quietly runs every kernel, every database, and every exchange in the world.",
         learner_goal="Print 'hello, C!' from a C program.",
-        concept="`#include <stdio.h>` exposes `printf`. `main` must return an `int`. Strings live between double quotes; `\\n` is a newline.",
+        concept="`#include <stdio.h>` brings in standard I/O — that's where `printf` lives. `int main()` is C's entry point; it must return an `int` (0 means success to the OS). Strings live between double quotes; `\\n` is a newline. Semicolons end statements — not optional, unlike Python.",
         example_code=(
             "#include <stdio.h>\n"
             "int main() {\n"
@@ -1463,9 +1522,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=42, stage=5, mode="cscript",
         title="Types and arithmetic",
-        scenario="C has explicit types: `int` is integer, `double` is 8-byte float. Mixing them follows promotion rules — division is the most surprising.",
+        scenario="The first surprise every Python-to-C convert hits: `7 / 2 == 3`, not `3.5`. C's division operator follows the types of its operands — if both are ints, the result is integer division. Python 3 silently fixed this; C didn't, and never will. The bug shows up at 4am in production when a quant runs `pnl / shares` with integer shares — silent truncation, wrong number, wrong trade. Two minutes here to lock it in.",
         learner_goal="Print the integer division of 7/2 and the floating-point division of 7.0/2.0.",
-        concept="`7 / 2` is integer division in C — it gives `3`, not `3.5`. To get the real quotient, one operand must be a float: `7.0 / 2` or `(double)7 / 2`.",
+        concept="In C, `/` operates by the types of its operands. Two ints → integer division, truncating toward zero (`7 / 2` = `3`). One or both operands floating-point → true division (`7.0 / 2` = `3.5`). To force float division on int variables: cast one with `(double)` or write a literal as `.0`.",
         example_code=(
             "#include <stdio.h>\n"
             "int main() {\n"
@@ -1488,9 +1547,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=43, stage=5, mode="cscript",
         title="Conditionals and loops",
-        scenario="C's `for` loop has three parts: init, test, increment. Same idea as Python but with explicit types and braces.",
+        scenario="The C for-loop is the syntactic ancestor of every C-family language's for-loop — JavaScript, Java, Go, C#, Rust all stole this shape. Three clauses, separated by semicolons: init, condition, increment. The compiler knows enough about that structure to vectorise the body if it can. That's why the hot loops in numpy, pandas, BLAS are all written like this.",
         learner_goal="Print the first 5 squares using a for-loop.",
-        concept="`for (int i = 1; i <= 5; i++) { ... }` runs the body 5 times with i from 1 to 5. `printf(\"%d \", i*i)` prints each square. After the loop, print a newline.",
+        concept="`for (init; condition; update) { body }` — three clauses, executed init once, condition each pass, update after each pass. `for (int i = 1; i <= 5; i++)` runs the body with i = 1, 2, 3, 4, 5. `i++` is shorthand for `i = i + 1` — every C-family language inherited it. `printf(\"%d \", x)` writes an integer followed by a space; no automatic newline.",
         example_code=(
             "#include <stdio.h>\n"
             "int main() {\n"
@@ -1519,9 +1578,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=44, stage=5, mode="cscript",
         title="Arrays and pointers",
-        scenario="In C, an array's name decays to a pointer to its first element. Pointer arithmetic walks the array byte-by-byte — `*(p + 2)` is the same as `p[2]`.",
+        scenario="The deepest fact about C: arrays *are* pointers, in disguise. An array name in any expression except `sizeof` decays to a pointer to its first element, and `a[i]` is syntactic sugar for `*(a + i)`. This is why pointer arithmetic and array indexing are interchangeable, why numpy's underlying buffer is one C pointer, why the inner loops of every BLAS routine are written with `p++` instead of `a[i+1]`. Internalise this and the next 7 lessons are easy.",
         learner_goal="Use pointer arithmetic to print the third element of an array.",
-        concept="Given `int a[5] = {10,20,30,40,50};` and `int *p = a;`, all of `a[2]`, `p[2]`, `*(p+2)`, `*(a+2)` are `30`. They're four ways of writing the same thing.",
+        concept="Given `int a[5] = {10,20,30,40,50};` and `int *p = a;`, the expressions `a[2]`, `p[2]`, `*(p+2)`, `*(a+2)` all evaluate to `30`. They're four spellings of the same memory access: 'go to the address `a`, add 2 × sizeof(int) bytes, dereference'. The compiler handles the sizeof scaling — you just write `+ 2`.",
         example_code=(
             "#include <stdio.h>\n"
             "int main() {\n"
@@ -1548,9 +1607,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=45, stage=5, mode="cscript",
         title="Structs",
-        scenario="A struct groups related fields. Every market-data tick, every order, every position in a quant system is a struct.",
+        scenario="Every market-data tick, every order, every position in a quant trading system is a struct. Look at any HFT feed handler's source — Sym (8 bytes), price (8 bytes), qty (4 bytes), side (1 byte), timestamp (8 bytes). The struct layout is the *contract* between the network wire format and the strategy logic. Get the field order wrong and your strategy reads garbage. The matching engines at CME, Eurex, every exchange — same story.",
         learner_goal="Define a Bond struct and print its fields.",
-        concept="`struct Bond { double face; int years; };` declares the shape. `struct Bond b;` declares an instance. Fields are set via `.` (`b.face = 1000.0;`).",
+        concept="`struct Name { type field1; type field2; ... };` declares the struct's shape (no instance yet). `struct Name x;` declares an instance. Field access uses `.` on instances (`x.field1 = 42;`) and `->` on pointers (`p->field1 = 42;`). C struct fields sit in declaration order in memory, plus padding to align natural word boundaries — that's why a `double` followed by an `int` typically takes 16 bytes, not 12.",
         example_code=(
             "#include <stdio.h>\n"
             "struct Bond {\n"
@@ -1587,9 +1646,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=46, stage=5, mode="cscript",
         title="Function pointers",
-        scenario="A function pointer lets you pass behaviour, not just data. C's `qsort` takes one — every C program that sorts a struct uses this pattern.",
+        scenario="C's `qsort` from `<stdlib.h>` is the canonical example: it takes a function pointer that compares two elements, so the same sort routine works for ints, doubles, structs, or any user type. Every C codebase you'll ever read — kernel code, Postgres, Redis, Nginx — uses function pointers for callbacks, dispatch tables, and polymorphism. C has no classes; function pointers are how you get virtual functions.",
         learner_goal="Pass a comparison function to `apply` and print the result.",
-        concept="`int (*f)(int)` is the type 'pointer to a function taking int and returning int'. Pass `square` to `apply(square, 5)` and `apply` calls it as `f(x)`.",
+        concept="`int (*f)(int)` reads as 'pointer to a function taking int and returning int'. Function names in expressions decay to function pointers — you can pass `square` directly. Inside `apply`, calling `f(x)` is identical to `(*f)(x)`; C allows both. Pre-C99 syntax conventions vary by codebase.",
         example_code=(
             "#include <stdio.h>\n"
             "int square(int x) { return x * x; }\n"
@@ -1616,9 +1675,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=47, stage=5, mode="cscript",
         title="malloc and free",
-        scenario="C makes you allocate and free memory yourself. Forgetting `free` is a leak; freeing twice is a crash. Modern languages hide this; C surfaces it.",
+        scenario="Memory bugs are why C has a reputation. Forget `free` and your matching engine leaks a few bytes per order — 100M orders/day × 32 bytes = 3GB/day. Free twice and it crashes mid-trading day. Read from freed memory and you might trade off stale prices and not know. Modern languages (Rust, Go, even modern C++) automate this. Production HFT shops still ship vanilla C because the overhead of even Rust's borrow-checker is more than they're willing to pay.",
         learner_goal="Allocate a 3-int buffer with malloc, write to it, print it, then free it.",
-        concept="`malloc(3 * sizeof(int))` allocates 12 bytes (on most systems). Cast the result to `int *`. Always `free(p)` when done. The pattern: allocate → use → free.",
+        concept="`malloc(N)` returns a `void *` to N bytes of uninitialised heap memory, or `NULL` on failure. Cast the result to your pointer type. Use `sizeof(T)` so the byte count adapts to the platform's int size. Always `free(p)` when done — every malloc must have a matching free. Production C code wraps these in arena/pool allocators for predictable latency, but the malloc/free pattern is the foundation.",
         example_code=(
             "#include <stdio.h>\n"
             "#include <stdlib.h>\n"
@@ -1649,9 +1708,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=48, stage=5, mode="cwasm",
         title="C ring buffer",
-        scenario="A ring buffer wraps a fixed-size array with head/tail indices. Every HFT feed handler has one. Same pattern: push when not full, pop when not empty.",
+        scenario="The LMAX Disruptor — the open-source ring buffer that powered LMAX Exchange — handled 6 million orders/second on a single thread. The trick is the data structure here: a fixed-size array, two index counters, no allocations during the hot path, lock-free between a single producer and a single consumer. Every HFT feed handler, every kernel network driver, every audio pipeline ships with one. Today's lesson: read the C, run it, see push and pop in action.",
         learner_goal="Read a fixed-size ring buffer in C and run it to see push/pop in action.",
-        concept="`head` and `tail` indices wrap modulo CAP. `count` distinguishes empty from full. Real production buffers use atomic ops on the indices for SPSC lock-free use; this demo skips that — same pattern, single-threaded.",
+        concept="`head` and `tail` are indices into a fixed-size `slots` array; both wrap modulo `CAP`. `count` distinguishes empty from full (with two indices alone, head == tail can mean either). Push at head, pop from tail — FIFO. Production single-producer-single-consumer (SPSC) versions use atomic ops on the indices and an extra memory fence to publish writes — same shape, lock-free.",
         example_code=(
             "/* See the full source in c-demos/ring_buffer.c */\n"
             "rb_push(&rb, 10);   // pushes succeed until count == CAP\n"
@@ -1704,9 +1763,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=49, stage=5, mode="fillblank",
         title="The same ring buffer in Python",
-        scenario="The Python translation works. It's also slow. Same algorithm, same memory pattern — what's missing is the compiled inner loop.",
+        scenario="Same algorithm, same memory access pattern, same correctness — and 100× slower. The bottleneck isn't the data structure; it's the interpreter dispatch on every `.push()` and `.pop()`. Every attribute lookup is a dict miss-hit, every method call is a frame allocation. This is exactly why the LOB at Citadel Securities is in C, not Python: the algorithm doesn't need rewriting, the runtime does.",
         learner_goal="Implement a fixed-size ring buffer in Python and time it.",
-        concept="A Python list with manual head/tail indices reproduces the C ring buffer's logic. Each push or pop is one method call — Python's per-call overhead is roughly 1µs, so a million ops takes ~1s where C takes ~10ms.",
+        concept="The Python class below reproduces the C ring buffer's logic exactly: a list as the slots, head/tail/count as integer attributes, modulo to wrap. Each `.push()` call goes through Python's attribute lookup machinery and method dispatch — about a microsecond of overhead per call. A million push+pop pairs takes ~1 second in Python; the C version runs the same million in ~10 milliseconds.",
         example_code=(
             "import time\n"
             "class RingBuffer:\n"
@@ -1755,9 +1814,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=50, stage=5, mode="predict",
         title="Cython preview",
-        scenario="Cython is Python with C type annotations. Add `cdef int` to a hot loop and you've trimmed most of the interpreter overhead — same code shape, 50–100× speedup.",
+        scenario="Cython is the bridge most real Python codebases reach for first when the profiler points to a hot loop. scikit-learn, pandas, statsmodels, gensim — all of them have Cython-compiled critical paths. Annotate types on the few lines that matter, run `cythonize`, and that section runs at near-C speed while the rest of the codebase stays Python. The win is in the inner loop where every interpreter dispatch was costing you.",
         learner_goal="Read a Cython-style snippet and recognise the type annotations.",
-        concept="A Cython hot loop looks like Python with extra declarations: `cdef int i, n = len(arr)`. The compiler turns the loop body into a C loop with no Python object lookups. Real Cython needs a build step; here we read.",
+        concept="In a `.pyx` file, `cdef int i, n = len(arr)` tells Cython 'these variables are C ints, not Python objects.' The compiler turns the loop body into a real C `for` loop with no Python-object lookups per iteration. Real Cython needs a `setup.py` build step that emits a `.so`; here we just read the shape. The lesson: typing a few hot variables yields 50–100× speedups on numeric loops.",
         example_code=(
             "# This is what a Cython hot-loop sum looks like.\n"
             "# In .pyx form, the compiler produces a tight C loop.\n"
@@ -1785,9 +1844,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=51, stage=5, mode="predict",
         title="cffi preview",
-        scenario="cffi lets Python call functions from a `.so` you compiled yourself. The same loop in a C library, called from Python, is what numpy does internally for every ufunc.",
+        scenario="Almost every fast Python library is, secretly, a thin Python skin over a `.so`/`.dll` compiled from C, C++ or Fortran. numpy: BLAS + LAPACK. pandas: numpy plus Cython. xgboost: a C++ core. Even psycopg2 wraps libpq. cffi (and its older sibling ctypes) is how that wrapping happens. Read the binding pattern once; you'll recognise it the next time you `pip install` something fast.",
         learner_goal="Recognise the cffi binding pattern — declare the function signature, load the shared object, call it.",
-        concept="cffi's pattern: `ffi.cdef('long c_sum(long *arr, int n);')`, `lib = ffi.dlopen('libsum.so')`, then `lib.c_sum(arr, len(arr))`. You're calling C from Python through a thin shim — the speed is the C code's, not Python's.",
+        concept="cffi's three-line pattern: `ffi.cdef('long c_sum(long *arr, int n);')` tells Python the function's C signature; `lib = ffi.dlopen('libsum.so')` loads the compiled library; `lib.c_sum(buf, n)` invokes the C function with a fraction of one microsecond of FFI overhead. The speed you get from `lib.c_sum` is whatever the C library was compiled to — Python is just dispatching the call.",
         example_code=(
             "# Pseudo-cffi usage — the real call goes to a compiled .so.\n"
             "# Here we simulate the same answer with a Python equivalent so\n"
