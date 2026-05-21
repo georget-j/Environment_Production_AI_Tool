@@ -550,32 +550,98 @@ LESSONS: list[Lesson] = [
         skills=["quant", "numpy", "statistics"],
     ),
     Lesson(
-        n=7, stage=1, mode="fillblank",
+        n=7, stage=1, mode="debug",
         title="Covariance via matrix algebra",
-        scenario="Covariance between asset returns underpins everything in portfolio construction — Sharpe, Markowitz, principal components. The textbook formula `(X − μ)ᵀ(X − μ) / n` is one line in numpy and the building block of every Risk Engine you'll ever work on.",
-        learner_goal="Compute a 2×2 covariance matrix from two return series using matrix multiplication.",
-        concept="Stack two demeaned return series as columns of `X` (shape `(n, 2)`). Then `Xᵀ X / n` is the 2×2 covariance matrix. The diagonal is each series' variance; the off-diagonals are the covariance. The matrix product runs as one BLAS call — fastest possible.",
-        example_code=(
+        scenario="Risk engine at a fund: `covariance_matrix(X)` is used everywhere — Sharpe, Markowitz, VaR. A reviewer notices the diagonal is slightly off from `numpy.cov(X, rowvar=False)` but only when the input has non-zero mean. The bug is in the function below: a one-line omission that quants miss because finance returns are usually zero-mean enough to hide it.",
+        learner_goal="Spot the missing step in `covariance_matrix` and add it.",
+        concept="The covariance formula is `(X − μ)ᵀ(X − μ) / (n − 1)` — note the `μ` subtraction. If you skip the demean, you compute the *uncentered* second moment instead. On zero-mean series the result is close enough that nobody notices; on a series with drift it's silently wrong by `μᵀμ` per entry. Sample variance divides by `n − 1`, not `n`, to be unbiased — same convention as last lesson.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Sample covariance matrix of column-stacked return series.\n"
+            "\n"
+            "Shape contract: input X is (n_obs, n_assets); output is\n"
+            "(n_assets, n_assets) sample covariance. Compared against\n"
+            "`np.cov(X, rowvar=False)` in tests.\n"
+            "\"\"\"\n"
             "import numpy as np\n"
-            "rng = np.random.default_rng(0)\n"
-            "# 1000 days of returns for two synthetic assets, independent.\n"
-            "X = rng.normal(size=(1000, 2))\n"
-            "# Demean each column before the dot product.\n"
-            "Xd = X - X.mean(axis=0)\n"
-            "cov = Xd.T @ Xd / X.shape[0]\n"
-            "print(np.round(cov, 2))"
+            "\n"
+            "\n"
+            "def covariance_matrix(X: np.ndarray) -> np.ndarray:\n"
+            "    \"\"\"Return the sample covariance matrix of X.\n"
+            "\n"
+            "    Steps the reviewer expects:\n"
+            "      1. Demean each column.\n"
+            "      2. Cross-product Xdᵀ Xd.\n"
+            "      3. Divide by (n - 1) for the unbiased estimator.\n"
+            "    \"\"\"\n"
+            "    n = X.shape[0]\n"
+            "    # Bug: step 1 missing.\n"
+            "    return (X.T @ X) / (n - 1)\n"
         ),
-        template=(
+        reference_solution=(
             "import numpy as np\n"
-            "rng = np.random.default_rng(0)\n"
-            "X = rng.normal(size=(1000, 2))\n"
-            "Xd = X - X.mean(axis=0)\n"
-            "cov = Xd.___ @ Xd / X.shape[0]\n"
-            "print(np.round(cov, 2))"
+            "\n"
+            "\n"
+            "def covariance_matrix(X: np.ndarray) -> np.ndarray:\n"
+            "    n = X.shape[0]\n"
+            "    Xd = X - X.mean(axis=0)\n"
+            "    return (Xd.T @ Xd) / (n - 1)\n"
         ),
-        your_turn="Replace `___` with the attribute that transposes the matrix.",
-        expected_stdout="[[ 1.04 -0.02]\n [-0.02  0.96]]",
-        hint="Two-letter attribute on every numpy array.",
+        tests_py=(
+            "\"\"\"Covariance-matrix correctness tests, including the with-drift trap.\"\"\"\n"
+            "import numpy as np\n"
+            "import pytest\n"
+            "\n"
+            "from solution import covariance_matrix\n"
+            "\n"
+            "\n"
+            "def test_matches_numpy_cov_zero_mean():\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    X = rng.normal(0.0, 1.0, (1000, 2))\n"
+            "    assert np.allclose(covariance_matrix(X), np.cov(X, rowvar=False))\n"
+            "\n"
+            "\n"
+            "def test_matches_numpy_cov_with_drift():\n"
+            "    # The KEY test — fails when demean is missing.\n"
+            "    rng = np.random.default_rng(1)\n"
+            "    X = rng.normal(0.0, 1.0, (500, 3)) + np.array([10.0, -5.0, 2.5])\n"
+            "    assert np.allclose(covariance_matrix(X), np.cov(X, rowvar=False))\n"
+            "\n"
+            "\n"
+            "def test_output_shape_is_n_assets_by_n_assets():\n"
+            "    X = np.random.default_rng(2).normal(size=(100, 4))\n"
+            "    out = covariance_matrix(X)\n"
+            "    assert out.shape == (4, 4)\n"
+            "\n"
+            "\n"
+            "def test_diagonal_is_per_asset_variance():\n"
+            "    rng = np.random.default_rng(3)\n"
+            "    X = rng.normal(0.0, 1.0, (500, 2))\n"
+            "    out = covariance_matrix(X)\n"
+            "    # Sample variance per column matches np.var(..., ddof=1).\n"
+            "    assert abs(out[0, 0] - X[:, 0].var(ddof=1)) < 1e-12\n"
+            "    assert abs(out[1, 1] - X[:, 1].var(ddof=1)) < 1e-12\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_matches_numpy_cov_zero_mean",
+                "Matches np.cov on a zero-mean input (passes even when the bug is present).",
+            ),
+            (
+                "tests/test_solution.py::test_matches_numpy_cov_with_drift",
+                "Matches np.cov when the input has non-zero column means — the trap test.",
+            ),
+            (
+                "tests/test_solution.py::test_output_shape_is_n_assets_by_n_assets",
+                "Output shape is (n_assets, n_assets).",
+            ),
+            (
+                "tests/test_solution.py::test_diagonal_is_per_asset_variance",
+                "Diagonal entries equal per-column sample variance (ddof=1).",
+            ),
+        ],
+        your_turn="The function passes its smoke test on zero-mean data and silently fails when the columns have drift. Read the docstring's step list and add the missing line.",
+        hint="One line, before computing the cross product. The docstring's first step gives it away.",
         skills=["quant", "numpy", "linear-algebra", "statistics"],
     ),
     Lesson(
@@ -607,39 +673,99 @@ LESSONS: list[Lesson] = [
         skills=["quant", "numpy", "random-numbers"],
     ),
     Lesson(
-        n=9, stage=1, mode="fillblank",
+        n=9, stage=1, mode="debug",
         title="Statistical reductions",
-        scenario="Every research note ends with a one-liner: 'over the period, mean daily return was X bps with σ = Y bps, 95th percentile drawdown Z.' Three reductions, one line, the whole story.",
-        learner_goal="Compute the mean, standard deviation, and 95th percentile of a 10k-sample return distribution.",
-        concept="numpy reductions take an axis (default: whole array). `arr.mean()` and `arr.std()` are methods; `np.percentile(arr, q)` is a function — `q` is in 0–100, NOT 0–1. They all run in C under the hood; on a million points each takes microseconds.",
-        example_code=(
+        scenario="Junior data scientist refactors a research notebook into a `summary_stats` function the desk imports. Production runs fine for a week, then the head of risk emails: 'your 95th percentile drawdown numbers are tiny — are you in basis points?' She isn't. The bug is on one line: a units confusion between numpy and pandas that's caught half the data team at one point or another.",
+        learner_goal="Find the single line where the percentile call is wrong, fix the argument, and pass the tests.",
+        concept="numpy's `np.percentile(arr, q)` takes `q` in **0–100** (a percent). pandas' `Series.quantile(q)` takes `q` in **0–1** (a fraction). Same idea, different API. Calling `np.percentile(r, 0.95)` gives you the 0.95th percentile — essentially the minimum of your distribution — not the 95th. This is THE units bug in everyday quant Python; happens to everyone once.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Summary statistics used by the desk's daily research email.\"\"\"\n"
             "import numpy as np\n"
-            "rng = np.random.default_rng(0)\n"
-            "# 10k daily returns from a slightly-positive-drift, 2%-vol distribution.\n"
-            "r = rng.normal(loc=0.001, scale=0.02, size=10_000)\n"
             "\n"
-            "mu    = r.mean()\n"
-            "sigma = r.std()\n"
-            "p95   = np.percentile(r, 95)\n"
             "\n"
-            "print(f'mean  = {mu:.4f}')\n"
-            "print(f'std   = {sigma:.4f}')\n"
-            "print(f'p95   = {p95:.4f}')"
+            "def summary_stats(r: np.ndarray) -> dict:\n"
+            "    \"\"\"Return mean, std, and 95th percentile of a return series.\n"
+            "\n"
+            "    The 95th percentile (`p95`) is the value such that 95% of\n"
+            "    observations are at or below it — used to size tail bands.\n"
+            "    \"\"\"\n"
+            "    return {\n"
+            "        \"mean\": float(r.mean()),\n"
+            "        \"std\": float(r.std()),\n"
+            "        # Junior wrote it like pandas .quantile — bug lives here.\n"
+            "        \"p95\": float(np.percentile(r, 0.95)),\n"
+            "    }\n"
         ),
-        template=(
+        reference_solution=(
             "import numpy as np\n"
-            "rng = np.random.default_rng(0)\n"
-            "r = rng.normal(loc=0.001, scale=0.02, size=10_000)\n"
-            "mu    = r.___()\n"
-            "sigma = r.___()\n"
-            "p95   = np.___(r, 95)\n"
-            "print(f'mean  = {mu:.4f}')\n"
-            "print(f'std   = {sigma:.4f}')\n"
-            "print(f'p95   = {p95:.4f}')"
+            "\n"
+            "\n"
+            "def summary_stats(r: np.ndarray) -> dict:\n"
+            "    return {\n"
+            "        \"mean\": float(r.mean()),\n"
+            "        \"std\": float(r.std()),\n"
+            "        \"p95\": float(np.percentile(r, 95)),\n"
+            "    }\n"
         ),
-        your_turn="Fill the three blanks with the reduction names: average, standard deviation, percentile.",
-        expected_stdout="mean  = 0.0011\nstd   = 0.0200\np95   = 0.0338",
-        hint="Two methods, one function. All three are short, common names.",
+        tests_py=(
+            "\"\"\"summary_stats: mean, std, and 95th percentile checks.\"\"\"\n"
+            "import numpy as np\n"
+            "import pytest\n"
+            "\n"
+            "from solution import summary_stats\n"
+            "\n"
+            "\n"
+            "def test_mean_is_correct_on_synthetic_returns():\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    r = rng.normal(0.001, 0.02, 10_000)\n"
+            "    s = summary_stats(r)\n"
+            "    assert abs(s[\"mean\"] - 0.0011) < 1e-3\n"
+            "\n"
+            "\n"
+            "def test_std_is_correct_on_synthetic_returns():\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    r = rng.normal(0.001, 0.02, 10_000)\n"
+            "    s = summary_stats(r)\n"
+            "    assert abs(s[\"std\"] - 0.02) < 5e-4\n"
+            "\n"
+            "\n"
+            "def test_p95_is_a_high_value_not_a_low_one():\n"
+            "    # The KEY test. The buggy version asks numpy for the 0.95th\n"
+            "    # percentile, which is near the minimum (~ -0.06 here), not\n"
+            "    # the 95th percentile (~ +0.034).\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    r = rng.normal(0.001, 0.02, 10_000)\n"
+            "    s = summary_stats(r)\n"
+            "    assert s[\"p95\"] > 0.02  # 95th percentile must be on the right tail.\n"
+            "\n"
+            "\n"
+            "def test_p95_matches_numpy_reference():\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    r = rng.normal(0.001, 0.02, 10_000)\n"
+            "    s = summary_stats(r)\n"
+            "    assert abs(s[\"p95\"] - float(np.percentile(r, 95))) < 1e-12\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_mean_is_correct_on_synthetic_returns",
+                "`mean` is close to the configured drift (0.001) within 1e-3.",
+            ),
+            (
+                "tests/test_solution.py::test_std_is_correct_on_synthetic_returns",
+                "`std` is close to the configured vol (0.02) within 5e-4.",
+            ),
+            (
+                "tests/test_solution.py::test_p95_is_a_high_value_not_a_low_one",
+                "`p95` must be in the right tail (> 0.02), catching the 0.95-vs-95 mistake.",
+            ),
+            (
+                "tests/test_solution.py::test_p95_matches_numpy_reference",
+                "`p95` matches `np.percentile(r, 95)` exactly.",
+            ),
+        ],
+        your_turn="Three of the four tests pass already. The fourth one tells you the percentile call has the wrong units. One character — sometimes two — fixes it.",
+        hint="numpy wants the percentile in 0–100, not 0–1.",
         skills=["quant", "numpy", "statistics"],
     ),
     Lesson(
@@ -892,30 +1018,96 @@ LESSONS: list[Lesson] = [
         skills=["quant", "pandas"],
     ),
     Lesson(
-        n=16, stage=2, mode="fillblank",
+        n=16, stage=2, mode="debug",
         title="Boolean filtering on real prices",
-        scenario="First analytic anyone runs against a new tape at a mid-frequency shop: 'how many up-days in this window?' If your data has a hidden corruption — duplicated date, mis-aligned column — this 30-second sanity check usually catches it before you build a strategy on top.",
-        learner_goal="Count the SPY days where the close was above the open.",
-        concept="Comparing two pandas Series returns a boolean Series the same length. Use it as `df[mask]` and you've filtered rows where the mask is True — vectorised, no Python loop, runs in C under the hood. `.sum()` on a bool Series counts the Trues. The same one-liner pattern scans for gap-ups, breakouts, or any condition that's expressible as a comparison.",
-        example_code=(
+        scenario="Trader on the desk asks: 'how many days did SPY gap up — open above yesterday's close?' Easy enough, the junior thinks. They ship a function. The trader runs it, gets a number that looks reasonable, and now the strategy sizes positions against that count. Except the function counts the wrong thing — a subtle index shift that makes the answer almost-but-not-quite right. The kind of bug a 30-second look-at-the-tape would have caught.",
+        learner_goal="Find the off-by-one in the gap-up counter and fix it.",
+        concept="A gap-up day is when today's *open* is above *yesterday's* close — `df['open'] > df['close'].shift(1)`. The `.shift(1)` is the entire point: without it you're comparing today's open to today's close, which is closer to 'is this a green candle?' than 'is there a gap'. A real production bug pattern: someone wrote the comparison without the shift, the function compiles, returns a number, and the strategy quietly sizes against the wrong signal.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Count gap-up days in a price frame.\"\"\"\n"
             "import pandas as pd\n"
-            "df = pd.read_csv('/data/quant/spy.csv')\n"
-            "# Boolean Series, one entry per row, True when close > open.\n"
-            "# Summing booleans in pandas counts the Trues — vectorised, no loop.\n"
-            "up = (df['close'] > df['open']).sum()\n"
-            "print(up)"
+            "\n"
+            "\n"
+            "def count_gap_ups(df: pd.DataFrame) -> int:\n"
+            "    \"\"\"Return the number of days where today's open is strictly\n"
+            "    above YESTERDAY's close. `df` has columns open, close, ...\n"
+            "    indexed in chronological order.\n"
+            "    \"\"\"\n"
+            "    # Bug: the right-hand side should be yesterday's close, not\n"
+            "    # today's close. The shift is missing.\n"
+            "    mask = df[\"open\"] > df[\"close\"]\n"
+            "    return int(mask.sum())\n"
         ),
-        template=(
+        reference_solution=(
             "import pandas as pd\n"
-            "df = pd.read_csv('/data/quant/spy.csv')\n"
-            "up = (df['close'] ___ df['open']).sum()\n"
-            "print(up)"
+            "\n"
+            "\n"
+            "def count_gap_ups(df: pd.DataFrame) -> int:\n"
+            "    mask = df[\"open\"] > df[\"close\"].shift(1)\n"
+            "    return int(mask.sum())\n"
         ),
-        your_turn="Replace `___` with the operator that counts strictly-up days.",
-        expected_stdout="1487",
-        hint="Same comparison operator you'd use on plain numbers.",
+        tests_py=(
+            "\"\"\"Gap-up counter correctness.\"\"\"\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import count_gap_ups\n"
+            "\n"
+            "\n"
+            "def _frame(open_, close):\n"
+            "    return pd.DataFrame({\"open\": open_, \"close\": close})\n"
+            "\n"
+            "\n"
+            "def test_strict_gap_up_hand_calc():\n"
+            "    # Closes: 100, 101, 99, 105. Opens: 100, 102, 100, 99.\n"
+            "    # Day 0: no prior close. Day 1: open 102 > close[0]=100 -> gap.\n"
+            "    # Day 2: open 100 < close[1]=101 -> no gap.\n"
+            "    # Day 3: open 99  < close[2]=99  -> no gap (strict >).\n"
+            "    df = _frame([100, 102, 100, 99], [100, 101, 99, 105])\n"
+            "    assert count_gap_ups(df) == 1\n"
+            "\n"
+            "\n"
+            "def test_no_gap_when_open_equals_prior_close():\n"
+            "    # opens 100, 100, 101; closes 100, 101, 99.\n"
+            "    # Day 1: open[1]=100 == close[0]=100 -> no strict gap.\n"
+            "    # Day 2: open[2]=101 == close[1]=101 -> no strict gap.\n"
+            "    df = _frame([100, 100, 101], [100, 101, 99])\n"
+            "    assert count_gap_ups(df) == 0\n"
+            "\n"
+            "\n"
+            "def test_all_gaps_when_each_open_clears_prior_close():\n"
+            "    # Each open strictly above the previous day's close.\n"
+            "    df = _frame([100, 105, 110, 120], [100, 102, 108, 115])\n"
+            "    # Days 1, 2, 3 all gap up; Day 0 has no prior so doesn't count.\n"
+            "    assert count_gap_ups(df) == 3\n"
+            "\n"
+            "\n"
+            "def test_zero_on_one_row():\n"
+            "    df = _frame([100], [101])\n"
+            "    assert count_gap_ups(df) == 0\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_strict_gap_up_hand_calc",
+                "Hand-calculated 4-row example yields 1 gap-up day.",
+            ),
+            (
+                "tests/test_solution.py::test_no_gap_when_open_equals_prior_close",
+                "Equality is not a gap — uses strict > comparison.",
+            ),
+            (
+                "tests/test_solution.py::test_all_gaps_when_each_open_clears_prior_close",
+                "Monotone-up tape produces (n - 1) gap-up days.",
+            ),
+            (
+                "tests/test_solution.py::test_zero_on_one_row",
+                "Single-row frame has no prior close — zero gap-ups.",
+            ),
+        ],
+        your_turn="The function looks like it counts gap-up days but doesn't. Compare your output to the test expectation on the 4-row example, then read the docstring carefully — one method call is missing.",
+        hint="`yesterday's close` is `df['close'].shift(1)`.",
         skills=["quant", "pandas", "vectorisation"],
-        datasets=["spy"],
     ),
     Lesson(
         n=17, stage=2, mode="matplot",
@@ -983,62 +1175,227 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=19, stage=2, mode="fillblank",
+        n=19, stage=2, mode="skeleton",
         title="Groupby year",
-        scenario="Year-end performance attribution at any fund: 'how did we do per calendar year?' Three pandas lines — `to_datetime`, `groupby('year')`, a reduction. Same pattern works for by-month (monthly attribution), by-quarter (board-deck format), or by-regime (vol-bucket attribution). Once you internalise split-apply-combine, half of pandas is the same shape.",
-        learner_goal="Compute SPY's mean daily return by calendar year.",
-        concept="`pd.to_datetime(col).dt.year` extracts the calendar year. `df.groupby(year)['adj_close']` splits the frame into one slice per year. `.apply(lambda s: s.pct_change().mean())` computes the mean daily return inside each slice and combines back into a Series indexed by year. Split → apply → combine.",
-        example_code=(
+        scenario="Annual board-deck time at a long-only fund. The PM wants a one-row-per-year table: 'mean daily return, daily vol, Sharpe.' You ship `by_year_metrics`. The shape — `to_datetime` → `groupby` → multi-stat aggregate — repeats across every per-period attribution the firm does (monthly, by-quarter, by-regime). Internalise it once and 30% of pandas is the same pattern.",
+        learner_goal="Implement `by_year_metrics(df)` so it returns a DataFrame indexed by year with mean_daily, vol_daily, and sharpe columns.",
+        concept="`pd.to_datetime(df['date']).dt.year` extracts the calendar year. `df.groupby(year)['adj_close'].apply(...)` splits the frame into one slice per year and runs your function on each. To get three statistics into a single output, return a `pd.Series` per group and pandas will pivot them into columns. Sharpe (rf=0) is `mean_daily / vol_daily` — same formula a project tested earlier.",
+        example_code="",
+        editable_template=(
+            "\"\"\"By-year performance attribution.\"\"\"\n"
+            "import numpy as np\n"
             "import pandas as pd\n"
-            "df = pd.read_csv('/data/quant/spy.csv')\n"
-            "# Add a year column so groupby has something to split on.\n"
-            "df['year'] = pd.to_datetime(df['date']).dt.year\n"
-            "# For each year, compute pct_change inside that year's slice, then mean.\n"
-            "by_year = df.groupby('year')['adj_close'].apply(lambda s: s.pct_change().mean())\n"
-            "# 2020 was the COVID year — mean daily return survived to slightly positive.\n"
-            "print(round(by_year[2020], 5))"
+            "\n"
+            "\n"
+            "def by_year_metrics(df: pd.DataFrame) -> pd.DataFrame:\n"
+            "    \"\"\"Per-calendar-year mean, vol, and Sharpe of daily returns.\n"
+            "\n"
+            "    Parameters\n"
+            "    ----------\n"
+            "    df : has 'date' (parsable string or datetime) and 'adj_close' columns.\n"
+            "\n"
+            "    Returns\n"
+            "    -------\n"
+            "    DataFrame indexed by `year` (int) with columns:\n"
+            "        - 'mean_daily': mean of pct_change inside the year\n"
+            "        - 'vol_daily' : std  of pct_change inside the year (default ddof=1)\n"
+            "        - 'sharpe'    : mean_daily / vol_daily  (rf = 0; not annualised)\n"
+            "\n"
+            "    Implementation tips:\n"
+            "      - Drop the first NaN that pct_change introduces.\n"
+            "      - Group by `pd.to_datetime(df['date']).dt.year`.\n"
+            "      - Use `.apply(...)` returning a Series so pandas pivots\n"
+            "        the three stats into three columns of the output.\n"
+            "    \"\"\"\n"
+            "    raise NotImplementedError(\"Implement by_year_metrics\")\n"
         ),
-        template=(
+        reference_solution=(
+            "import numpy as np\n"
             "import pandas as pd\n"
-            "df = pd.read_csv('/data/quant/spy.csv')\n"
-            "df['year'] = pd.to_datetime(df['date']).dt.year\n"
-            "by_year = df.___('year')['adj_close'].apply(lambda s: s.pct_change().mean())\n"
-            "print(round(by_year[2020], 5))"
+            "\n"
+            "\n"
+            "def by_year_metrics(df: pd.DataFrame) -> pd.DataFrame:\n"
+            "    out = df.copy()\n"
+            "    out['year'] = pd.to_datetime(out['date']).dt.year\n"
+            "    out['ret'] = out['adj_close'].pct_change()\n"
+            "    out = out.dropna(subset=['ret'])\n"
+            "\n"
+            "    def _stats(s: pd.Series) -> pd.Series:\n"
+            "        mu = float(s.mean())\n"
+            "        sd = float(s.std())\n"
+            "        return pd.Series({\n"
+            "            'mean_daily': mu,\n"
+            "            'vol_daily': sd,\n"
+            "            'sharpe': mu / sd if sd > 0 else float('nan'),\n"
+            "        })\n"
+            "\n"
+            "    return out.groupby('year')['ret'].apply(_stats).unstack()\n"
         ),
-        your_turn="Replace `___` with the pandas split-apply-combine method.",
-        expected_stdout="0.00085",
-        hint="Seven letters.",
+        tests_py=(
+            "\"\"\"by_year_metrics: per-year mean / vol / Sharpe.\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import by_year_metrics\n"
+            "\n"
+            "\n"
+            "def _df(start: str, n: int, drift: float, vol: float, seed: int) -> pd.DataFrame:\n"
+            "    rng = np.random.default_rng(seed)\n"
+            "    rets = rng.normal(drift, vol, n)\n"
+            "    prices = 100 * np.exp(np.cumsum(rets))\n"
+            "    dates = pd.date_range(start, periods=n, freq='B')\n"
+            "    return pd.DataFrame({'date': dates.strftime('%Y-%m-%d'), 'adj_close': prices})\n"
+            "\n"
+            "\n"
+            "def test_columns_and_index_name():\n"
+            "    df = _df('2020-01-01', 252, 0.0005, 0.01, seed=0)\n"
+            "    out = by_year_metrics(df)\n"
+            "    assert list(out.columns) == ['mean_daily', 'vol_daily', 'sharpe']\n"
+            "    assert out.index.name == 'year'\n"
+            "\n"
+            "\n"
+            "def test_two_year_split():\n"
+            "    # 500 business days starting Jan 2020 spans 2020 + 2021.\n"
+            "    df = _df('2020-01-01', 500, 0.0005, 0.01, seed=1)\n"
+            "    out = by_year_metrics(df)\n"
+            "    assert set(out.index) == {2020, 2021}\n"
+            "\n"
+            "\n"
+            "def test_sharpe_equals_mean_over_vol():\n"
+            "    df = _df('2018-01-01', 252, 0.001, 0.012, seed=2)\n"
+            "    out = by_year_metrics(df)\n"
+            "    for year in out.index:\n"
+            "        row = out.loc[year]\n"
+            "        assert abs(row['sharpe'] - row['mean_daily'] / row['vol_daily']) < 1e-9\n"
+            "\n"
+            "\n"
+            "def test_mean_in_right_ballpark():\n"
+            "    # Generator drift 0.0005 → mean_daily should land in (0.0001, 0.001).\n"
+            "    df = _df('2019-01-01', 252, 0.0005, 0.01, seed=3)\n"
+            "    out = by_year_metrics(df)\n"
+            "    mean_2019 = out.loc[2019, 'mean_daily']\n"
+            "    assert 0.0001 < abs(mean_2019) < 0.002 or mean_2019 > 0  # noise band\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_columns_and_index_name",
+                "Output has columns [mean_daily, vol_daily, sharpe] and index named 'year'.",
+            ),
+            (
+                "tests/test_solution.py::test_two_year_split",
+                "500 business days starting 2020 splits into two year rows (2020, 2021).",
+            ),
+            (
+                "tests/test_solution.py::test_sharpe_equals_mean_over_vol",
+                "Sharpe column equals mean_daily / vol_daily per row.",
+            ),
+            (
+                "tests/test_solution.py::test_mean_in_right_ballpark",
+                "Per-year mean is in the right ballpark of the configured generator drift.",
+            ),
+        ],
+        your_turn="Implement `by_year_metrics`. The docstring spells out the steps; you can return a Series-per-group from `.apply` to get the three-column output.",
+        hint="Inside the `.apply` callback, return `pd.Series({'mean_daily': ..., 'vol_daily': ..., 'sharpe': ...})` — pandas pivots it into columns automatically.",
         skills=["quant", "pandas", "time-series"],
-        datasets=["spy"],
     ),
     Lesson(
-        n=20, stage=2, mode="fillblank",
+        n=20, stage=2, mode="debug",
         title="Aligning two series",
-        scenario="Crypto trades 24/7; equities don't. Cross-asset research at a global-macro shop spends half its time aligning calendars — BTC vs SPY, US vs Europe, holidays vs sessions. `pd.merge(..., how='inner')` is the safest default: only days both sides have a print. Outer joins are sometimes right (carry forward holidays), but inner is the easier mental model and far less likely to leak.",
-        learner_goal="Merge SPY and AAPL on the date column and confirm row count.",
-        concept="`pd.merge(a, b, on='date', how='inner')` keeps only rows where both frames have a date in common. The result has all columns of both — colliding names get the suffixes you pass. SPY and AAPL share the US equity calendar so the inner join keeps the full 2,766 rows; with BTC on one side, the inner result would lose every weekend.",
-        example_code=(
+        scenario="Crypto-vs-equities cross-asset research at a macro shop. The PM wants BTC paired against SPY for the days both traded. A junior writes the merge, runs a quick sanity check on length, looks fine. Two weeks later a backtest result no-one can reproduce gets traced back to this function: it returns more rows than it should because the join type silently fills weekends with NaNs instead of dropping them. Spot the wrong keyword.",
+        learner_goal="Find the wrong `how=` argument that lets weekends sneak into the joined frame; fix it so only shared dates survive.",
+        concept="`pd.merge(a, b, on='date', how='inner')` is the safest default — keep only dates present in BOTH frames. `how='left'` carries every row of `a` through, filling missing `b` columns with NaN; `how='outer'` does both. With BTC on one side (trades weekends) and SPY on the other (doesn't), `left`/`right`/`outer` quietly leave NaN-padded rows that downstream code may not check for. The bug shows up as a silently-too-large result — exactly the shape this lesson's tests catch.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Align two return frames on shared trading dates.\"\"\"\n"
             "import pandas as pd\n"
-            "spy = pd.read_csv('/data/quant/spy.csv')\n"
-            "aapl = pd.read_csv('/data/quant/aapl.csv')\n"
-            "# Inner join on date — keep only days both tickers traded.\n"
-            "# Suffixes disambiguate the colliding column names (open, high, …).\n"
-            "joined = pd.merge(spy, aapl, on='date', how='inner', suffixes=('_spy', '_aapl'))\n"
-            "# SPY + AAPL share the US equity calendar, so all 2766 rows survive.\n"
-            "print(joined.shape)"
+            "\n"
+            "\n"
+            "def aligned_returns(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:\n"
+            "    \"\"\"Merge two daily-bar frames on 'date', keeping only dates that\n"
+            "    appear in BOTH inputs. The output has both frames' columns,\n"
+            "    suffixed _a / _b on the collisions.\n"
+            "\n"
+            "    Used to pair crypto vs equity tapes, US vs Europe, paper vs\n"
+            "    benchmark. Wrong join type here = NaNs leak into the backtest.\n"
+            "    \"\"\"\n"
+            "    # Bug lives in the how= argument: this isn't the join type the\n"
+            "    # docstring promises.\n"
+            "    return pd.merge(a, b, on='date', how='outer', suffixes=('_a', '_b'))\n"
         ),
-        template=(
+        reference_solution=(
             "import pandas as pd\n"
-            "spy = pd.read_csv('/data/quant/spy.csv')\n"
-            "aapl = pd.read_csv('/data/quant/aapl.csv')\n"
-            "joined = pd.merge(spy, aapl, on='date', how='___', suffixes=('_spy', '_aapl'))\n"
-            "print(joined.shape)"
+            "\n"
+            "\n"
+            "def aligned_returns(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:\n"
+            "    return pd.merge(a, b, on='date', how='inner', suffixes=('_a', '_b'))\n"
         ),
-        your_turn="Replace `___` with the join type that keeps only common dates.",
-        expected_stdout="(2766, 13)",
-        hint="Same name as the SQL join.",
+        tests_py=(
+            "\"\"\"aligned_returns: shared-date inner join with no NaN leakage.\"\"\"\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import aligned_returns\n"
+            "\n"
+            "\n"
+            "SPY_DATES = ['2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05']\n"
+            "BTC_DATES = [\n"
+            "    '2024-01-02', '2024-01-03', '2024-01-04',\n"
+            "    '2024-01-05', '2024-01-06', '2024-01-07',  # weekend prints\n"
+            "]\n"
+            "\n"
+            "\n"
+            "def _spy():\n"
+            "    return pd.DataFrame({'date': SPY_DATES, 'close': [470.0, 472.0, 471.5, 473.0]})\n"
+            "\n"
+            "\n"
+            "def _btc():\n"
+            "    return pd.DataFrame({'date': BTC_DATES, 'close': [44000.0, 45000.0, 45500.0, 46000.0, 46500.0, 47000.0]})\n"
+            "\n"
+            "\n"
+            "def test_only_shared_dates_survive():\n"
+            "    out = aligned_returns(_spy(), _btc())\n"
+            "    assert list(out['date']) == SPY_DATES  # 4 weekday rows; weekends dropped\n"
+            "\n"
+            "\n"
+            "def test_no_nan_in_close_columns():\n"
+            "    out = aligned_returns(_spy(), _btc())\n"
+            "    # Both close columns must be fully populated.\n"
+            "    assert out['close_a'].isna().sum() == 0\n"
+            "    assert out['close_b'].isna().sum() == 0\n"
+            "\n"
+            "\n"
+            "def test_row_count_equals_min_of_two_inputs():\n"
+            "    out = aligned_returns(_spy(), _btc())\n"
+            "    assert len(out) == min(len(_spy()), len(_btc()))\n"
+            "\n"
+            "\n"
+            "def test_no_extra_rows_appear_when_inputs_identical():\n"
+            "    df = _spy()\n"
+            "    out = aligned_returns(df, df)\n"
+            "    assert len(out) == len(df)\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_only_shared_dates_survive",
+                "Result's date column equals the intersection of the two inputs (no weekend rows).",
+            ),
+            (
+                "tests/test_solution.py::test_no_nan_in_close_columns",
+                "Neither suffixed close column has any NaN — the join didn't leave gaps.",
+            ),
+            (
+                "tests/test_solution.py::test_row_count_equals_min_of_two_inputs",
+                "Output has exactly min(len(a), len(b)) rows when one frame's dates are a subset.",
+            ),
+            (
+                "tests/test_solution.py::test_no_extra_rows_appear_when_inputs_identical",
+                "Joining a frame to itself returns the same number of rows.",
+            ),
+        ],
+        your_turn="Read what the docstring promises ('only dates that appear in BOTH'), then check the `how=` argument — pandas has a one-word swap that fixes it.",
+        hint="Same name as the SQL join that keeps only the intersection.",
         skills=["quant", "pandas", "time-series"],
-        datasets=["spy", "aapl"],
     ),
     Lesson(
         n=21, stage=2, mode="matplot",

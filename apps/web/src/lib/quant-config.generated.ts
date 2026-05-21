@@ -66,10 +66,35 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   }
 },
   "quant-07-covariance-via-matrix-algebra": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nrng = np.random.default_rng(0)\nX = rng.normal(size=(1000, 2))\nXd = X - X.mean(axis=0)\ncov = Xd.___ @ Xd / X.shape[0]\nprint(np.round(cov, 2))",
-  "expected_stdout": "[[ 1.04 -0.02]\n [-0.02  0.96]]",
-  "hint": "Two-letter attribute on every numpy array."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_matches_numpy_cov_zero_mean",
+      "description": "Matches np.cov on a zero-mean input (passes even when the bug is present)."
+    },
+    {
+      "id": "tests/test_solution.py::test_matches_numpy_cov_with_drift",
+      "description": "Matches np.cov when the input has non-zero column means \u2014 the trap test."
+    },
+    {
+      "id": "tests/test_solution.py::test_output_shape_is_n_assets_by_n_assets",
+      "description": "Output shape is (n_assets, n_assets)."
+    },
+    {
+      "id": "tests/test_solution.py::test_diagonal_is_per_asset_variance",
+      "description": "Diagonal entries equal per-column sample variance (ddof=1)."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Sample covariance matrix of column-stacked return series.\n\nShape contract: input X is (n_obs, n_assets); output is\n(n_assets, n_assets) sample covariance. Compared against\n`np.cov(X, rowvar=False)` in tests.\n\"\"\"\nimport numpy as np\n\n\ndef covariance_matrix(X: np.ndarray) -> np.ndarray:\n    \"\"\"Return the sample covariance matrix of X.\n\n    Steps the reviewer expects:\n      1. Demean each column.\n      2. Cross-product Xd\u1d40 Xd.\n      3. Divide by (n - 1) for the unbiased estimator.\n    \"\"\"\n    n = X.shape[0]\n    # Bug: step 1 missing.\n    return (X.T @ X) / (n - 1)\n",
+    "tests/test_solution.py": "\"\"\"Covariance-matrix correctness tests, including the with-drift trap.\"\"\"\nimport numpy as np\nimport pytest\n\nfrom solution import covariance_matrix\n\n\ndef test_matches_numpy_cov_zero_mean():\n    rng = np.random.default_rng(0)\n    X = rng.normal(0.0, 1.0, (1000, 2))\n    assert np.allclose(covariance_matrix(X), np.cov(X, rowvar=False))\n\n\ndef test_matches_numpy_cov_with_drift():\n    # The KEY test \u2014 fails when demean is missing.\n    rng = np.random.default_rng(1)\n    X = rng.normal(0.0, 1.0, (500, 3)) + np.array([10.0, -5.0, 2.5])\n    assert np.allclose(covariance_matrix(X), np.cov(X, rowvar=False))\n\n\ndef test_output_shape_is_n_assets_by_n_assets():\n    X = np.random.default_rng(2).normal(size=(100, 4))\n    out = covariance_matrix(X)\n    assert out.shape == (4, 4)\n\n\ndef test_diagonal_is_per_asset_variance():\n    rng = np.random.default_rng(3)\n    X = rng.normal(0.0, 1.0, (500, 2))\n    out = covariance_matrix(X)\n    # Sample variance per column matches np.var(..., ddof=1).\n    assert abs(out[0, 0] - X[:, 0].var(ddof=1)) < 1e-12\n    assert abs(out[1, 1] - X[:, 1].var(ddof=1)) < 1e-12\n"
+  }
 },
   "quant-08-reproducible-random-numbers": {
   "mode": "fillblank",
@@ -78,10 +103,35 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "hint": "Match the integer Bob used."
 },
   "quant-09-statistical-reductions": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nrng = np.random.default_rng(0)\nr = rng.normal(loc=0.001, scale=0.02, size=10_000)\nmu    = r.___()\nsigma = r.___()\np95   = np.___(r, 95)\nprint(f'mean  = {mu:.4f}')\nprint(f'std   = {sigma:.4f}')\nprint(f'p95   = {p95:.4f}')",
-  "expected_stdout": "mean  = 0.0011\nstd   = 0.0200\np95   = 0.0338",
-  "hint": "Two methods, one function. All three are short, common names."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_mean_is_correct_on_synthetic_returns",
+      "description": "`mean` is close to the configured drift (0.001) within 1e-3."
+    },
+    {
+      "id": "tests/test_solution.py::test_std_is_correct_on_synthetic_returns",
+      "description": "`std` is close to the configured vol (0.02) within 5e-4."
+    },
+    {
+      "id": "tests/test_solution.py::test_p95_is_a_high_value_not_a_low_one",
+      "description": "`p95` must be in the right tail (> 0.02), catching the 0.95-vs-95 mistake."
+    },
+    {
+      "id": "tests/test_solution.py::test_p95_matches_numpy_reference",
+      "description": "`p95` matches `np.percentile(r, 95)` exactly."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Summary statistics used by the desk's daily research email.\"\"\"\nimport numpy as np\n\n\ndef summary_stats(r: np.ndarray) -> dict:\n    \"\"\"Return mean, std, and 95th percentile of a return series.\n\n    The 95th percentile (`p95`) is the value such that 95% of\n    observations are at or below it \u2014 used to size tail bands.\n    \"\"\"\n    return {\n        \"mean\": float(r.mean()),\n        \"std\": float(r.std()),\n        # Junior wrote it like pandas .quantile \u2014 bug lives here.\n        \"p95\": float(np.percentile(r, 0.95)),\n    }\n",
+    "tests/test_solution.py": "\"\"\"summary_stats: mean, std, and 95th percentile checks.\"\"\"\nimport numpy as np\nimport pytest\n\nfrom solution import summary_stats\n\n\ndef test_mean_is_correct_on_synthetic_returns():\n    rng = np.random.default_rng(0)\n    r = rng.normal(0.001, 0.02, 10_000)\n    s = summary_stats(r)\n    assert abs(s[\"mean\"] - 0.0011) < 1e-3\n\n\ndef test_std_is_correct_on_synthetic_returns():\n    rng = np.random.default_rng(0)\n    r = rng.normal(0.001, 0.02, 10_000)\n    s = summary_stats(r)\n    assert abs(s[\"std\"] - 0.02) < 5e-4\n\n\ndef test_p95_is_a_high_value_not_a_low_one():\n    # The KEY test. The buggy version asks numpy for the 0.95th\n    # percentile, which is near the minimum (~ -0.06 here), not\n    # the 95th percentile (~ +0.034).\n    rng = np.random.default_rng(0)\n    r = rng.normal(0.001, 0.02, 10_000)\n    s = summary_stats(r)\n    assert s[\"p95\"] > 0.02  # 95th percentile must be on the right tail.\n\n\ndef test_p95_matches_numpy_reference():\n    rng = np.random.default_rng(0)\n    r = rng.normal(0.001, 0.02, 10_000)\n    s = summary_stats(r)\n    assert abs(s[\"p95\"] - float(np.percentile(r, 95))) < 1e-12\n"
+  }
 },
   "quant-10-why-numpy-is-fast": {
   "mode": "predict",
@@ -152,13 +202,35 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "prompt": "Two space-separated numbers."
 },
   "quant-16-boolean-filtering-on-real-prices": {
-  "mode": "fillblank",
-  "template": "import pandas as pd\ndf = pd.read_csv('/data/quant/spy.csv')\nup = (df['close'] ___ df['open']).sum()\nprint(up)",
-  "expected_stdout": "1487",
-  "hint": "Same comparison operator you'd use on plain numbers.",
-  "datasets": [
-    "spy"
-  ]
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_strict_gap_up_hand_calc",
+      "description": "Hand-calculated 4-row example yields 1 gap-up day."
+    },
+    {
+      "id": "tests/test_solution.py::test_no_gap_when_open_equals_prior_close",
+      "description": "Equality is not a gap \u2014 uses strict > comparison."
+    },
+    {
+      "id": "tests/test_solution.py::test_all_gaps_when_each_open_clears_prior_close",
+      "description": "Monotone-up tape produces (n - 1) gap-up days."
+    },
+    {
+      "id": "tests/test_solution.py::test_zero_on_one_row",
+      "description": "Single-row frame has no prior close \u2014 zero gap-ups."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Count gap-up days in a price frame.\"\"\"\nimport pandas as pd\n\n\ndef count_gap_ups(df: pd.DataFrame) -> int:\n    \"\"\"Return the number of days where today's open is strictly\n    above YESTERDAY's close. `df` has columns open, close, ...\n    indexed in chronological order.\n    \"\"\"\n    # Bug: the right-hand side should be yesterday's close, not\n    # today's close. The shift is missing.\n    mask = df[\"open\"] > df[\"close\"]\n    return int(mask.sum())\n",
+    "tests/test_solution.py": "\"\"\"Gap-up counter correctness.\"\"\"\nimport pandas as pd\nimport pytest\n\nfrom solution import count_gap_ups\n\n\ndef _frame(open_, close):\n    return pd.DataFrame({\"open\": open_, \"close\": close})\n\n\ndef test_strict_gap_up_hand_calc():\n    # Closes: 100, 101, 99, 105. Opens: 100, 102, 100, 99.\n    # Day 0: no prior close. Day 1: open 102 > close[0]=100 -> gap.\n    # Day 2: open 100 < close[1]=101 -> no gap.\n    # Day 3: open 99  < close[2]=99  -> no gap (strict >).\n    df = _frame([100, 102, 100, 99], [100, 101, 99, 105])\n    assert count_gap_ups(df) == 1\n\n\ndef test_no_gap_when_open_equals_prior_close():\n    # opens 100, 100, 101; closes 100, 101, 99.\n    # Day 1: open[1]=100 == close[0]=100 -> no strict gap.\n    # Day 2: open[2]=101 == close[1]=101 -> no strict gap.\n    df = _frame([100, 100, 101], [100, 101, 99])\n    assert count_gap_ups(df) == 0\n\n\ndef test_all_gaps_when_each_open_clears_prior_close():\n    # Each open strictly above the previous day's close.\n    df = _frame([100, 105, 110, 120], [100, 102, 108, 115])\n    # Days 1, 2, 3 all gap up; Day 0 has no prior so doesn't count.\n    assert count_gap_ups(df) == 3\n\n\ndef test_zero_on_one_row():\n    df = _frame([100], [101])\n    assert count_gap_ups(df) == 0\n"
+  }
 },
   "quant-17-daily-and-log-returns": {
   "mode": "matplot",
@@ -179,23 +251,66 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   ]
 },
   "quant-19-groupby-year": {
-  "mode": "fillblank",
-  "template": "import pandas as pd\ndf = pd.read_csv('/data/quant/spy.csv')\ndf['year'] = pd.to_datetime(df['date']).dt.year\nby_year = df.___('year')['adj_close'].apply(lambda s: s.pct_change().mean())\nprint(round(by_year[2020], 5))",
-  "expected_stdout": "0.00085",
-  "hint": "Seven letters.",
-  "datasets": [
-    "spy"
-  ]
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_columns_and_index_name",
+      "description": "Output has columns [mean_daily, vol_daily, sharpe] and index named 'year'."
+    },
+    {
+      "id": "tests/test_solution.py::test_two_year_split",
+      "description": "500 business days starting 2020 splits into two year rows (2020, 2021)."
+    },
+    {
+      "id": "tests/test_solution.py::test_sharpe_equals_mean_over_vol",
+      "description": "Sharpe column equals mean_daily / vol_daily per row."
+    },
+    {
+      "id": "tests/test_solution.py::test_mean_in_right_ballpark",
+      "description": "Per-year mean is in the right ballpark of the configured generator drift."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"By-year performance attribution.\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef by_year_metrics(df: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Per-calendar-year mean, vol, and Sharpe of daily returns.\n\n    Parameters\n    ----------\n    df : has 'date' (parsable string or datetime) and 'adj_close' columns.\n\n    Returns\n    -------\n    DataFrame indexed by `year` (int) with columns:\n        - 'mean_daily': mean of pct_change inside the year\n        - 'vol_daily' : std  of pct_change inside the year (default ddof=1)\n        - 'sharpe'    : mean_daily / vol_daily  (rf = 0; not annualised)\n\n    Implementation tips:\n      - Drop the first NaN that pct_change introduces.\n      - Group by `pd.to_datetime(df['date']).dt.year`.\n      - Use `.apply(...)` returning a Series so pandas pivots\n        the three stats into three columns of the output.\n    \"\"\"\n    raise NotImplementedError(\"Implement by_year_metrics\")\n",
+    "tests/test_solution.py": "\"\"\"by_year_metrics: per-year mean / vol / Sharpe.\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import by_year_metrics\n\n\ndef _df(start: str, n: int, drift: float, vol: float, seed: int) -> pd.DataFrame:\n    rng = np.random.default_rng(seed)\n    rets = rng.normal(drift, vol, n)\n    prices = 100 * np.exp(np.cumsum(rets))\n    dates = pd.date_range(start, periods=n, freq='B')\n    return pd.DataFrame({'date': dates.strftime('%Y-%m-%d'), 'adj_close': prices})\n\n\ndef test_columns_and_index_name():\n    df = _df('2020-01-01', 252, 0.0005, 0.01, seed=0)\n    out = by_year_metrics(df)\n    assert list(out.columns) == ['mean_daily', 'vol_daily', 'sharpe']\n    assert out.index.name == 'year'\n\n\ndef test_two_year_split():\n    # 500 business days starting Jan 2020 spans 2020 + 2021.\n    df = _df('2020-01-01', 500, 0.0005, 0.01, seed=1)\n    out = by_year_metrics(df)\n    assert set(out.index) == {2020, 2021}\n\n\ndef test_sharpe_equals_mean_over_vol():\n    df = _df('2018-01-01', 252, 0.001, 0.012, seed=2)\n    out = by_year_metrics(df)\n    for year in out.index:\n        row = out.loc[year]\n        assert abs(row['sharpe'] - row['mean_daily'] / row['vol_daily']) < 1e-9\n\n\ndef test_mean_in_right_ballpark():\n    # Generator drift 0.0005 \u2192 mean_daily should land in (0.0001, 0.001).\n    df = _df('2019-01-01', 252, 0.0005, 0.01, seed=3)\n    out = by_year_metrics(df)\n    mean_2019 = out.loc[2019, 'mean_daily']\n    assert 0.0001 < abs(mean_2019) < 0.002 or mean_2019 > 0  # noise band\n"
+  }
 },
   "quant-20-aligning-two-series": {
-  "mode": "fillblank",
-  "template": "import pandas as pd\nspy = pd.read_csv('/data/quant/spy.csv')\naapl = pd.read_csv('/data/quant/aapl.csv')\njoined = pd.merge(spy, aapl, on='date', how='___', suffixes=('_spy', '_aapl'))\nprint(joined.shape)",
-  "expected_stdout": "(2766, 13)",
-  "hint": "Same name as the SQL join.",
-  "datasets": [
-    "spy",
-    "aapl"
-  ]
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_only_shared_dates_survive",
+      "description": "Result's date column equals the intersection of the two inputs (no weekend rows)."
+    },
+    {
+      "id": "tests/test_solution.py::test_no_nan_in_close_columns",
+      "description": "Neither suffixed close column has any NaN \u2014 the join didn't leave gaps."
+    },
+    {
+      "id": "tests/test_solution.py::test_row_count_equals_min_of_two_inputs",
+      "description": "Output has exactly min(len(a), len(b)) rows when one frame's dates are a subset."
+    },
+    {
+      "id": "tests/test_solution.py::test_no_extra_rows_appear_when_inputs_identical",
+      "description": "Joining a frame to itself returns the same number of rows."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Align two return frames on shared trading dates.\"\"\"\nimport pandas as pd\n\n\ndef aligned_returns(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Merge two daily-bar frames on 'date', keeping only dates that\n    appear in BOTH inputs. The output has both frames' columns,\n    suffixed _a / _b on the collisions.\n\n    Used to pair crypto vs equity tapes, US vs Europe, paper vs\n    benchmark. Wrong join type here = NaNs leak into the backtest.\n    \"\"\"\n    # Bug lives in the how= argument: this isn't the join type the\n    # docstring promises.\n    return pd.merge(a, b, on='date', how='outer', suffixes=('_a', '_b'))\n",
+    "tests/test_solution.py": "\"\"\"aligned_returns: shared-date inner join with no NaN leakage.\"\"\"\nimport pandas as pd\nimport pytest\n\nfrom solution import aligned_returns\n\n\nSPY_DATES = ['2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05']\nBTC_DATES = [\n    '2024-01-02', '2024-01-03', '2024-01-04',\n    '2024-01-05', '2024-01-06', '2024-01-07',  # weekend prints\n]\n\n\ndef _spy():\n    return pd.DataFrame({'date': SPY_DATES, 'close': [470.0, 472.0, 471.5, 473.0]})\n\n\ndef _btc():\n    return pd.DataFrame({'date': BTC_DATES, 'close': [44000.0, 45000.0, 45500.0, 46000.0, 46500.0, 47000.0]})\n\n\ndef test_only_shared_dates_survive():\n    out = aligned_returns(_spy(), _btc())\n    assert list(out['date']) == SPY_DATES  # 4 weekday rows; weekends dropped\n\n\ndef test_no_nan_in_close_columns():\n    out = aligned_returns(_spy(), _btc())\n    # Both close columns must be fully populated.\n    assert out['close_a'].isna().sum() == 0\n    assert out['close_b'].isna().sum() == 0\n\n\ndef test_row_count_equals_min_of_two_inputs():\n    out = aligned_returns(_spy(), _btc())\n    assert len(out) == min(len(_spy()), len(_btc()))\n\n\ndef test_no_extra_rows_appear_when_inputs_identical():\n    df = _spy()\n    out = aligned_returns(df, df)\n    assert len(out) == len(df)\n"
+  }
 },
   "quant-21-fitting-a-normal-to-returns": {
   "mode": "matplot",
