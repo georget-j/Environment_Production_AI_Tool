@@ -50,4 +50,172 @@ export const QUANT_PROJECTS_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "README.md": "# Project 1 \u2014 Monte Carlo of asset paths\n\nWelcome to the canonical \"first quant project.\" Simulate many price\npaths under geometric Brownian motion (GBM), then study the resulting\ndistribution of terminal prices.\n\n## What you build\n\n- **`paths.py`** \u2014 `simulate_gbm(S0, mu, sigma, T, steps, paths, seed)`\n  returns a `(steps + 1, paths)` ndarray of price trajectories.\n- **`stats.py`** \u2014 `terminal_stats(prices)` returns the summary stats of\n  the final row: `{mean, std, p05, p95}`.\n\n## What the tests check\n\n- Shape, first-row-is-S0, reproducibility under a fixed seed\n- Zero-vol path matches `S0 * exp(mu * T)` exactly\n- Sample mean of `S_T` is within 2% of `S0 * exp(mu * T)` at 10k paths\n- Variance of `log(S_T / S0)` scales linearly with horizon\n- `terminal_stats` returns the four expected keys with the right ordering\n\n## References\n\n- Hilpisch, *Derivatives Analytics with Python* (dawp) \u2014\n  github.com/yhilpisch/dawp\n- Glasserman, *Monte Carlo Methods in Financial Engineering* \u2014 the\n  textbook every quant has on their shelf\n\n## Time\n\n~60 minutes if you know GBM; ~2 hours from first principles.\n",
     },
   },
+  "quant-project-2-return-distribution-dashboard": {
+    mode: "pyodide",
+    editable: ["dashboard.py", "metrics.py"],
+    readonly: ["tests/test_dashboard.py", "tests/conftest.py", "README.md"],
+    tests: [
+    {
+      id: "tests/test_dashboard.py::test_load_returns_shape_and_columns",
+      description: "`load_returns(1000)` is shape (1000, 5) with columns SPY/AAPL/QQQ/TLT/GLD.",
+    },
+    {
+      id: "tests/test_dashboard.py::test_load_returns_is_reproducible",
+      description: "Same seed \u2192 identical DataFrame across calls.",
+    },
+    {
+      id: "tests/test_dashboard.py::test_load_returns_means_in_right_ballpark",
+      description: "SPY daily mean is within \u00b10.0001 of 0.10/252 over 5000 days.",
+    },
+    {
+      id: "tests/test_dashboard.py::test_summary_metrics_columns",
+      description: "`summary_metrics` returns columns [mean_annual, vol_annual, sharpe, skew, kurt].",
+    },
+    {
+      id: "tests/test_dashboard.py::test_summary_metrics_vol_in_ballpark",
+      description: "SPY annualised vol lands between 0.15 and 0.22 with the configured 0.18.",
+    },
+    {
+      id: "tests/test_dashboard.py::test_summary_metrics_sharpe_is_mean_over_vol",
+      description: "Per-ticker `sharpe` equals `round(mean_annual / vol_annual, 4)`.",
+    },
+    {
+      id: "tests/test_dashboard.py::test_max_drawdown_is_negative_on_volatile_series",
+      description: "Drawdown on AAPL (30% vol) is at least -5%.",
+    },
+    {
+      id: "tests/test_dashboard.py::test_max_drawdown_zero_on_monotone_series",
+      description: "Drawdown on a constant-positive series is zero.",
+    },
+    ],
+    inline: {
+    "dashboard.py": "\"\"\"Build a daily-returns dashboard across five tickers.\n\nReal research uses bundled CSVs. To keep this project entirely\ndeterministic and offline-safe, we synthesise the returns from a fixed\nRNG \u2014 same shape, same tests, no I/O. Treat each column as a ticker.\n\"\"\"\nimport numpy as np\nimport pandas as pd\n\nTICKERS = [\"SPY\", \"AAPL\", \"QQQ\", \"TLT\", \"GLD\"]\n# Annualised drift and vol per ticker \u2014 fixed so the tests reproduce.\nDRIFTS = np.array([0.10, 0.18, 0.13, 0.02, 0.05])\nVOLS   = np.array([0.18, 0.30, 0.22, 0.12, 0.15])\n\n\ndef load_returns(days: int = 2500, seed: int = 0) -> pd.DataFrame:\n    \"\"\"Return a (days, 5) DataFrame of daily log returns for TICKERS.\n\n    Use `np.random.default_rng(seed)` so the dataset is reproducible.\n    Daily drift is `DRIFTS / 252`; daily vol is `VOLS / sqrt(252)`.\n\n    Returns\n    -------\n    DataFrame with columns equal to TICKERS, index 0..days-1, dtype float.\n    \"\"\"\n    raise NotImplementedError(\"Implement load_returns\")\n\n\ndef summary_metrics(returns: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Per-column summary stats. Returns a DataFrame indexed by ticker\n    with columns: ['mean_annual', 'vol_annual', 'sharpe', 'skew', 'kurt'].\n\n    - mean_annual = mean(daily) * 252\n    - vol_annual  = std(daily)  * sqrt(252)\n    - sharpe      = mean_annual / vol_annual  (rf = 0)\n    - skew, kurt  = scipy.stats.skew / kurtosis on the daily series\n\n    Round every value to 4 decimal places.\n    \"\"\"\n    raise NotImplementedError(\"Implement summary_metrics\")\n",
+    "metrics.py": "\"\"\"Drawdown helpers used by tests and a future viz layer.\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef max_drawdown(returns: pd.Series) -> float:\n    \"\"\"Return the worst peak-to-trough loss on the equity curve.\n\n    equity = (1 + returns).cumprod()  \u2014 log returns approximate; OK here.\n    dd     = equity / equity.cummax() - 1\n    return the minimum of `dd` as a negative float.\n    \"\"\"\n    raise NotImplementedError(\"Implement max_drawdown\")\n",
+    "tests/test_dashboard.py": "\"\"\"Tests for the returns dashboard.\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom dashboard import load_returns, summary_metrics, TICKERS\nfrom metrics import max_drawdown\n\n\ndef test_load_returns_shape_and_columns():\n    df = load_returns(days=1000, seed=0)\n    assert df.shape == (1000, 5)\n    assert list(df.columns) == TICKERS\n\n\ndef test_load_returns_is_reproducible():\n    a = load_returns(days=500, seed=42)\n    b = load_returns(days=500, seed=42)\n    pd.testing.assert_frame_equal(a, b)\n\n\ndef test_load_returns_means_in_right_ballpark():\n    # SPY's daily drift target is 0.10 / 252 \u2248 0.000397. The empirical\n    # mean of 5000 daily draws has standard error \u2248 vol_daily / sqrt(5000)\n    # \u2248 0.00016, so a 3\u03c3 band is ~5e-4. Use 6e-4 for headroom on any seed.\n    df = load_returns(days=5000, seed=7)\n    spy_daily_mean = df[\"SPY\"].mean()\n    assert abs(spy_daily_mean - 0.10 / 252) < 6e-4\n\n\ndef test_summary_metrics_columns():\n    df = load_returns(days=2500, seed=11)\n    s = summary_metrics(df)\n    assert list(s.columns) == [\"mean_annual\", \"vol_annual\", \"sharpe\", \"skew\", \"kurt\"]\n    assert list(s.index) == TICKERS\n\n\ndef test_summary_metrics_vol_in_ballpark():\n    # SPY's annualised vol should land near its 0.18 generator setting.\n    df = load_returns(days=2500, seed=11)\n    s = summary_metrics(df)\n    assert 0.15 < s.loc[\"SPY\", \"vol_annual\"] < 0.22\n\n\ndef test_summary_metrics_sharpe_is_mean_over_vol():\n    df = load_returns(days=2500, seed=11)\n    s = summary_metrics(df)\n    for tkr in TICKERS:\n        expected = s.loc[tkr, \"mean_annual\"] / s.loc[tkr, \"vol_annual\"]\n        assert abs(s.loc[tkr, \"sharpe\"] - round(expected, 4)) < 1e-4\n\n\ndef test_max_drawdown_is_negative_on_volatile_series():\n    df = load_returns(days=2500, seed=21)\n    # AAPL is the most volatile \u2014 expect a non-trivial drawdown.\n    dd = max_drawdown(df[\"AAPL\"])\n    assert dd < -0.05  # at least a 5% drawdown\n\n\ndef test_max_drawdown_zero_on_monotone_series():\n    # A monotonically positive series has zero drawdown.\n    s = pd.Series([0.01] * 100)\n    assert abs(max_drawdown(s)) < 1e-9\n",
+    "tests/conftest.py": "# tests/conftest.py \u2014 pyodide places this project at /home/pyodide.\n",
+    "README.md": "# Project 2 \u2014 Return-distribution dashboard\n\nBuild the panel every fund manager glances at first: per-ticker mean,\nvol, Sharpe, skew, kurtosis, and a drawdown helper. Synthetic returns\nkeep things fully reproducible \u2014 the maths is the same on real CSVs.\n\n## What you build\n\n- **`dashboard.py`** \u2014 `load_returns(days, seed)` and `summary_metrics(returns)`\n- **`metrics.py`** \u2014 `max_drawdown(returns)` for a single series\n\n## What the tests check\n\n- Shape and column order of `load_returns`\n- Reproducibility (same seed \u2192 identical frame)\n- Drift recovers the configured per-ticker mean within tolerance\n- Sharpe is `mean_annual / vol_annual` (rf = 0)\n- Drawdown is negative on AAPL (vol = 30%) and zero on a monotone series\n\n## References\n\n- empyrical-reloaded \u2014 github.com/stefan-jansen/empyrical-reloaded\n- pyfolio \u2014 github.com/quantopian/pyfolio (legacy but the source for many\n  canonical metric definitions)\n\n## Time\n\n~45 minutes if you know pandas; ~90 from scratch.\n",
+    },
+  },
+  "quant-project-3-mini-options-pricer": {
+    mode: "pyodide",
+    editable: ["analytical.py", "binomial.py", "mc.py"],
+    readonly: ["tests/test_pricing.py", "tests/conftest.py", "README.md"],
+    tests: [
+    {
+      id: "tests/test_pricing.py::test_bs_hull_example_call",
+      description: "BS call on Hull's S=K=100, r=5%, \u03c3=20%, T=1y matches 10.4506 to 3 dp.",
+    },
+    {
+      id: "tests/test_pricing.py::test_bs_hull_example_put",
+      description: "BS put on the same parameters matches 5.5735 to 2 dp.",
+    },
+    {
+      id: "tests/test_pricing.py::test_put_call_parity_holds",
+      description: "C - P equals S - K\u00b7exp(-rT) on Hull's parameters.",
+    },
+    {
+      id: "tests/test_pricing.py::test_binomial_converges_to_bs_as_N_grows",
+      description: "500-step CRR is within 0.05 of BS and beats the 100-step tree.",
+    },
+    {
+      id: "tests/test_pricing.py::test_mc_matches_bs_within_tolerance",
+      description: "50k-path MC is within 0.30 of BS (\u22483\u03c3 standard error band).",
+    },
+    {
+      id: "tests/test_pricing.py::test_mc_is_reproducible",
+      description: "Same seed twice \u2192 identical MC estimate.",
+    },
+    {
+      id: "tests/test_pricing.py::test_deep_otm_call_is_near_zero",
+      description: "K=200, S=100 deep-OTM call price is ~0.",
+    },
+    ],
+    inline: {
+    "analytical.py": "\"\"\"Black-Scholes analytical price for European call and put.\"\"\"\nimport math\nfrom scipy.stats import norm\n\n\ndef bs_call_put(S: float, K: float, r: float, sigma: float, T: float) -> tuple:\n    \"\"\"Return (call, put) prices for a European option under Black-Scholes.\n\n    d1 = (ln(S/K) + (r + sigma^2/2) * T) / (sigma * sqrt(T))\n    d2 = d1 - sigma * sqrt(T)\n    C  = S * N(d1) - K * exp(-r*T) * N(d2)\n    P  = K * exp(-r*T) * N(-d2) - S * N(-d1)\n\n    Returns\n    -------\n    (call, put) : tuple of two floats\n    \"\"\"\n    raise NotImplementedError(\"Implement bs_call_put\")\n",
+    "binomial.py": "\"\"\"CRR binomial-tree price for a European call.\"\"\"\nimport math\nimport numpy as np\n\n\ndef crr_call(S: float, K: float, r: float, sigma: float, T: float, N: int) -> float:\n    \"\"\"Cox-Ross-Rubinstein N-step tree price for a European call.\n\n    Steps:\n      dt = T / N\n      u  = exp(sigma * sqrt(dt));   d = 1 / u\n      p  = (exp(r * dt) - d) / (u - d)\n      Terminal prices: S * u^i * d^(N-i)  for i in 0..N\n      Backward-induct: V_t = exp(-r * dt) * (p * V_up + (1 - p) * V_down)\n\n    Returns\n    -------\n    float \u2014 the value at t=0.\n    \"\"\"\n    raise NotImplementedError(\"Implement crr_call\")\n",
+    "mc.py": "\"\"\"Monte Carlo Black-Scholes call pricer.\"\"\"\nimport numpy as np\n\n\ndef mc_call(\n    S: float, K: float, r: float, sigma: float, T: float,\n    paths: int = 20_000, seed: int = 0,\n) -> float:\n    \"\"\"Risk-neutral MC estimate of a European call price.\n\n    S_T = S * exp((r - sigma^2 / 2) * T + sigma * sqrt(T) * Z), Z ~ N(0, 1)\n    Price = exp(-r * T) * mean(max(S_T - K, 0))\n\n    Use np.random.default_rng(seed) so each call is reproducible.\n    \"\"\"\n    raise NotImplementedError(\"Implement mc_call\")\n",
+    "tests/test_pricing.py": "\"\"\"Cross-method sanity tests for the three pricers.\"\"\"\nimport pytest\n\nfrom analytical import bs_call_put\nfrom binomial import crr_call\nfrom mc import mc_call\n\n\nHULL_PARAMS = dict(S=100, K=100, r=0.05, sigma=0.20, T=1.0)\n\n\ndef test_bs_hull_example_call():\n    call, _ = bs_call_put(**HULL_PARAMS)\n    assert abs(call - 10.4506) < 1e-3\n\n\ndef test_bs_hull_example_put():\n    _, put = bs_call_put(**HULL_PARAMS)\n    # From put-call parity: P = C - S + K*exp(-rT) = 10.4506 - 100 + 95.123 \u2248 5.574\n    assert abs(put - 5.5735) < 1e-2\n\n\ndef test_put_call_parity_holds():\n    # C - P should equal S - K * exp(-r * T)\n    import math\n    call, put = bs_call_put(**HULL_PARAMS)\n    rhs = HULL_PARAMS[\"S\"] - HULL_PARAMS[\"K\"] * math.exp(-HULL_PARAMS[\"r\"] * HULL_PARAMS[\"T\"])\n    assert abs((call - put) - rhs) < 1e-4\n\n\ndef test_binomial_converges_to_bs_as_N_grows():\n    bs_call, _ = bs_call_put(**HULL_PARAMS)\n    crr_100 = crr_call(N=100, **HULL_PARAMS)\n    crr_500 = crr_call(N=500, **HULL_PARAMS)\n    # The 500-step tree should be closer to BS than the 100-step tree.\n    assert abs(crr_500 - bs_call) < abs(crr_100 - bs_call) + 0.005\n    assert abs(crr_500 - bs_call) < 0.05\n\n\ndef test_mc_matches_bs_within_tolerance():\n    bs_call, _ = bs_call_put(**HULL_PARAMS)\n    mc = mc_call(paths=50_000, seed=42, **HULL_PARAMS)\n    # 50k paths \u2192 standard error ~0.07; allow 0.3 wiggle.\n    assert abs(mc - bs_call) < 0.3\n\n\ndef test_mc_is_reproducible():\n    a = mc_call(paths=5000, seed=11, **HULL_PARAMS)\n    b = mc_call(paths=5000, seed=11, **HULL_PARAMS)\n    assert a == b\n\n\ndef test_deep_otm_call_is_near_zero():\n    call, _ = bs_call_put(S=100, K=200, r=0.05, sigma=0.20, T=1.0)\n    assert 0 <= call < 0.01\n",
+    "tests/conftest.py": "# tests/conftest.py \u2014 pyodide handles sys.path.\n",
+    "README.md": "# Project 3 \u2014 Mini options pricer\n\nThree independent implementations of the same vanilla call price:\nthe closed-form Black-Scholes, the CRR binomial tree, and a\nrisk-neutral Monte Carlo. They should agree to within their respective\ntolerances on the canonical Hull textbook example.\n\n## What you build\n\n- **`analytical.py`** \u2014 `bs_call_put(S, K, r, sigma, T) -> (call, put)`\n- **`binomial.py`** \u2014 `crr_call(S, K, r, sigma, T, N) -> float`\n- **`mc.py`** \u2014 `mc_call(S, K, r, sigma, T, paths, seed) -> float`\n\n## What the tests check\n\n- BS call matches Hull's 10.4506 (S=K=100, r=5%, \u03c3=20%, T=1y)\n- Put-call parity `C \u2212 P = S \u2212 K\u00b7exp(\u2212rT)` to machine precision\n- 500-step binomial gets closer to BS than 100-step\n- MC with 50k paths is within 0.3 of BS\n- MC is reproducible under a fixed seed\n- Deep OTM call (K=200, S=100) is essentially zero\n\n## References\n\n- py_vollib \u2014 github.com/vollib/py_vollib \u2014 the production-grade\n  reference implementation\n- Hull, *Options, Futures and Other Derivatives* \u2014 chapter 13 has the\n  worked example we test against\n\n## Time\n\n~75 minutes if you know BS; ~3 hours from first principles.\n",
+    },
+  },
+  "quant-project-4-walk-forward-backtest": {
+    mode: "pyodide",
+    editable: ["features.py", "backtest.py"],
+    readonly: ["tests/test_backtest.py", "tests/conftest.py", "README.md"],
+    tests: [
+    {
+      id: "tests/test_backtest.py::test_features_dropna_and_shape",
+      description: "`make_features` returns mom_5/mom_20/vol_20 with no NaN rows.",
+    },
+    {
+      id: "tests/test_backtest.py::test_features_are_strictly_past",
+      description: "Perturbing future returns doesn't change past features (no leakage).",
+    },
+    {
+      id: "tests/test_backtest.py::test_walk_forward_predicts_a_strict_suffix",
+      description: "Walk-forward predictions cover only a chronological suffix of the data.",
+    },
+    {
+      id: "tests/test_backtest.py::test_walk_forward_is_reproducible",
+      description: "Same inputs twice \u2192 identical predictions.",
+    },
+    {
+      id: "tests/test_backtest.py::test_walk_forward_does_not_peek_at_future",
+      description: "Perturbing the LAST 20 returns doesn't change predictions for early rows.",
+    },
+    ],
+    inline: {
+    "features.py": "\"\"\"Construct ML features from a return series \u2014 strictly past-only.\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef make_features(returns: pd.Series) -> pd.DataFrame:\n    \"\"\"Build features for ML on a daily-return series.\n\n    Features:\n      - mom_5  = sum of returns over the prior 5 days  (lag 1)\n      - mom_20 = sum of returns over the prior 20 days (lag 1)\n      - vol_20 = std of returns over the prior 20 days (lag 1)\n\n    Every feature for day t must use ONLY data from day t-1 and earlier.\n    This is the lookahead-bias-free convention: rolling on r.shift(1).\n\n    Drop any rows containing NaN before returning.\n\n    Returns\n    -------\n    DataFrame with columns ['mom_5', 'mom_20', 'vol_20'] indexed like\n    `returns` (minus the burn-in rows).\n    \"\"\"\n    raise NotImplementedError(\"Implement make_features\")\n",
+    "backtest.py": "\"\"\"Walk-forward chronological backtest with an ML model.\"\"\"\nimport numpy as np\nimport pandas as pd\nfrom sklearn.linear_model import LinearRegression\n\n\ndef walk_forward(\n    features: pd.DataFrame,\n    target: pd.Series,\n    n_splits: int = 5,\n    embargo: int = 1,\n) -> pd.Series:\n    \"\"\"Walk-forward predictions of `target` from `features`.\n\n    Algorithm:\n      - Align `features` and `target` on their common index, drop NaNs.\n      - Split the aligned frame into `n_splits` chronological chunks.\n      - For each chunk after the first: train a `LinearRegression` on\n        all data BEFORE the chunk's start (minus `embargo` rows of\n        gap), then predict the chunk.\n      - Concatenate the per-chunk predictions in order.\n\n    The `embargo` parameter excludes the last `embargo` rows of the\n    train window \u2014 protects against serial correlation leakage at the\n    train/test boundary (Lopez de Prado's purgedKFold idea).\n\n    Returns\n    -------\n    Series of predictions, indexed like the predicted rows of `target`.\n    \"\"\"\n    raise NotImplementedError(\"Implement walk_forward\")\n",
+    "tests/test_backtest.py": "\"\"\"Tests for the walk-forward backtest.\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom features import make_features\nfrom backtest import walk_forward\n\n\ndef _synthetic_returns(n: int, seed: int = 0) -> pd.Series:\n    rng = np.random.default_rng(seed)\n    return pd.Series(rng.normal(0, 0.01, n))\n\n\ndef test_features_dropna_and_shape():\n    r = _synthetic_returns(200, seed=1)\n    f = make_features(r)\n    assert list(f.columns) == [\"mom_5\", \"mom_20\", \"vol_20\"]\n    # 20-day rolling windows on a lagged series eat ~20 rows.\n    assert len(f) <= 200 - 20\n    assert f.isna().sum().sum() == 0\n\n\ndef test_features_are_strictly_past():\n    # If a feature on day t uses returns up to day t-1, then perturbing\n    # ONLY returns from day t onward must leave features for day < t intact.\n    r = _synthetic_returns(200, seed=2)\n    f1 = make_features(r)\n    r2 = r.copy()\n    # Slam the second half with huge values.\n    r2.iloc[100:] = 9.99\n    f2 = make_features(r2)\n    # Features up to and including row index 90 should be unchanged.\n    common = f1.index.intersection(f2.index)\n    common_before = common[common < 90]\n    pd.testing.assert_frame_equal(\n        f1.loc[common_before],\n        f2.loc[common_before],\n    )\n\n\ndef test_walk_forward_predicts_a_strict_suffix():\n    r = _synthetic_returns(500, seed=3)\n    f = make_features(r)\n    y = r.loc[f.index]  # the next-day return; aligned to features.index\n    preds = walk_forward(f, y, n_splits=5)\n    # The first chunk is training-only \u2014 preds covers the rest.\n    n = len(f)\n    expected_min = n // 5  # at least 1 chunk worth of predictions\n    assert len(preds) >= expected_min\n    # Predictions index must be a suffix of features.index.\n    assert preds.index.is_monotonic_increasing\n    assert preds.index[0] > f.index[0]\n\n\ndef test_walk_forward_is_reproducible():\n    r = _synthetic_returns(400, seed=4)\n    f = make_features(r)\n    y = r.loc[f.index]\n    p1 = walk_forward(f, y, n_splits=5)\n    p2 = walk_forward(f, y, n_splits=5)\n    pd.testing.assert_series_equal(p1, p2)\n\n\ndef test_walk_forward_does_not_peek_at_future():\n    # If we change the LAST 20 returns dramatically, predictions for the\n    # FIRST predicted day (which only saw early history) must be unchanged.\n    r1 = _synthetic_returns(400, seed=5)\n    r2 = r1.copy()\n    r2.iloc[-20:] = 9.99\n    f1 = make_features(r1); f2 = make_features(r2)\n    y1 = r1.loc[f1.index]; y2 = r2.loc[f2.index]\n    p1 = walk_forward(f1, y1, n_splits=5)\n    p2 = walk_forward(f2, y2, n_splits=5)\n    # The first predicted row used only early training data \u2014 must match.\n    assert abs(p1.iloc[0] - p2.iloc[0]) < 1e-10\n",
+    "tests/conftest.py": "# tests/conftest.py \u2014 pyodide handles sys.path.\n",
+    "README.md": "# Project 4 \u2014 Walk-forward backtest with ML signal\n\nTwo of the most-common quant-ML bugs in production: features that\nsecretly use future data, and train/test splits that shuffle time\nseries. This project forces both bugs out of your code with explicit\ntests for \"no lookahead\" and \"predictions only use prior data.\"\n\n## What you build\n\n- **`features.py`** \u2014 `make_features(returns)` returns a 3-feature\n  DataFrame: `mom_5`, `mom_20`, `vol_20`, all strictly past-only.\n- **`backtest.py`** \u2014 `walk_forward(features, target, n_splits, embargo)`\n  produces walk-forward chronological predictions with an embargo gap.\n\n## What the tests check\n\n- Features drop NaNs and have the right columns\n- Perturbing future returns leaves past features unchanged (no leakage)\n- Walk-forward predictions cover a strict suffix of the data\n- Predictions are reproducible under a fixed seed\n- Perturbing the LAST 20 returns doesn't affect predictions for early\n  rows (deepest leakage test)\n\n## References\n\n- Lopez de Prado, *Advances in Financial Machine Learning* \u2014 chapter 7\n  on cross-validation and embargoes\n- skfolio \u2014 github.com/skfolio/skfolio (modern walk-forward backtester)\n\n## Time\n\n~90 minutes if you know sklearn; ~3 hours from scratch.\n",
+    },
+  },
+  "quant-project-5-limit-order-book": {
+    mode: "pyodide",
+    editable: ["lob.py"],
+    readonly: ["tests/test_lob.py", "tests/conftest.py", "README.md"],
+    tests: [
+    {
+      id: "tests/test_lob.py::test_empty_book_top_is_none_none",
+      description: "Empty book reports (None, None) from top_of_book().",
+    },
+    {
+      id: "tests/test_lob.py::test_add_and_top_of_book",
+      description: "Best bid is the highest bid; best ask is the lowest ask.",
+    },
+    {
+      id: "tests/test_lob.py::test_cancel_returns_true_and_removes",
+      description: "Cancelling a resting order removes it and updates top-of-book.",
+    },
+    {
+      id: "tests/test_lob.py::test_cancel_unknown_returns_false",
+      description: "Cancelling an unknown order_id returns False, no exception.",
+    },
+    {
+      id: "tests/test_lob.py::test_match_crosses_when_bid_meets_ask",
+      description: "A matched bid + ask at the same price executes 1 trade and empties the book.",
+    },
+    {
+      id: "tests/test_lob.py::test_match_partial_fill_leaves_remainder",
+      description: "Aggressive bid for less than the ask quantity leaves the rest of the ask resting.",
+    },
+    {
+      id: "tests/test_lob.py::test_match_executes_at_resting_price_time_priority",
+      description: "Trades print at the resting order's price (price-time priority).",
+    },
+    {
+      id: "tests/test_lob.py::test_match_walks_multiple_levels",
+      description: "Bid sweeping 3 ask levels generates 3 trades summing to the bid quantity.",
+    },
+    ],
+    inline: {
+    "lob.py": "\"\"\"A price-time-priority limit order book in pure Python.\n\nThe same data structure runs the matching engines at CME, Eurex,\nNYSE, Coinbase \u2014 modulo what language they're written in (C, C++,\nsometimes Rust). The algorithm is the same.\n\nImplement a price-priority order book with the following operations:\n  - add(side, price, qty)  -> order_id\n  - cancel(order_id)       -> True/False\n  - top_of_book()          -> (best_bid, best_ask) or (None, None)\n  - match()                -> list of trades\n\nUse a SortedDict / SortedList of price levels per side, or two dicts +\na sort-on-read pattern. For this project's scale a sorted dict is fine.\n\"\"\"\nfrom collections import defaultdict, deque\n\n\nclass LimitOrderBook:\n    \"\"\"Price-time priority LOB.\n\n    Internal state (suggestion \u2014 feel free to use other structures\n    as long as the tests pass):\n      - self.bids:  dict[float, deque[(order_id, qty)]]   high-to-low best\n      - self.asks:  dict[float, deque[(order_id, qty)]]   low-to-high best\n      - self.next_id: int\n      - self.orders: dict[order_id, (side, price)]\n    \"\"\"\n\n    def __init__(self) -> None:\n        raise NotImplementedError(\"Implement __init__\")\n\n    def add(self, side: str, price: float, qty: int) -> int:\n        \"\"\"Add a resting limit order. Returns a unique integer order_id.\n\n        side: 'bid' or 'ask'. price > 0. qty > 0.\n        \"\"\"\n        raise NotImplementedError(\"Implement add\")\n\n    def cancel(self, order_id: int) -> bool:\n        \"\"\"Cancel a resting order. Returns True if it was cancelled,\n        False if the id was unknown / already executed.\"\"\"\n        raise NotImplementedError(\"Implement cancel\")\n\n    def top_of_book(self) -> tuple:\n        \"\"\"Return (best_bid_price, best_ask_price).\n\n        - best_bid is the highest bid (or None if empty)\n        - best_ask is the lowest ask (or None if empty)\n        \"\"\"\n        raise NotImplementedError(\"Implement top_of_book\")\n\n    def match(self) -> list:\n        \"\"\"Cross the book: while best_bid >= best_ask, execute the\n        oldest order on each side at the resting price of whichever\n        was first, then fill quantities, mutate the book, append a\n        trade entry to the result list.\n\n        Each trade is a dict:\n            {\"price\": float, \"qty\": int,\n             \"bid_order_id\": int, \"ask_order_id\": int}\n\n        Return the list of trades, oldest first.\n        \"\"\"\n        raise NotImplementedError(\"Implement match\")\n",
+    "tests/test_lob.py": "\"\"\"Tests for the limit order book.\"\"\"\nimport pytest\nfrom lob import LimitOrderBook\n\n\ndef test_empty_book_top_is_none_none():\n    book = LimitOrderBook()\n    assert book.top_of_book() == (None, None)\n\n\ndef test_add_and_top_of_book():\n    book = LimitOrderBook()\n    book.add(\"bid\", 100.0, 5)\n    book.add(\"bid\", 99.5, 3)\n    book.add(\"ask\", 100.5, 4)\n    book.add(\"ask\", 101.0, 2)\n    assert book.top_of_book() == (100.0, 100.5)\n\n\ndef test_cancel_returns_true_and_removes():\n    book = LimitOrderBook()\n    oid = book.add(\"bid\", 100.0, 5)\n    book.add(\"bid\", 99.5, 3)\n    assert book.cancel(oid) is True\n    assert book.top_of_book()[0] == 99.5\n\n\ndef test_cancel_unknown_returns_false():\n    book = LimitOrderBook()\n    book.add(\"bid\", 100.0, 5)\n    assert book.cancel(99999) is False\n\n\ndef test_match_crosses_when_bid_meets_ask():\n    book = LimitOrderBook()\n    book.add(\"ask\", 100.0, 5)\n    book.add(\"bid\", 100.0, 5)\n    trades = book.match()\n    assert len(trades) == 1\n    assert trades[0][\"price\"] == 100.0\n    assert trades[0][\"qty\"] == 5\n    assert book.top_of_book() == (None, None)\n\n\ndef test_match_partial_fill_leaves_remainder():\n    book = LimitOrderBook()\n    book.add(\"ask\", 100.0, 5)\n    book.add(\"bid\", 100.0, 3)\n    trades = book.match()\n    assert len(trades) == 1\n    assert trades[0][\"qty\"] == 3\n    # 2 qty left on the ask.\n    assert book.top_of_book() == (None, 100.0)\n\n\ndef test_match_executes_at_resting_price_time_priority():\n    book = LimitOrderBook()\n    book.add(\"ask\", 100.0, 5)  # resting ask FIRST \u2192 trade prints at 100\n    book.add(\"bid\", 101.0, 5)  # aggressive bid arrives\n    trades = book.match()\n    assert len(trades) == 1\n    assert trades[0][\"price\"] == 100.0\n\n\ndef test_match_walks_multiple_levels():\n    book = LimitOrderBook()\n    book.add(\"ask\", 100.0, 2)\n    book.add(\"ask\", 100.5, 3)\n    book.add(\"ask\", 101.0, 1)\n    book.add(\"bid\", 101.0, 6)\n    trades = book.match()\n    assert len(trades) == 3\n    assert sum(t[\"qty\"] for t in trades) == 6\n    assert book.top_of_book()[1] is None\n",
+    "tests/conftest.py": "# tests/conftest.py \u2014 pyodide handles sys.path.\n",
+    "README.md": "# Project 5 \u2014 Limit order book in Python\n\nThe same data structure that runs every electronic exchange \u2014 CME,\nEurex, NYSE, Coinbase. Implement a price-time-priority LOB in pure\nPython and pass the 8 tests covering top-of-book, cancellation,\ncrossing, partial fills, and multi-level walks.\n\n## What you build\n\n- **`lob.py`** \u2014 `LimitOrderBook` class with `add`, `cancel`,\n  `top_of_book`, and `match`.\n\n## What the tests check\n\n- Empty book reports (None, None)\n- Adding bids and asks; correct top-of-book\n- Cancellation removes the order and updates top-of-book\n- Cancelling an unknown id returns False\n- Full and partial fills on `match()`\n- Aggressive orders trade at the resting price (price-time priority)\n- Multi-level walks fill across price levels until either side empties\n\n## References\n\n- HFT-Orderbook \u2014 github.com/Crypto-toolbox/HFT-Orderbook \u2014 production\n  reference in Python; reads like documentation\n- LMAX Disruptor (Java) \u2014 for the lock-free production version\n\n## Time\n\n~2 hours from scratch; the data-structure choices matter more than the\namount of code.\n",
+    },
+  },
 };

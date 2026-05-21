@@ -34,3 +34,131 @@ on conflict (slug) do update set
   skills = excluded.skills,
   is_free = excluded.is_free,
   order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000341',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-project-2-return-distribution-dashboard',
+  E'Return distribution dashboard',
+  E'Every fund''s monthly report leads with a panel of per-ticker stats: mean, vol, Sharpe, skew, kurtosis, max drawdown. The engine behind that panel is half a dozen pandas reductions and a couple of scipy.stats calls. Build it once and the shape becomes muscle memory — at AQR, at Citadel, at any long-only allocator you ever work for, the same panel exists.',
+  E'Implement reproducible synthetic-returns loading, per-ticker summary statistics, and a max-drawdown helper. Pass 8 tests.',
+  E'# Return distribution dashboard\n\nBuild the panel every fund manager glances at first: per-ticker mean,\nvol, Sharpe, skew, kurtosis, and a drawdown helper. Synthetic returns\nkeep things fully reproducible — the maths is the same on real CSVs.\n\n## What you build\n\n- **`dashboard.py`** — `load_returns(days, seed)` and `summary_metrics(returns)`\n- **`metrics.py`** — `max_drawdown(returns)` for a single series\n\n## What the tests check\n\n- Shape and column order of `load_returns`\n- Reproducibility (same seed → identical frame)\n- Drift recovers the configured per-ticker mean within tolerance\n- Sharpe is `mean_annual / vol_annual` (rf = 0)\n- Drawdown is negative on AAPL (vol = 30%) and zero on a monotone series\n\n## References\n\n- empyrical-reloaded — github.com/stefan-jansen/empyrical-reloaded\n- pyfolio — github.com/quantopian/pyfolio (legacy but the source for many\n  canonical metric definitions)\n\n## Time\n\n~45 minutes if you know pandas; ~90 from scratch.\n\n## Files in this project\n\n- `dashboard.py` (editable)\n- `metrics.py` (editable)\n- `tests/test_dashboard.py` (read-only)\n- `tests/conftest.py` (read-only)\n- `README.md` (read-only)\n\n## How to run\n\nClick **Run tests** below — pytest discovers `tests/test_*.py` automatically. Failing tests light up red and the mentor on the right can explain what each assertion expects.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": true}',
+  array['quant', 'pandas', 'statistics', 'risk-metrics'],
+  true,
+  102
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000342',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-project-3-mini-options-pricer',
+  E'Mini options pricer',
+  E'Every market-maker''s vol-desk runs three independent pricing paths for any vanilla quote: analytical Black-Scholes for the fast path, a tree for early-exercise checks, and Monte Carlo for path-dependent or basket payoffs. When they disagree, that''s a bug. Today you build all three from scratch and verify they agree on Hull''s textbook example to the relevant tolerance.',
+  E'Implement Black-Scholes, CRR binomial tree, and Monte Carlo European-call pricers; verify cross-method consistency and put-call parity through 7 tests.',
+  E'# Mini options pricer\n\nThree independent implementations of the same vanilla call price:\nthe closed-form Black-Scholes, the CRR binomial tree, and a\nrisk-neutral Monte Carlo. They should agree to within their respective\ntolerances on the canonical Hull textbook example.\n\n## What you build\n\n- **`analytical.py`** — `bs_call_put(S, K, r, sigma, T) -> (call, put)`\n- **`binomial.py`** — `crr_call(S, K, r, sigma, T, N) -> float`\n- **`mc.py`** — `mc_call(S, K, r, sigma, T, paths, seed) -> float`\n\n## What the tests check\n\n- BS call matches Hull''s 10.4506 (S=K=100, r=5%, σ=20%, T=1y)\n- Put-call parity `C − P = S − K·exp(−rT)` to machine precision\n- 500-step binomial gets closer to BS than 100-step\n- MC with 50k paths is within 0.3 of BS\n- MC is reproducible under a fixed seed\n- Deep OTM call (K=200, S=100) is essentially zero\n\n## References\n\n- py_vollib — github.com/vollib/py_vollib — the production-grade\n  reference implementation\n- Hull, *Options, Futures and Other Derivatives* — chapter 13 has the\n  worked example we test against\n\n## Time\n\n~75 minutes if you know BS; ~3 hours from first principles.\n\n## Files in this project\n\n- `analytical.py` (editable)\n- `binomial.py` (editable)\n- `mc.py` (editable)\n- `tests/test_pricing.py` (read-only)\n- `tests/conftest.py` (read-only)\n- `README.md` (read-only)\n\n## How to run\n\nClick **Run tests** below — pytest discovers `tests/test_*.py` automatically. Failing tests light up red and the mentor on the right can explain what each assertion expects.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": true}',
+  array['quant', 'options', 'black-scholes', 'monte-carlo'],
+  true,
+  103
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000343',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-project-4-walk-forward-backtest',
+  E'Walk-forward backtest',
+  E'Every quant-ML interview at every fund includes some version of this question: ''show me your backtest doesn''t peek at the future.'' Lopez de Prado wrote a book about it. The fund risk team has a checklist. The supervisor on your first day will stare at your code looking for one of these bugs. Today: build a backtest that survives the stare-test, with explicit tests proving features are past-only and predictions don''t see the next chunk.',
+  E'Implement a strictly-past-only feature builder and a walk-forward backtester. Pass 5 tests that include a direct lookahead-bias check.',
+  E'# Walk-forward backtest\n\nTwo of the most-common quant-ML bugs in production: features that\nsecretly use future data, and train/test splits that shuffle time\nseries. This project forces both bugs out of your code with explicit\ntests for "no lookahead" and "predictions only use prior data."\n\n## What you build\n\n- **`features.py`** — `make_features(returns)` returns a 3-feature\n  DataFrame: `mom_5`, `mom_20`, `vol_20`, all strictly past-only.\n- **`backtest.py`** — `walk_forward(features, target, n_splits, embargo)`\n  produces walk-forward chronological predictions with an embargo gap.\n\n## What the tests check\n\n- Features drop NaNs and have the right columns\n- Perturbing future returns leaves past features unchanged (no leakage)\n- Walk-forward predictions cover a strict suffix of the data\n- Predictions are reproducible under a fixed seed\n- Perturbing the LAST 20 returns doesn''t affect predictions for early\n  rows (deepest leakage test)\n\n## References\n\n- Lopez de Prado, *Advances in Financial Machine Learning* — chapter 7\n  on cross-validation and embargoes\n- skfolio — github.com/skfolio/skfolio (modern walk-forward backtester)\n\n## Time\n\n~90 minutes if you know sklearn; ~3 hours from scratch.\n\n## Files in this project\n\n- `features.py` (editable)\n- `backtest.py` (editable)\n- `tests/test_backtest.py` (read-only)\n- `tests/conftest.py` (read-only)\n- `README.md` (read-only)\n\n## How to run\n\nClick **Run tests** below — pytest discovers `tests/test_*.py` automatically. Failing tests light up red and the mentor on the right can explain what each assertion expects.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": true}',
+  array['quant', 'machine-learning', 'backtesting', 'pandas'],
+  true,
+  104
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000344',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-project-5-limit-order-book',
+  E'Limit order book',
+  E'The matching engine at every electronic exchange runs the same data structure: a price-time-priority limit order book. CME''s iLink, Eurex T7, NYSE Pillar — same shape, different implementation language (C++ in all three). The Python version below is the toy that lets you understand the algorithm; the production version uses contiguous memory and atomic indices for SPSC lock-free use.',
+  E'Implement a price-time-priority LOB with add / cancel / top_of_book / match in Python. Pass 8 tests covering all the edge cases that matter at the exchange level.',
+  E'# Limit order book\n\nThe same data structure that runs every electronic exchange — CME,\nEurex, NYSE, Coinbase. Implement a price-time-priority LOB in pure\nPython and pass the 8 tests covering top-of-book, cancellation,\ncrossing, partial fills, and multi-level walks.\n\n## What you build\n\n- **`lob.py`** — `LimitOrderBook` class with `add`, `cancel`,\n  `top_of_book`, and `match`.\n\n## What the tests check\n\n- Empty book reports (None, None)\n- Adding bids and asks; correct top-of-book\n- Cancellation removes the order and updates top-of-book\n- Cancelling an unknown id returns False\n- Full and partial fills on `match()`\n- Aggressive orders trade at the resting price (price-time priority)\n- Multi-level walks fill across price levels until either side empties\n\n## References\n\n- HFT-Orderbook — github.com/Crypto-toolbox/HFT-Orderbook — production\n  reference in Python; reads like documentation\n- LMAX Disruptor (Java) — for the lock-free production version\n\n## Time\n\n~2 hours from scratch; the data-structure choices matter more than the\namount of code.\n\n## Files in this project\n\n- `lob.py` (editable)\n- `tests/test_lob.py` (read-only)\n- `tests/conftest.py` (read-only)\n- `README.md` (read-only)\n\n## How to run\n\nClick **Run tests** below — pytest discovers `tests/test_*.py` automatically. Failing tests light up red and the mentor on the right can explain what each assertion expects.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": true}',
+  array['quant', 'low-latency', 'performance'],
+  true,
+  105
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
