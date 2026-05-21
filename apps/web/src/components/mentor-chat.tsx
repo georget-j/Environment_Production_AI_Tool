@@ -44,6 +44,9 @@ type Props = {
    * mentor ships this with every chat request so it never has to ask the
    * learner to paste their code. Empty map for read-only lessons. */
   getFilesSnapshot?: () => Record<string, string>;
+  /** Drives runtime-specific mentor guidance. "c" for cscript lessons so
+   * the model knows the sandbox is JSCPP; otherwise "python". */
+  language?: "python" | "c";
 };
 
 export const MentorChat = forwardRef<MentorChatHandle, Props>(
@@ -54,6 +57,7 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(
       onShowAnswer,
       showAnswerPending = false,
       getFilesSnapshot,
+      language,
     },
     ref,
   ) {
@@ -106,6 +110,7 @@ export const MentorChat = forwardRef<MentorChatHandle, Props>(
           message: text,
           hint_level: level,
           current_files: getFilesSnapshot ? getFilesSnapshot() : {},
+          language,
         }),
       });
       setPending(false);

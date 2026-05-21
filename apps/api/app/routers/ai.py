@@ -27,6 +27,9 @@ class ChatRequest(BaseModel):
     # Snapshot of the learner's current editor contents. Sent on every
     # chat call so the mentor never has to ask the learner to paste code.
     current_files: dict[str, str] = Field(default_factory=dict)
+    # "python" (default), "c". Drives runtime-specific mentor guidance so
+    # the model doesn't suggest unsupported sandbox features.
+    language: str | None = None
 
 
 class ChatTurnOut(BaseModel):
@@ -96,6 +99,7 @@ def chat_endpoint(
         latest_test_output=latest_submission.test_output if latest_submission else None,
         attempts_count=progress.attempts_count if progress else 0,
         current_files=capped_files or None,
+        language=body.language if body.language in ("python", "c") else None,
     )
 
     history = _load_history(db, user.id, challenge.id)

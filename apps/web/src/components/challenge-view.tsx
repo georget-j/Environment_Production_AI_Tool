@@ -6,6 +6,7 @@ import {
   type ChallengeRunnerHandle,
 } from "@/components/challenge-runner";
 import { CodePreview } from "@/components/code-preview";
+import { LessonCFillBlank } from "@/components/lesson-c-fill-blank";
 import { LessonFillBlank } from "@/components/lesson-fill-blank";
 import { LessonMatplot } from "@/components/lesson-matplot";
 import { LessonPredict } from "@/components/lesson-predict";
@@ -216,6 +217,17 @@ export function ChallengeView({
         />
       );
       break;
+    case "cscript":
+      runner = (
+        <LessonCFillBlank
+          config={config}
+          nextSlug={nextSlug}
+          onCodeChange={(code) => {
+            filesRef.current = { "solution.c": code };
+          }}
+        />
+      );
+      break;
     case "reading":
     default:
       runner = (
@@ -229,6 +241,9 @@ export function ChallengeView({
 
   const mentorOnShowAnswer =
     config?.mode === "pyodide" ? () => setShowAnswerOpen(true) : undefined;
+
+  const mentorLanguage: "python" | "c" | undefined =
+    config?.mode === "cscript" ? "c" : "python";
 
   return (
     <div className="grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]">
@@ -267,6 +282,7 @@ export function ChallengeView({
             onShowAnswer={mentorOnShowAnswer}
             showAnswerPending={showAnswerPending}
             getFilesSnapshot={getFilesSnapshot}
+            language={mentorLanguage}
           />
         </div>
       </aside>

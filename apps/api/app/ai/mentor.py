@@ -44,6 +44,27 @@ class ChallengeContext:
     # by the web client on every chat call so the mentor doesn't have to ask
     # the learner to paste their code.
     current_files: dict[str, str] | None = None
+    # "python" (default), "c", or None. Drives a runtime-specific addendum
+    # so the mentor doesn't suggest unsupported features for the lesson's
+    # in-browser sandbox (e.g. <pthread.h> in JSCPP, file I/O, etc.).
+    language: str | None = None
+
+
+# Mentor system-prompt addenda per in-browser runtime. Kept terse — they
+# ride alongside the main socratic-hint prompt every C lesson.
+_LANGUAGE_ADDENDA = {
+    "c": (
+        "Runtime context: this learner's code runs in a small in-browser C "
+        "interpreter (picoc compiled to WASM). It supports stdio (printf, basic "
+        "scanf), control flow, arrays, pointers, structs, malloc/free, function "
+        "pointers, and the essentials of <math.h>, <string.h>, <stdlib.h>. It "
+        "does NOT support: threads (<pthread.h>), file I/O beyond stdin/stdout, "
+        "<unistd.h>, <signal.h>, system calls, or deep recursion (small "
+        "interpreter stack — prefer iteration). Never suggest these. The error "
+        "format the learner sees is 'line LINE:COL <message>' — refer to that "
+        "directly when diagnosing."
+    ),
+}
 
 
 # Per-file content cap so a noisy lesson can't blow up the prompt.
@@ -65,6 +86,11 @@ def build_messages(
 ) -> list[dict[str, str]]:
     level = max(1, min(3, hint_level))
     system_prompt = get_prompt_with_guardrail("socratic-hint-prompt")
+    language_note = (
+        f"\n\n{_LANGUAGE_ADDENDA[context.language]}"
+        if context.language and context.language in _LANGUAGE_ADDENDA
+        else ""
+    )
     context_block = (
         f"Challenge: {context.title}\n"
         f"Scenario: {context.scenario}\n"
@@ -77,6 +103,7 @@ def build_messages(
         f"{_HINT_INSTRUCTIONS[level]}\n"
         f"Important: you ALREADY have the learner's current code above. "
         f"Never ask them to paste or share their code — refer to it directly."
+        f"{language_note}"
     )
     messages: list[dict[str, str]] = [
         {"role": "system", "content": system_prompt},

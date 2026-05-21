@@ -56,6 +56,21 @@ export type FillBlankLessonConfig = {
 };
 
 /**
+ * Quant track 'cscript' lesson: editable C in JSCPP. Same shape as
+ * fillblank but runs through the C interpreter instead of Pyodide.
+ * Compares stdout to `expected_stdout` whitespace-trimmed.
+ */
+export type CScriptLessonConfig = {
+  mode: "cscript";
+  /** Initial editor content. Use `___` for blanks. */
+  template: string;
+  /** Exact stdout the finished code should print (whitespace-trimmed compare). */
+  expected_stdout: string;
+  /** One-line hint shown under the editor. */
+  hint?: string;
+};
+
+/**
  * Quant track 'matplot' lesson: Monaco + Pyodide + inline matplotlib SVG.
  * Pass criterion is "code runs cleanly AND a non-empty figure was drawn AND
  * (if expected_stdout is set) stdout matches". No pixel-diff: too brittle.
@@ -83,7 +98,8 @@ export type ChallengeRunnerConfig =
     }
   | PredictLessonConfig
   | FillBlankLessonConfig
-  | MatplotLessonConfig;
+  | MatplotLessonConfig
+  | CScriptLessonConfig;
 
 import { PYTHON_BASICS_CONFIG } from "@/lib/python-basics-config.generated";
 
