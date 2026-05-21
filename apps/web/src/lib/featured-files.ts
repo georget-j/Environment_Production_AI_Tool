@@ -75,6 +75,31 @@ export type CScriptLessonConfig = {
  * Pass criterion is "code runs cleanly AND a non-empty figure was drawn AND
  * (if expected_stdout is set) stdout matches". No pixel-diff: too brittle.
  */
+/**
+ * Quant track 'cwasm' lesson: read-only `.c` source preview + a Run button
+ * that loads a pre-built WASM module from /wasm/quant/<slug>.js and
+ * captures its stdout. Pass criterion: stdout matches `expected_stdout`
+ * loosely (substring match — timings vary). Use when picoc-js can't run
+ * the lesson (deep recursion, perf benchmarks needing real -O3 code).
+ */
+export type CWasmLessonConfig = {
+  mode: "cwasm";
+  /** The .c source the learner reads (rendered with syntax highlight). */
+  source: string;
+  /** Slug under /wasm/quant/ — must match an entry in c-wasm.ts. */
+  wasm_demo:
+    | "ring_buffer"
+    | "struct_layout"
+    | "lob_node"
+    | "cache_locality"
+    | "manual_vs_libc_strlen"
+    | "printf_internals";
+  /** Substring expected in stdout for the lesson to pass. */
+  expected_stdout_contains: string;
+  /** One-line hint shown above the demo. */
+  hint?: string;
+};
+
 export type MatplotLessonConfig = {
   mode: "matplot";
   /** Initial editor content. Use `___` for blanks if you want a fill-in shape. */
@@ -99,7 +124,8 @@ export type ChallengeRunnerConfig =
   | PredictLessonConfig
   | FillBlankLessonConfig
   | MatplotLessonConfig
-  | CScriptLessonConfig;
+  | CScriptLessonConfig
+  | CWasmLessonConfig;
 
 import { PYTHON_BASICS_CONFIG } from "@/lib/python-basics-config.generated";
 

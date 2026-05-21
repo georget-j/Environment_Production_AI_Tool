@@ -7,6 +7,7 @@ import {
 } from "@/components/challenge-runner";
 import { CodePreview } from "@/components/code-preview";
 import { LessonCFillBlank } from "@/components/lesson-c-fill-blank";
+import { LessonCWasm } from "@/components/lesson-c-wasm";
 import { LessonFillBlank } from "@/components/lesson-fill-blank";
 import { LessonMatplot } from "@/components/lesson-matplot";
 import { LessonPredict } from "@/components/lesson-predict";
@@ -227,6 +228,9 @@ export function ChallengeView({
           }}
         />
       );
+      break;
+    case "cwasm":
+      runner = <LessonCWasm config={config} nextSlug={nextSlug} />;
       break;
     case "reading":
     default:
