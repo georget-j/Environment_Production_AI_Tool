@@ -9,6 +9,10 @@
  * threads, file I/O beyond stdin/stdout, system calls, or unbounded
  * recursion (the interpreter stack is small — teach iterative versions).
  *
+ * The published npm bundle imports Node-only modules at parse time, so
+ * we don't bundle it; instead we load the UMD build from jsdelivr at
+ * runtime and grab `window.picocjs.runC`. Same CDN as Pyodide.
+ *
  * picoc's `runC` is fire-and-forget; output and errors both come back
  * via a single `consoleWrite(s)` callback. Errors are formatted as
  *   <source line>
@@ -17,6 +21,8 @@
  * We detect that prefix and surface it as an error.
  */
 
+const PICOC_VERSION = "1.0.12";
+const PICOC_UMD_URL = `https://cdn.jsdelivr.net/npm/picoc-js@${PICOC_VERSION}/dist/bundle.umd.js`;
 const RUNTIME_TIMEOUT_MS = 2500;
 const SETTLE_DELAY_MS = 200;
 const ERROR_LINE_RE = /^file\.c:\d+:\d+\s/m;
@@ -43,16 +49,46 @@ type PicocApi = {
 
 let picocPromise: Promise<PicocApi> | null = null;
 
-async function loadPicoc(): Promise<PicocApi> {
-  if (!picocPromise) {
-    picocPromise = (async () => {
-      const mod = (await import("picoc-js")) as unknown as PicocApi;
-      return mod;
-    })().catch((exc) => {
-      picocPromise = null;
-      throw exc;
-    });
+function loadPicoc(): Promise<PicocApi> {
+  if (picocPromise) return picocPromise;
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("C runtime only loads in the browser"));
   }
+  const w = window as typeof window & { picocjs?: PicocApi };
+  if (w.picocjs?.runC) return Promise.resolve(w.picocjs);
+  picocPromise = new Promise<PicocApi>((resolve, reject) => {
+    const existing = document.querySelector(
+      `script[data-picoc="${PICOC_VERSION}"]`,
+    ) as HTMLScriptElement | null;
+    const script = existing ?? document.createElement("script");
+    if (!existing) {
+      script.src = PICOC_UMD_URL;
+      script.async = true;
+      script.dataset.picoc = PICOC_VERSION;
+      document.head.appendChild(script);
+    }
+    const settle = () => {
+      const picoc = (window as typeof window & { picocjs?: PicocApi }).picocjs;
+      if (picoc?.runC) resolve(picoc);
+      else
+        reject(
+          new Error("picoc-js script loaded but window.picocjs is missing"),
+        );
+    };
+    if (existing) {
+      // Race: another caller is already loading. Wait a microtask then check.
+      setTimeout(settle, 0);
+    } else {
+      script.onload = settle;
+      script.onerror = () => {
+        picocPromise = null;
+        reject(new Error("Couldn't fetch picoc-js from the CDN"));
+      };
+    }
+  }).catch((exc) => {
+    picocPromise = null;
+    throw exc;
+  });
   return picocPromise;
 }
 
@@ -81,13 +117,9 @@ export async function runC(code: string): Promise<CRunResult> {
       if (settleTimer) clearTimeout(settleTimer);
       clearTimeout(hardCap);
       const joined = chunks.join("\n");
-      // picoc emits both stdout and errors into the same callback. Split
-      // them: anything after a `file.c:LINE:COL` marker is the error.
       const errMatch = ERROR_LINE_RE.exec(joined);
       if (errMatch) {
         const errStart = errMatch.index;
-        // Walk back past the carat/source-line annotation lines (up to 2)
-        // so the stdout doesn't get the noisy prefix.
         const stdout = joined
           .slice(0, errStart)
           .replace(/(^|\n)[^\n]*\n[^\n]*\^\s*$/, "");
@@ -129,9 +161,6 @@ export async function runC(code: string): Promise<CRunResult> {
 }
 
 function friendlyCError(raw: string): string {
-  // picoc's error lines look like "file.c:2:39 out of memory".
-  // Strip "file.c:" prefix for readability — learners didn't pick the
-  // filename, and "line 2" is what matters.
   return raw
     .split("\n")
     .map((line) => line.replace(/^file\.c:/, "line "))
@@ -139,7 +168,7 @@ function friendlyCError(raw: string): string {
     .trim();
 }
 
-/** Wipe the lazy picoc instance. Next call boots a fresh WASM module. */
+/** Wipe the lazy picoc cache. Forces the next call to re-resolve. */
 export function resetCRuntime(): void {
   picocPromise = null;
 }
