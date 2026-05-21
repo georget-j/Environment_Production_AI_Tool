@@ -172,76 +172,95 @@ export function ChallengeView({
   }, [challengeId, config]);
 
   let runner: React.ReactNode;
-  switch (config?.mode) {
-    case "pyodide":
-      runner = repoTemplateUrl ? (
-        <ChallengeRunner
-          ref={runnerRef}
-          challengeSlug={challengeSlug}
-          challengeId={challengeId}
-          repoTemplateUrl={repoTemplateUrl}
-          branch={repoBranch ?? "main"}
-          config={config}
-          onStuck={handleStuck}
-          onFilesChange={handleFilesChange}
-        />
-      ) : (
-        <p className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-          This challenge is missing a template URL — please contact support.
+  // No config for this slug = lesson was renamed/removed since the last
+  // build. Surface a clear error rather than the misleading "no template"
+  // path below.
+  if (config === undefined) {
+    runner = (
+      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-semibold">Lesson configuration missing.</p>
+        <p className="mt-1">
+          The slug <code>{challengeSlug}</code> doesn&apos;t have a runner
+          config in this build. The lesson may have been renamed — go back to
+          the{" "}
+          <a href="/tracks/quant-programmer" className="underline">
+            track page
+          </a>{" "}
+          and click the lesson from there.
         </p>
-      );
-      break;
-    case "predict":
-      runner = <LessonPredict config={config} nextSlug={nextSlug} />;
-      break;
-    case "fillblank":
-      runner = (
-        <LessonFillBlank
-          config={config}
-          nextSlug={nextSlug}
-          onCodeChange={(code) => {
-            // Mirror the single editable into filesRef so MentorChat picks
-            // it up via getFilesSnapshot.
-            filesRef.current = { "solution.py": code };
-          }}
-        />
-      );
-      break;
-    case "matplot":
-      runner = (
-        <LessonMatplot
-          config={config}
-          nextSlug={nextSlug}
-          onCodeChange={(code) => {
-            filesRef.current = { "solution.py": code };
-          }}
-        />
-      );
-      break;
-    case "cscript":
-      runner = (
-        <LessonCFillBlank
-          config={config}
-          nextSlug={nextSlug}
-          onCodeChange={(code) => {
-            filesRef.current = { "solution.c": code };
-          }}
-        />
-      );
-      break;
-    case "cwasm":
-      runner = <LessonCWasm config={config} nextSlug={nextSlug} />;
-      break;
-    case "reading":
-    default:
-      runner = (
-        <CodePreview
-          repoTemplateUrl={repoTemplateUrl}
-          branch={repoBranch}
-          paths={config?.mode === "reading" ? config.readonly : []}
-        />
-      );
-  }
+      </div>
+    );
+  } else
+    switch (config?.mode) {
+      case "pyodide":
+        runner = repoTemplateUrl ? (
+          <ChallengeRunner
+            ref={runnerRef}
+            challengeSlug={challengeSlug}
+            challengeId={challengeId}
+            repoTemplateUrl={repoTemplateUrl}
+            branch={repoBranch ?? "main"}
+            config={config}
+            onStuck={handleStuck}
+            onFilesChange={handleFilesChange}
+          />
+        ) : (
+          <p className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+            This challenge is missing a template URL — please contact support.
+          </p>
+        );
+        break;
+      case "predict":
+        runner = <LessonPredict config={config} nextSlug={nextSlug} />;
+        break;
+      case "fillblank":
+        runner = (
+          <LessonFillBlank
+            config={config}
+            nextSlug={nextSlug}
+            onCodeChange={(code) => {
+              // Mirror the single editable into filesRef so MentorChat picks
+              // it up via getFilesSnapshot.
+              filesRef.current = { "solution.py": code };
+            }}
+          />
+        );
+        break;
+      case "matplot":
+        runner = (
+          <LessonMatplot
+            config={config}
+            nextSlug={nextSlug}
+            onCodeChange={(code) => {
+              filesRef.current = { "solution.py": code };
+            }}
+          />
+        );
+        break;
+      case "cscript":
+        runner = (
+          <LessonCFillBlank
+            config={config}
+            nextSlug={nextSlug}
+            onCodeChange={(code) => {
+              filesRef.current = { "solution.c": code };
+            }}
+          />
+        );
+        break;
+      case "cwasm":
+        runner = <LessonCWasm config={config} nextSlug={nextSlug} />;
+        break;
+      case "reading":
+      default:
+        runner = (
+          <CodePreview
+            repoTemplateUrl={repoTemplateUrl}
+            branch={repoBranch}
+            paths={config?.mode === "reading" ? config.readonly : []}
+          />
+        );
+    }
 
   const mentorOnShowAnswer =
     config?.mode === "pyodide" ? () => setShowAnswerOpen(true) : undefined;
