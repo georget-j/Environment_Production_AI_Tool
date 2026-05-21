@@ -60,6 +60,28 @@ export function ChallengeView({
   const [showAnswerError, setShowAnswerError] =
     useState<ShowAnswerError | null>(null);
   const [mentorOverlayOpen, setMentorOverlayOpen] = useState(false);
+  // Mentor sidebar starts collapsed by default on lg+ so code-heavy
+  // lessons get the wider editor. Choice is persisted to localStorage —
+  // initial render uses the default so SSR/CSR match; the effect below
+  // syncs to the stored value once the client is mounted.
+  const [mentorCollapsed, setMentorCollapsed] = useState(true);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("prodready:mentor-collapsed");
+    if (stored === "false") setMentorCollapsed(false);
+  }, []);
+  const handleToggleMentor = useCallback(() => {
+    setMentorCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          "prodready:mentor-collapsed",
+          next ? "true" : "false",
+        );
+      }
+      return next;
+    });
+  }, []);
 
   // Lock body scroll + Escape-to-close while the mobile mentor overlay
   // is open. No-ops on lg+ because the overlay is hidden by CSS there.
@@ -274,15 +296,24 @@ export function ChallengeView({
   const mentorLanguage: "python" | "c" | undefined =
     config?.mode === "cscript" ? "c" : "python";
 
+  // On lg+, the grid's right column is either the full mentor sidebar
+  // (~400px) or a thin 40px rail that the learner clicks to expand.
+  // The mobile overlay flow doesn't depend on this column.
+  const gridClass = mentorCollapsed
+    ? "grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_40px]"
+    : "grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]";
+
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]">
+    <div className={gridClass}>
       <section className="min-h-0 min-w-0 overflow-hidden">{runner}</section>
 
       {/* Mentor: lives in the grid's right column on lg+. On smaller
        * screens the grid is single-column (workspace only) and the
        * mentor is rendered as a full-screen overlay when the floating
        * "Ask the mentor" button is tapped. Same MentorChat instance —
-       * only the wrapper's position class changes. */}
+       * only the wrapper's position class changes. The desktop sidebar
+       * also has a collapsed "rail" mode where only a vertical toggle
+       * button is visible, reclaiming ~360px for the editor. */}
       <aside
         className={
           mentorOverlayOpen
@@ -303,16 +334,62 @@ export function ChallengeView({
             </button>
           </div>
         )}
-        <div className="min-h-0 flex-1">
-          <MentorChat
-            ref={mentorRef}
-            challengeId={challengeId}
-            onJumpToCode={handleJumpToCode}
-            onShowAnswer={mentorOnShowAnswer}
-            showAnswerPending={showAnswerPending}
-            getFilesSnapshot={getFilesSnapshot}
-            language={mentorLanguage}
-          />
+        {/* Desktop rail — only visible on lg+ when the mentor is
+         * collapsed. Clicking it expands the sidebar. The overlay
+         * (mobile) path always shows the full chat, never the rail. */}
+        {mentorCollapsed && !mentorOverlayOpen && (
+          <button
+            type="button"
+            onClick={handleToggleMentor}
+            className="hidden lg:flex h-full w-full flex-col items-center justify-start gap-3 rounded-md border border-border bg-muted/30 py-3 text-xs font-medium text-muted-foreground hover:bg-muted/60"
+            aria-label="Expand the AI mentor"
+            title="Expand the AI mentor"
+          >
+            <span aria-hidden="true">›</span>
+            <span
+              className="select-none"
+              style={{
+                writingMode: "vertical-rl",
+                transform: "rotate(180deg)",
+              }}
+            >
+              Ask the mentor
+            </span>
+          </button>
+        )}
+        <div
+          className={
+            mentorCollapsed && !mentorOverlayOpen
+              ? "hidden"
+              : "flex min-h-0 flex-1 flex-col"
+          }
+        >
+          {/* Desktop collapse button — only on lg+, only when expanded.
+           * Sits inline so it doesn't reflow the mentor's internal layout. */}
+          {!mentorOverlayOpen && (
+            <div className="hidden lg:flex flex-none items-center justify-end border-b border-border bg-background/60 px-2 py-1">
+              <button
+                type="button"
+                onClick={handleToggleMentor}
+                className="rounded-md px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
+                aria-label="Collapse the AI mentor"
+                title="Collapse"
+              >
+                Collapse ›
+              </button>
+            </div>
+          )}
+          <div className="min-h-0 flex-1">
+            <MentorChat
+              ref={mentorRef}
+              challengeId={challengeId}
+              onJumpToCode={handleJumpToCode}
+              onShowAnswer={mentorOnShowAnswer}
+              showAnswerPending={showAnswerPending}
+              getFilesSnapshot={getFilesSnapshot}
+              language={mentorLanguage}
+            />
+          </div>
         </div>
       </aside>
 
