@@ -4,5 +4,64 @@
 import type { ChallengeRunnerConfig } from "@/lib/featured-files";
 
 export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
-  // (no lessons defined yet)
+  "quant-01-why-numpy": {
+  "mode": "predict",
+  "code": "import numpy as np, time\nn = 1_000_000\nxs = list(range(n))\narr = np.arange(n)\nprint(sum(xs) == int(arr.sum()))",
+  "expected_stdout": "True",
+  "prompt": "True or False?"
+},
+  "quant-02-creating-arrays": {
+  "mode": "fillblank",
+  "template": "import numpy as np\na = np.array([1.0, 2.0, 3.0])\nb = np.___(3)\nc = np.___(0, 1, 5)\nprint(a, b, c, sep=' | ')",
+  "expected_stdout": "[1. 2. 3.] | [0. 0. 0.] | [0.   0.25 0.5  0.75 1.  ]",
+  "hint": "One blank is `zeros`, the other is `linspace`."
+},
+  "quant-03-broadcasting": {
+  "mode": "predict",
+  "code": "import numpy as np\nM = np.zeros((4, 3))\nrow = np.array([10, 20, 30])\nprint((M + row)[0])",
+  "expected_stdout": "[10. 20. 30.]",
+  "prompt": "Type the row exactly as numpy prints it."
+},
+  "quant-04-boolean-masks": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nr = np.array([-0.02, 0.01, -0.005, 0.015, 0.0, 0.03])\npositive = r[r ___ 0]\nprint(positive)",
+  "expected_stdout": "[0.01  0.015 0.03 ]",
+  "hint": "Strictly positive \u2014 zero doesn't count."
+},
+  "quant-05-covariance-via-matrix-algebra": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nrng = np.random.default_rng(0)\nX = rng.normal(size=(1000, 2))\nXd = X - X.mean(axis=0)\ncov = Xd.___ @ Xd / X.shape[0]\nprint(np.round(cov, 2))",
+  "expected_stdout": "[[ 1.04 -0.02]\n [-0.02  0.96]]",
+  "hint": "Two-letter attribute on every numpy array."
+},
+  "quant-06-reproducible-random-numbers": {
+  "mode": "fillblank",
+  "template": "import numpy as np\na = np.random.default_rng(___).normal(size=3)\nb = np.random.default_rng(42).normal(size=3)\nprint(np.array_equal(a, b))",
+  "expected_stdout": "True",
+  "hint": "Use 42."
+},
+  "quant-07-statistical-reductions": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nrng = np.random.default_rng(0)\nr = rng.normal(loc=0.001, scale=0.02, size=10_000)\nprint(round(r.___(), 4), round(r.___(), 4), round(np.___(r, 95), 4))",
+  "expected_stdout": "0.0011 0.02 0.0338",
+  "hint": "Two methods, one function. All three are short, common names."
+},
+  "quant-08-why-numpy-is-fast": {
+  "mode": "predict",
+  "code": "import numpy as np\nx = np.arange(1_000_000)\nprint(int(x.sum()))",
+  "expected_stdout": "499999500000",
+  "prompt": "Type the integer."
+},
+  "quant-09-vectorising-a-rolling-mean": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nx = np.array([1, 2, 3, 4, 5, 6], dtype=float)\nw = 3\nc = np.concatenate(([0], np.___(x)))\nroll = (c[w:] - c[:-w]) / w\nprint(roll)",
+  "expected_stdout": "[2. 3. 4. 5.]",
+  "hint": "It's literally called the cumulative sum."
+},
+  "quant-10-plot-a-price-path": {
+  "mode": "matplot",
+  "template": "import numpy as np, matplotlib.pyplot as plt\nrng = np.random.default_rng(0)\nshocks = rng.normal(0, 0.01, 252)\nprice = 100 * np.exp(np.cumsum(shocks))\nplt.plot(___)\nplt.title('Simulated price path'); plt.xlabel('day'); plt.ylabel('price')\nprint('plotted')",
+  "expected_stdout": "plotted",
+  "hint": "It's a single variable name."
+},
 };
