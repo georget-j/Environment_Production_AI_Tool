@@ -1022,11 +1022,628 @@ on conflict (slug) do update set
   is_free = excluded.is_free,
   order_index = excluded.order_index;
 
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000031e',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-31-sklearn-fit-and-predict',
+  E'sklearn fit and predict',
+  E'scikit-learn''s API is the same for every estimator: `.fit(X, y)` learns, `.predict(X)` infers, `.score(X, y)` reports R² or accuracy.',
+  E'Train a linear regression on a toy dataset and verify the perfect fit.',
+  E'**Concept.** Every sklearn estimator inherits `fit/predict/score`. With perfectly linear data, `LinearRegression` recovers the coefficient exactly and `.score` returns 1.0.\n\n**Example.**\n\n```python\nimport numpy as np\nfrom sklearn.linear_model import LinearRegression\nX = np.arange(10).reshape(-1, 1)\ny = 2 * X.ravel() + 3\nmodel = LinearRegression().fit(X, y)\nprint(round(model.score(X, y), 4))\n```\n\n**Your turn.** Replace `___` with the method that trains the model.\n\n**Expected.** `1.0`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning', 'regression'],
+  true,
+  31
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000031f',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-32-lookahead-bias',
+  E'Lookahead bias',
+  E'In finance ML the order of your rows matters. A random `train_test_split` lets the model see the future — and inflates your Sharpe spectacularly.',
+  E'Recognise why a chronological split is the honest baseline.',
+  E'**Concept.** `sklearn.model_selection.train_test_split(shuffle=False)` keeps order intact. The first 80% becomes training, last 20% becomes test. Anything else for time series is a bug.\n\n**Example.**\n\n```python\nfrom sklearn.model_selection import train_test_split\nimport numpy as np\nX = np.arange(10).reshape(-1, 1); y = np.arange(10)\n_, X_test, _, _ = train_test_split(X, y, test_size=0.2, shuffle=False)\nprint(X_test.ravel().tolist())\n```\n\n**Predict.** Predict what the test set looks like — last 20% of an ordered range 0..9.\n\n**Expected.** `[8, 9]`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning', 'backtesting'],
+  true,
+  32
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000320',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-33-momentum-signal-regression',
+  E'Momentum signal regression',
+  E'A 5-day momentum is a classic feature: did the stock go up over the last week? Regressing next-day return on this is the smallest non-trivial ML model in finance.',
+  E'Fit a linear regression of next-day SPY return on lagged 5-day return; report the R².',
+  E'**Concept.** `mom_5 = r.shift(1).rolling(5).sum()`. Drop NaNs, split chronologically with shuffle=False, fit `LinearRegression`. R² near zero is *expected* — markets are hard.\n\n**Example.**\n\n```python\nimport pandas as pd, numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import train_test_split\nr = pd.read_csv(''/data/quant/spy.csv'')[''adj_close''].pct_change()\ndf = pd.DataFrame({''mom'': r.shift(1).rolling(5).sum(), ''next'': r}).dropna()\nX = df[[''mom'']].values; y = df[''next''].values\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\nscore = LinearRegression().fit(Xtr, ytr).score(Xte, yte)\nprint(round(score, 4))\n```\n\n**Your turn.** Replace `___` so the split keeps chronological order (no shuffling).\n\n**Expected.** `0.0049`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning', 'regression'],
+  true,
+  33
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000321',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-34-random-forest-direction-classifier',
+  E'Random forest direction classifier',
+  E'A forest of decision trees can spot non-linear patterns a linear model would miss — at the cost of being a black box.',
+  E'Train a 100-tree random forest to predict next-day direction from 5-day momentum and rolling volatility.',
+  E'**Concept.** `RandomForestClassifier(n_estimators=100)` builds 100 trees. Two features: 5-day momentum and 20-day rolling std. The label is `np.sign(next_return)`. Score is accuracy on a chronological test split.\n\n**Example.**\n\n```python\nimport pandas as pd, numpy as np\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import train_test_split\nr = pd.read_csv(''/data/quant/spy.csv'')[''adj_close''].pct_change()\ndf = pd.DataFrame({\n    ''mom'': r.shift(1).rolling(5).sum(),\n    ''vol'': r.shift(1).rolling(20).std(),\n    ''next'': np.sign(r),\n}).dropna()\nX = df[[''mom'',''vol'']].values; y = df[''next''].values\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\nscore = RandomForestClassifier(n_estimators=100, random_state=0).fit(Xtr, ytr).score(Xte, yte)\nprint(round(score, 3))\n```\n\n**Your turn.** Replace `___` with the method that trains the forest.\n\n**Expected.** `0.526`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning'],
+  true,
+  34
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000322',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-35-time-series-cross-validation',
+  E'Time-series cross-validation',
+  E'`TimeSeriesSplit` slices a chronological frame into expanding-window CV folds. Every test fold starts after its train fold — no leakage.',
+  E'Run a 5-fold time-series CV on a linear model and average the fold scores.',
+  E'**Concept.** `TimeSeriesSplit(n_splits=5)` yields five (train_idx, test_idx) pairs. Loop, fit on train_idx, score on test_idx, average. Use `cross_val_score(...)` for the one-liner.\n\n**Example.**\n\n```python\nimport pandas as pd, numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import TimeSeriesSplit, cross_val_score\nr = pd.read_csv(''/data/quant/spy.csv'')[''adj_close''].pct_change()\ndf = pd.DataFrame({''mom'': r.shift(1).rolling(5).sum(), ''next'': r}).dropna()\nX = df[[''mom'']].values; y = df[''next''].values\ntscv = TimeSeriesSplit(n_splits=5)\nscores = cross_val_score(LinearRegression(), X, y, cv=tscv)\nprint(round(scores.mean(), 4))\n```\n\n**Your turn.** Replace `___` with the splitter that respects chronological order.\n\n**Expected.** `0.0`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning', 'backtesting'],
+  true,
+  35
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000323',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-36-the-p-hacked-sharpe-trap',
+  E'The p-hacked Sharpe trap',
+  E'Try 1000 random strategies; the best one will look brilliant by chance. Lopez de Prado calls this ''backtest overfitting'' and warns it dwarfs every other risk in quant ML.',
+  E'Predict the maximum Sharpe of 1000 pure-noise strategies — and feel why a ''great'' backtest in isolation is meaningless.',
+  E'**Concept.** Generate 1000 random return series with mean 0 and σ=0.01. Compute each one''s annualised Sharpe. The MAX across them is several standard deviations above zero — pure chance, not skill.\n\n**Example.**\n\n```python\nimport numpy as np\nrng = np.random.default_rng(42)\nR = rng.normal(0, 0.01, size=(1000, 1000))\nsharpe = R.mean(axis=1) / R.std(axis=1) * np.sqrt(252)\nprint(round(sharpe.max(), 2) > 1.5)\n```\n\n**Predict.** 1000 pure-noise strategies — is the best one''s annualised Sharpe > 1.5?\n\n**Expected.** `True`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning', 'backtesting', 'risk-metrics'],
+  true,
+  36
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000324',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-37-why-c',
+  E'Why C',
+  E'Python is where research lives. C is where the inner loop of a matching engine runs a billion times a day. The latency budget is the difference.',
+  E'Read a real C limit-order-book node and see it execute.',
+  E'**Concept.** The demo below is a small sorted-list LOB written in C, compiled to WASM at `-O3`. Even this tiny example is faster than the equivalent pure-Python: no per-element interpreter overhead, no object headers, just contiguous memory and direct pointer chasing.\n\n**Example.**\n\n```c\n/* Sorted-insert LOB in C — see c-demos/lob_node.c */\ninsert_bid(&book, 1, 100.05, 5);\ninsert_bid(&book, 2, 100.10, 3);\n```\n\n**Your turn.** Click Run demo. The C compiles ahead of time — what you see is `-O3` speed.\n\n**Expected.** `best bid: 100.10`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language', 'low-latency'],
+  true,
+  37
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000325',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-38-hello-c',
+  E'Hello C',
+  E'The simplest C program — `printf` plus `return 0`. Same shape every C program in the world has at its core.',
+  E'Print ''hello, C!'' from a C program.',
+  E'**Concept.** `#include <stdio.h>` exposes `printf`. `main` must return an `int`. Strings live between double quotes; `\\n` is a newline.\n\n**Example.**\n\n```c\n#include <stdio.h>\nint main() {\n    printf("hello, C!\\n");\n    return 0;\n}\n```\n\n**Your turn.** Replace `___` with the exact string `hello, C!`.\n\n**Expected.** `hello, C!`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language'],
+  true,
+  38
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000326',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-39-types-and-arithmetic',
+  E'Types and arithmetic',
+  E'C has explicit types: `int` is integer, `double` is 8-byte float. Mixing them follows promotion rules — division is the most surprising.',
+  E'Print the integer division of 7/2 and the floating-point division of 7.0/2.0.',
+  E'**Concept.** `7 / 2` is integer division in C — it gives `3`, not `3.5`. To get the real quotient, one operand must be a float: `7.0 / 2` or `(double)7 / 2`.\n\n**Example.**\n\n```c\n#include <stdio.h>\nint main() {\n    printf("%d %.1f\\n", 7 / 2, 7.0 / 2);\n    return 0;\n}\n```\n\n**Your turn.** Replace `___` with the literal that keeps the second division floating-point.\n\n**Expected.** `3 3.5`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language'],
+  true,
+  39
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000327',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-40-conditionals-and-loops',
+  E'Conditionals and loops',
+  E'C''s `for` loop has three parts: init, test, increment. Same idea as Python but with explicit types and braces.',
+  E'Print the first 5 squares using a for-loop.',
+  E'**Concept.** `for (int i = 1; i <= 5; i++) { ... }` runs the body 5 times with i from 1 to 5. `printf("%d ", i*i)` prints each square. After the loop, print a newline.\n\n**Example.**\n\n```c\n#include <stdio.h>\nint main() {\n    for (int i = 1; i <= 5; i++) {\n        printf("%d ", i * i);\n    }\n    printf("\\n");\n    return 0;\n}\n```\n\n**Your turn.** Replace `___` with the increment that advances i by 1 each iteration.\n\n**Expected.** `1 4 9 16 25`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language'],
+  true,
+  40
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000328',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-41-arrays-and-pointers',
+  E'Arrays and pointers',
+  E'In C, an array''s name decays to a pointer to its first element. Pointer arithmetic walks the array byte-by-byte — `*(p + 2)` is the same as `p[2]`.',
+  E'Use pointer arithmetic to print the third element of an array.',
+  E'**Concept.** Given `int a[5] = {10,20,30,40,50};` and `int *p = a;`, all of `a[2]`, `p[2]`, `*(p+2)`, `*(a+2)` are `30`. They''re four ways of writing the same thing.\n\n**Example.**\n\n```c\n#include <stdio.h>\nint main() {\n    int a[5] = {10, 20, 30, 40, 50};\n    int *p = a;\n    printf("%d\\n", *(p + 2));\n    return 0;\n}\n```\n\n**Your turn.** Replace `___` with the offset that gives you the third element.\n\n**Expected.** `30`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language', 'memory'],
+  true,
+  41
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000329',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-42-structs',
+  E'Structs',
+  E'A struct groups related fields. Every market-data tick, every order, every position in a quant system is a struct.',
+  E'Define a Bond struct and print its fields.',
+  E'**Concept.** `struct Bond { double face; int years; };` declares the shape. `struct Bond b;` declares an instance. Fields are set via `.` (`b.face = 1000.0;`).\n\n**Example.**\n\n```c\n#include <stdio.h>\nstruct Bond {\n    double face;\n    int years;\n};\nint main() {\n    struct Bond b;\n    b.face = 1000.0;\n    b.years = 5;\n    printf("face=%.2f years=%d\\n", b.face, b.years);\n    return 0;\n}\n```\n\n**Your turn.** Replace `___` with the field name we set above.\n\n**Expected.** `face=1000.00 years=5`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language', 'memory'],
+  true,
+  42
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000032a',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-43-function-pointers',
+  E'Function pointers',
+  E'A function pointer lets you pass behaviour, not just data. C''s `qsort` takes one — every C program that sorts a struct uses this pattern.',
+  E'Pass a comparison function to `apply` and print the result.',
+  E'**Concept.** `int (*f)(int)` is the type ''pointer to a function taking int and returning int''. Pass `square` to `apply(square, 5)` and `apply` calls it as `f(x)`.\n\n**Example.**\n\n```c\n#include <stdio.h>\nint square(int x) { return x * x; }\nint apply(int (*f)(int), int x) { return f(x); }\nint main() {\n    printf("%d\\n", apply(square, 7));\n    return 0;\n}\n```\n\n**Your turn.** Replace `___` with the function name to pass as a function pointer.\n\n**Expected.** `49`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language'],
+  true,
+  43
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000032b',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-44-malloc-and-free',
+  E'malloc and free',
+  E'C makes you allocate and free memory yourself. Forgetting `free` is a leak; freeing twice is a crash. Modern languages hide this; C surfaces it.',
+  E'Allocate a 3-int buffer with malloc, write to it, print it, then free it.',
+  E'**Concept.** `malloc(3 * sizeof(int))` allocates 12 bytes (on most systems). Cast the result to `int *`. Always `free(p)` when done. The pattern: allocate → use → free.\n\n**Example.**\n\n```c\n#include <stdio.h>\n#include <stdlib.h>\nint main() {\n    int *p = (int *) malloc(3 * sizeof(int));\n    p[0] = 7; p[1] = 8; p[2] = 9;\n    printf("%d %d %d\\n", p[0], p[1], p[2]);\n    free(p);\n    return 0;\n}\n```\n\n**Your turn.** Replace `___` with the function that returns memory to the heap.\n\n**Expected.** `7 8 9`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language', 'memory'],
+  true,
+  44
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000032c',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-45-c-ring-buffer',
+  E'C ring buffer',
+  E'A ring buffer wraps a fixed-size array with head/tail indices. Every HFT feed handler has one. Same pattern: push when not full, pop when not empty.',
+  E'Read a fixed-size ring buffer in C and run it to see push/pop in action.',
+  E'**Concept.** `head` and `tail` indices wrap modulo CAP. `count` distinguishes empty from full. Real production buffers use atomic ops on the indices for SPSC lock-free use; this demo skips that — same pattern, single-threaded.\n\n**Example.**\n\n```c\n/* See the full source in c-demos/ring_buffer.c */\nrb_push(&rb, 10);   // pushes succeed until count == CAP\nrb_pop(&rb, &out);  // pops out the oldest value (FIFO)\n```\n\n**Your turn.** Click Run demo. Watch what happens when push 5 hits a CAP=4 buffer.\n\n**Expected.** `push(50) FULL`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'c-language', 'low-latency', 'memory'],
+  true,
+  45
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000032d',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-46-the-same-ring-buffer-in-python',
+  E'The same ring buffer in Python',
+  E'The Python translation works. It''s also slow. Same algorithm, same memory pattern — what''s missing is the compiled inner loop.',
+  E'Implement a fixed-size ring buffer in Python and time it.',
+  E'**Concept.** A Python list with manual head/tail indices reproduces the C ring buffer''s logic. Each push or pop is one method call — Python''s per-call overhead is roughly 1µs, so a million ops takes ~1s where C takes ~10ms.\n\n**Example.**\n\n```python\nimport time\nclass RingBuffer:\n    def __init__(self, cap):\n        self.slots = [0]*cap; self.cap = cap; self.head = self.tail = self.count = 0\n    def push(self, x):\n        if self.count == self.cap: return False\n        self.slots[self.head] = x; self.head = (self.head + 1) % self.cap; self.count += 1\n        return True\n    def pop(self):\n        if self.count == 0: return None\n        v = self.slots[self.tail]; self.tail = (self.tail + 1) % self.cap; self.count -= 1\n        return v\nrb = RingBuffer(4)\nfor i in (10, 20, 30, 40, 50): rb.push(i)\nout = []\nwhile (v := rb.pop()) is not None:\n    out.append(v)\nprint(out)\n```\n\n**Your turn.** Replace `___` with the method name that adds items to the buffer.\n\n**Expected.** `[10, 20, 30, 40]`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'performance', 'memory'],
+  true,
+  46
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000032e',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-47-cython-preview',
+  E'Cython preview',
+  E'Cython is Python with C type annotations. Add `cdef int` to a hot loop and you''ve trimmed most of the interpreter overhead — same code shape, 50–100× speedup.',
+  E'Read a Cython-style snippet and recognise the type annotations.',
+  E'**Concept.** A Cython hot loop looks like Python with extra declarations: `cdef int i, n = len(arr)`. The compiler turns the loop body into a C loop with no Python object lookups. Real Cython needs a build step; here we read.\n\n**Example.**\n\n```python\n# This is what a Cython hot-loop sum looks like.\n# In .pyx form, the compiler produces a tight C loop.\ndef cy_sum(arr):\n    # cdef int i, n = len(arr); cdef long total = 0\n    total = 0\n    for i in range(len(arr)):\n        total += arr[i]\n    return total\nprint(cy_sum(list(range(100))))\n```\n\n**Predict.** Predict the sum of 0..99 that the function prints.\n\n**Expected.** `4950`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'performance', 'c-language'],
+  true,
+  47
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000032f',
+  '00000000-0000-0000-0000-000000000035',
+  'quant-48-cffi-preview',
+  E'cffi preview',
+  E'cffi lets Python call functions from a `.so` you compiled yourself. The same loop in a C library, called from Python, is what numpy does internally for every ufunc.',
+  E'Recognise the cffi binding pattern — declare the function signature, load the shared object, call it.',
+  E'**Concept.** cffi''s pattern: `ffi.cdef(''long c_sum(long *arr, int n);'')`, `lib = ffi.dlopen(''libsum.so'')`, then `lib.c_sum(arr, len(arr))`. You''re calling C from Python through a thin shim — the speed is the C code''s, not Python''s.\n\n**Example.**\n\n```python\n# Pseudo-cffi usage — the real call goes to a compiled .so.\n# Here we simulate the same answer with a Python equivalent so\n# you can see the call shape and result.\ndef c_sum_simulated(arr, n):\n    return sum(arr[:n])\nprint(c_sum_simulated(list(range(50)), 50))\n```\n\n**Predict.** Predict the sum of 0..49 the (simulated) C call returns.\n\n**Expected.** `1225`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'performance', 'c-language'],
+  true,
+  48
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
 insert into public.skills (slug, name) values
+  ('backtesting', 'Backtesting'),
   ('black-scholes', 'Black-Scholes'),
+  ('c-language', 'C language'),
   ('greeks', 'Greeks'),
   ('linear-algebra', 'Linear algebra'),
+  ('low-latency', 'Low latency'),
+  ('machine-learning', 'Machine learning'),
   ('matplotlib', 'Matplotlib'),
+  ('memory', 'Memory & layout'),
   ('monte-carlo', 'Monte Carlo'),
   ('numpy', 'NumPy'),
   ('options', 'Options'),

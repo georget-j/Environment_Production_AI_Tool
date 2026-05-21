@@ -1043,6 +1043,624 @@ LESSONS: list[Lesson] = [
         skills=["quant", "pandas", "risk-metrics"],
         datasets=["spy"],
     ),
+
+    # ============ Stage 4 — Machine Learning for Finance (6 lessons) ============
+    Lesson(
+        n=31, stage=4, mode="fillblank",
+        title="sklearn fit and predict",
+        scenario="scikit-learn's API is the same for every estimator: `.fit(X, y)` learns, `.predict(X)` infers, `.score(X, y)` reports R² or accuracy.",
+        learner_goal="Train a linear regression on a toy dataset and verify the perfect fit.",
+        concept="Every sklearn estimator inherits `fit/predict/score`. With perfectly linear data, `LinearRegression` recovers the coefficient exactly and `.score` returns 1.0.",
+        example_code=(
+            "import numpy as np\n"
+            "from sklearn.linear_model import LinearRegression\n"
+            "X = np.arange(10).reshape(-1, 1)\n"
+            "y = 2 * X.ravel() + 3\n"
+            "model = LinearRegression().fit(X, y)\n"
+            "print(round(model.score(X, y), 4))"
+        ),
+        template=(
+            "import numpy as np\n"
+            "from sklearn.linear_model import LinearRegression\n"
+            "X = np.arange(10).reshape(-1, 1)\n"
+            "y = 2 * X.ravel() + 3\n"
+            "model = LinearRegression().___(X, y)\n"
+            "print(round(model.score(X, y), 4))"
+        ),
+        your_turn="Replace `___` with the method that trains the model.",
+        expected_stdout="1.0",
+        hint="Three letters.",
+        skills=["quant", "machine-learning", "regression"],
+    ),
+    Lesson(
+        n=32, stage=4, mode="predict",
+        title="Lookahead bias",
+        scenario="In finance ML the order of your rows matters. A random `train_test_split` lets the model see the future — and inflates your Sharpe spectacularly.",
+        learner_goal="Recognise why a chronological split is the honest baseline.",
+        concept="`sklearn.model_selection.train_test_split(shuffle=False)` keeps order intact. The first 80% becomes training, last 20% becomes test. Anything else for time series is a bug.",
+        example_code=(
+            "from sklearn.model_selection import train_test_split\n"
+            "import numpy as np\n"
+            "X = np.arange(10).reshape(-1, 1); y = np.arange(10)\n"
+            "_, X_test, _, _ = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
+            "print(X_test.ravel().tolist())"
+        ),
+        code=(
+            "from sklearn.model_selection import train_test_split\n"
+            "import numpy as np\n"
+            "X = np.arange(10).reshape(-1, 1); y = np.arange(10)\n"
+            "_, X_test, _, _ = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
+            "print(X_test.ravel().tolist())"
+        ),
+        your_turn="Predict what the test set looks like — last 20% of an ordered range 0..9.",
+        expected_stdout="[8, 9]",
+        prompt="Type the list as Python prints it.",
+        skills=["quant", "machine-learning", "backtesting"],
+    ),
+    Lesson(
+        n=33, stage=4, mode="fillblank",
+        title="Momentum signal regression",
+        scenario="A 5-day momentum is a classic feature: did the stock go up over the last week? Regressing next-day return on this is the smallest non-trivial ML model in finance.",
+        learner_goal="Fit a linear regression of next-day SPY return on lagged 5-day return; report the R².",
+        concept="`mom_5 = r.shift(1).rolling(5).sum()`. Drop NaNs, split chronologically with shuffle=False, fit `LinearRegression`. R² near zero is *expected* — markets are hard.",
+        example_code=(
+            "import pandas as pd, numpy as np\n"
+            "from sklearn.linear_model import LinearRegression\n"
+            "from sklearn.model_selection import train_test_split\n"
+            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
+            "df = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\n"
+            "X = df[['mom']].values; y = df['next'].values\n"
+            "Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
+            "score = LinearRegression().fit(Xtr, ytr).score(Xte, yte)\n"
+            "print(round(score, 4))"
+        ),
+        template=(
+            "import pandas as pd, numpy as np\n"
+            "from sklearn.linear_model import LinearRegression\n"
+            "from sklearn.model_selection import train_test_split\n"
+            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
+            "df = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\n"
+            "X = df[['mom']].values; y = df['next'].values\n"
+            "Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, ___=False)\n"
+            "score = LinearRegression().fit(Xtr, ytr).score(Xte, yte)\n"
+            "print(round(score, 4))"
+        ),
+        your_turn="Replace `___` so the split keeps chronological order (no shuffling).",
+        expected_stdout="0.0049",
+        hint="Seven letters.",
+        skills=["quant", "machine-learning", "regression"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=34, stage=4, mode="fillblank",
+        title="Random forest direction classifier",
+        scenario="A forest of decision trees can spot non-linear patterns a linear model would miss — at the cost of being a black box.",
+        learner_goal="Train a 100-tree random forest to predict next-day direction from 5-day momentum and rolling volatility.",
+        concept="`RandomForestClassifier(n_estimators=100)` builds 100 trees. Two features: 5-day momentum and 20-day rolling std. The label is `np.sign(next_return)`. Score is accuracy on a chronological test split.",
+        example_code=(
+            "import pandas as pd, numpy as np\n"
+            "from sklearn.ensemble import RandomForestClassifier\n"
+            "from sklearn.model_selection import train_test_split\n"
+            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
+            "df = pd.DataFrame({\n"
+            "    'mom': r.shift(1).rolling(5).sum(),\n"
+            "    'vol': r.shift(1).rolling(20).std(),\n"
+            "    'next': np.sign(r),\n"
+            "}).dropna()\n"
+            "X = df[['mom','vol']].values; y = df['next'].values\n"
+            "Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
+            "score = RandomForestClassifier(n_estimators=100, random_state=0).fit(Xtr, ytr).score(Xte, yte)\n"
+            "print(round(score, 3))"
+        ),
+        template=(
+            "import pandas as pd, numpy as np\n"
+            "from sklearn.ensemble import RandomForestClassifier\n"
+            "from sklearn.model_selection import train_test_split\n"
+            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
+            "df = pd.DataFrame({\n"
+            "    'mom': r.shift(1).rolling(5).sum(),\n"
+            "    'vol': r.shift(1).rolling(20).std(),\n"
+            "    'next': np.sign(r),\n"
+            "}).dropna()\n"
+            "X = df[['mom','vol']].values; y = df['next'].values\n"
+            "Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
+            "score = RandomForestClassifier(n_estimators=100, random_state=0).___(Xtr, ytr).score(Xte, yte)\n"
+            "print(round(score, 3))"
+        ),
+        your_turn="Replace `___` with the method that trains the forest.",
+        expected_stdout="0.526",
+        hint="Same method as every sklearn estimator.",
+        skills=["quant", "machine-learning"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=35, stage=4, mode="fillblank",
+        title="Time-series cross-validation",
+        scenario="`TimeSeriesSplit` slices a chronological frame into expanding-window CV folds. Every test fold starts after its train fold — no leakage.",
+        learner_goal="Run a 5-fold time-series CV on a linear model and average the fold scores.",
+        concept="`TimeSeriesSplit(n_splits=5)` yields five (train_idx, test_idx) pairs. Loop, fit on train_idx, score on test_idx, average. Use `cross_val_score(...)` for the one-liner.",
+        example_code=(
+            "import pandas as pd, numpy as np\n"
+            "from sklearn.linear_model import LinearRegression\n"
+            "from sklearn.model_selection import TimeSeriesSplit, cross_val_score\n"
+            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
+            "df = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\n"
+            "X = df[['mom']].values; y = df['next'].values\n"
+            "tscv = TimeSeriesSplit(n_splits=5)\n"
+            "scores = cross_val_score(LinearRegression(), X, y, cv=tscv)\n"
+            "print(round(scores.mean(), 4))"
+        ),
+        template=(
+            "import pandas as pd, numpy as np\n"
+            "from sklearn.linear_model import LinearRegression\n"
+            "from sklearn.model_selection import TimeSeriesSplit, cross_val_score\n"
+            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
+            "df = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\n"
+            "X = df[['mom']].values; y = df['next'].values\n"
+            "tscv = ___(n_splits=5)\n"
+            "scores = cross_val_score(LinearRegression(), X, y, cv=tscv)\n"
+            "print(round(scores.mean(), 4))"
+        ),
+        your_turn="Replace `___` with the splitter that respects chronological order.",
+        expected_stdout="0.0",
+        hint="Imported above — three words run together.",
+        skills=["quant", "machine-learning", "backtesting"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=36, stage=4, mode="predict",
+        title="The p-hacked Sharpe trap",
+        scenario="Try 1000 random strategies; the best one will look brilliant by chance. Lopez de Prado calls this 'backtest overfitting' and warns it dwarfs every other risk in quant ML.",
+        learner_goal="Predict the maximum Sharpe of 1000 pure-noise strategies — and feel why a 'great' backtest in isolation is meaningless.",
+        concept="Generate 1000 random return series with mean 0 and σ=0.01. Compute each one's annualised Sharpe. The MAX across them is several standard deviations above zero — pure chance, not skill.",
+        example_code=(
+            "import numpy as np\n"
+            "rng = np.random.default_rng(42)\n"
+            "R = rng.normal(0, 0.01, size=(1000, 1000))\n"
+            "sharpe = R.mean(axis=1) / R.std(axis=1) * np.sqrt(252)\n"
+            "print(round(sharpe.max(), 2) > 1.5)"
+        ),
+        code=(
+            "import numpy as np\n"
+            "rng = np.random.default_rng(42)\n"
+            "R = rng.normal(0, 0.01, size=(1000, 1000))\n"
+            "sharpe = R.mean(axis=1) / R.std(axis=1) * np.sqrt(252)\n"
+            "print(round(sharpe.max(), 2) > 1.5)"
+        ),
+        your_turn="1000 pure-noise strategies — is the best one's annualised Sharpe > 1.5?",
+        expected_stdout="True",
+        prompt="True or False?",
+        skills=["quant", "machine-learning", "backtesting", "risk-metrics"],
+    ),
+
+    # ============ Stage 5 — Performance & C (12 lessons) ============
+    Lesson(
+        n=37, stage=5, mode="cwasm",
+        title="Why C",
+        scenario="Python is where research lives. C is where the inner loop of a matching engine runs a billion times a day. The latency budget is the difference.",
+        learner_goal="Read a real C limit-order-book node and see it execute.",
+        concept="The demo below is a small sorted-list LOB written in C, compiled to WASM at `-O3`. Even this tiny example is faster than the equivalent pure-Python: no per-element interpreter overhead, no object headers, just contiguous memory and direct pointer chasing.",
+        example_code=(
+            "/* Sorted-insert LOB in C — see c-demos/lob_node.c */\n"
+            "insert_bid(&book, 1, 100.05, 5);\n"
+            "insert_bid(&book, 2, 100.10, 3);"
+        ),
+        source=(
+            "#include <stdio.h>\n"
+            "#include <stdlib.h>\n"
+            "\n"
+            "typedef struct Order {\n"
+            "    int order_id;\n"
+            "    double price;\n"
+            "    int qty;\n"
+            "    struct Order *next;\n"
+            "} Order;\n"
+            "\n"
+            "/* Insert sorted descending by price (best bid at head). */\n"
+            "static Order *insert_bid(Order *head, int id, double price, int qty) {\n"
+            "    Order *n = malloc(sizeof *n);\n"
+            "    n->order_id = id; n->price = price; n->qty = qty; n->next = NULL;\n"
+            "    if (head == NULL || price > head->price) {\n"
+            "        n->next = head;\n"
+            "        return n;\n"
+            "    }\n"
+            "    Order *cur = head;\n"
+            "    while (cur->next != NULL && cur->next->price >= price) cur = cur->next;\n"
+            "    n->next = cur->next;\n"
+            "    cur->next = n;\n"
+            "    return head;\n"
+            "}\n"
+            "\n"
+            "int main(void) {\n"
+            "    Order *bids = NULL;\n"
+            "    bids = insert_bid(bids, 1, 100.05, 5);\n"
+            "    bids = insert_bid(bids, 2, 100.10, 3);\n"
+            "    bids = insert_bid(bids, 3, 99.95, 8);\n"
+            "    bids = insert_bid(bids, 4, 100.10, 2);\n"
+            "    bids = insert_bid(bids, 5, 100.07, 1);\n"
+            "    printf(\"bids: \"); for (Order *c = bids; c; c = c->next)\n"
+            "        printf(\"[#%d %.2f x %d] \", c->order_id, c->price, c->qty);\n"
+            "    printf(\"\\nbest bid: %.2f (qty %d)\\n\", bids->price, bids->qty);\n"
+            "    return 0;\n"
+            "}\n"
+        ),
+        wasm_demo="lob_node",
+        expected_stdout_contains="best bid: 100.10",
+        your_turn="Click Run demo. The C compiles ahead of time — what you see is `-O3` speed.",
+        hint="The best bid should win on price, then time priority.",
+        skills=["quant", "c-language", "low-latency"],
+    ),
+    Lesson(
+        n=38, stage=5, mode="cscript",
+        title="Hello C",
+        scenario="The simplest C program — `printf` plus `return 0`. Same shape every C program in the world has at its core.",
+        learner_goal="Print 'hello, C!' from a C program.",
+        concept="`#include <stdio.h>` exposes `printf`. `main` must return an `int`. Strings live between double quotes; `\\n` is a newline.",
+        example_code=(
+            "#include <stdio.h>\n"
+            "int main() {\n"
+            "    printf(\"hello, C!\\n\");\n"
+            "    return 0;\n"
+            "}"
+        ),
+        template=(
+            "#include <stdio.h>\n"
+            "int main() {\n"
+            "    printf(\"___\\n\");\n"
+            "    return 0;\n"
+            "}"
+        ),
+        your_turn="Replace `___` with the exact string `hello, C!`.",
+        expected_stdout="hello, C!",
+        hint="No quotes — those come from the surrounding code.",
+        skills=["quant", "c-language"],
+    ),
+    Lesson(
+        n=39, stage=5, mode="cscript",
+        title="Types and arithmetic",
+        scenario="C has explicit types: `int` is integer, `double` is 8-byte float. Mixing them follows promotion rules — division is the most surprising.",
+        learner_goal="Print the integer division of 7/2 and the floating-point division of 7.0/2.0.",
+        concept="`7 / 2` is integer division in C — it gives `3`, not `3.5`. To get the real quotient, one operand must be a float: `7.0 / 2` or `(double)7 / 2`.",
+        example_code=(
+            "#include <stdio.h>\n"
+            "int main() {\n"
+            "    printf(\"%d %.1f\\n\", 7 / 2, 7.0 / 2);\n"
+            "    return 0;\n"
+            "}"
+        ),
+        template=(
+            "#include <stdio.h>\n"
+            "int main() {\n"
+            "    printf(\"%d %.1f\\n\", 7 / 2, 7.0 / ___);\n"
+            "    return 0;\n"
+            "}"
+        ),
+        your_turn="Replace `___` with the literal that keeps the second division floating-point.",
+        expected_stdout="3 3.5",
+        hint="A single digit.",
+        skills=["quant", "c-language"],
+    ),
+    Lesson(
+        n=40, stage=5, mode="cscript",
+        title="Conditionals and loops",
+        scenario="C's `for` loop has three parts: init, test, increment. Same idea as Python but with explicit types and braces.",
+        learner_goal="Print the first 5 squares using a for-loop.",
+        concept="`for (int i = 1; i <= 5; i++) { ... }` runs the body 5 times with i from 1 to 5. `printf(\"%d \", i*i)` prints each square. After the loop, print a newline.",
+        example_code=(
+            "#include <stdio.h>\n"
+            "int main() {\n"
+            "    for (int i = 1; i <= 5; i++) {\n"
+            "        printf(\"%d \", i * i);\n"
+            "    }\n"
+            "    printf(\"\\n\");\n"
+            "    return 0;\n"
+            "}"
+        ),
+        template=(
+            "#include <stdio.h>\n"
+            "int main() {\n"
+            "    for (int i = 1; i <= 5; ___) {\n"
+            "        printf(\"%d \", i * i);\n"
+            "    }\n"
+            "    printf(\"\\n\");\n"
+            "    return 0;\n"
+            "}"
+        ),
+        your_turn="Replace `___` with the increment that advances i by 1 each iteration.",
+        expected_stdout="1 4 9 16 25",
+        hint="Two characters.",
+        skills=["quant", "c-language"],
+    ),
+    Lesson(
+        n=41, stage=5, mode="cscript",
+        title="Arrays and pointers",
+        scenario="In C, an array's name decays to a pointer to its first element. Pointer arithmetic walks the array byte-by-byte — `*(p + 2)` is the same as `p[2]`.",
+        learner_goal="Use pointer arithmetic to print the third element of an array.",
+        concept="Given `int a[5] = {10,20,30,40,50};` and `int *p = a;`, all of `a[2]`, `p[2]`, `*(p+2)`, `*(a+2)` are `30`. They're four ways of writing the same thing.",
+        example_code=(
+            "#include <stdio.h>\n"
+            "int main() {\n"
+            "    int a[5] = {10, 20, 30, 40, 50};\n"
+            "    int *p = a;\n"
+            "    printf(\"%d\\n\", *(p + 2));\n"
+            "    return 0;\n"
+            "}"
+        ),
+        template=(
+            "#include <stdio.h>\n"
+            "int main() {\n"
+            "    int a[5] = {10, 20, 30, 40, 50};\n"
+            "    int *p = a;\n"
+            "    printf(\"%d\\n\", *(p + ___));\n"
+            "    return 0;\n"
+            "}"
+        ),
+        your_turn="Replace `___` with the offset that gives you the third element.",
+        expected_stdout="30",
+        hint="Arrays are zero-indexed.",
+        skills=["quant", "c-language", "memory"],
+    ),
+    Lesson(
+        n=42, stage=5, mode="cscript",
+        title="Structs",
+        scenario="A struct groups related fields. Every market-data tick, every order, every position in a quant system is a struct.",
+        learner_goal="Define a Bond struct and print its fields.",
+        concept="`struct Bond { double face; int years; };` declares the shape. `struct Bond b;` declares an instance. Fields are set via `.` (`b.face = 1000.0;`).",
+        example_code=(
+            "#include <stdio.h>\n"
+            "struct Bond {\n"
+            "    double face;\n"
+            "    int years;\n"
+            "};\n"
+            "int main() {\n"
+            "    struct Bond b;\n"
+            "    b.face = 1000.0;\n"
+            "    b.years = 5;\n"
+            "    printf(\"face=%.2f years=%d\\n\", b.face, b.years);\n"
+            "    return 0;\n"
+            "}"
+        ),
+        template=(
+            "#include <stdio.h>\n"
+            "struct Bond {\n"
+            "    double face;\n"
+            "    int years;\n"
+            "};\n"
+            "int main() {\n"
+            "    struct Bond b;\n"
+            "    b.face = 1000.0;\n"
+            "    b.years = 5;\n"
+            "    printf(\"face=%.2f years=%d\\n\", b.face, b.___);\n"
+            "    return 0;\n"
+            "}"
+        ),
+        your_turn="Replace `___` with the field name we set above.",
+        expected_stdout="face=1000.00 years=5",
+        hint="It's right above — five letters.",
+        skills=["quant", "c-language", "memory"],
+    ),
+    Lesson(
+        n=43, stage=5, mode="cscript",
+        title="Function pointers",
+        scenario="A function pointer lets you pass behaviour, not just data. C's `qsort` takes one — every C program that sorts a struct uses this pattern.",
+        learner_goal="Pass a comparison function to `apply` and print the result.",
+        concept="`int (*f)(int)` is the type 'pointer to a function taking int and returning int'. Pass `square` to `apply(square, 5)` and `apply` calls it as `f(x)`.",
+        example_code=(
+            "#include <stdio.h>\n"
+            "int square(int x) { return x * x; }\n"
+            "int apply(int (*f)(int), int x) { return f(x); }\n"
+            "int main() {\n"
+            "    printf(\"%d\\n\", apply(square, 7));\n"
+            "    return 0;\n"
+            "}"
+        ),
+        template=(
+            "#include <stdio.h>\n"
+            "int square(int x) { return x * x; }\n"
+            "int apply(int (*f)(int), int x) { return f(x); }\n"
+            "int main() {\n"
+            "    printf(\"%d\\n\", apply(___, 7));\n"
+            "    return 0;\n"
+            "}"
+        ),
+        your_turn="Replace `___` with the function name to pass as a function pointer.",
+        expected_stdout="49",
+        hint="It's the function defined above main.",
+        skills=["quant", "c-language"],
+    ),
+    Lesson(
+        n=44, stage=5, mode="cscript",
+        title="malloc and free",
+        scenario="C makes you allocate and free memory yourself. Forgetting `free` is a leak; freeing twice is a crash. Modern languages hide this; C surfaces it.",
+        learner_goal="Allocate a 3-int buffer with malloc, write to it, print it, then free it.",
+        concept="`malloc(3 * sizeof(int))` allocates 12 bytes (on most systems). Cast the result to `int *`. Always `free(p)` when done. The pattern: allocate → use → free.",
+        example_code=(
+            "#include <stdio.h>\n"
+            "#include <stdlib.h>\n"
+            "int main() {\n"
+            "    int *p = (int *) malloc(3 * sizeof(int));\n"
+            "    p[0] = 7; p[1] = 8; p[2] = 9;\n"
+            "    printf(\"%d %d %d\\n\", p[0], p[1], p[2]);\n"
+            "    free(p);\n"
+            "    return 0;\n"
+            "}"
+        ),
+        template=(
+            "#include <stdio.h>\n"
+            "#include <stdlib.h>\n"
+            "int main() {\n"
+            "    int *p = (int *) malloc(3 * sizeof(int));\n"
+            "    p[0] = 7; p[1] = 8; p[2] = 9;\n"
+            "    printf(\"%d %d %d\\n\", p[0], p[1], p[2]);\n"
+            "    ___(p);\n"
+            "    return 0;\n"
+            "}"
+        ),
+        your_turn="Replace `___` with the function that returns memory to the heap.",
+        expected_stdout="7 8 9",
+        hint="Opposite of malloc — four letters.",
+        skills=["quant", "c-language", "memory"],
+    ),
+    Lesson(
+        n=45, stage=5, mode="cwasm",
+        title="C ring buffer",
+        scenario="A ring buffer wraps a fixed-size array with head/tail indices. Every HFT feed handler has one. Same pattern: push when not full, pop when not empty.",
+        learner_goal="Read a fixed-size ring buffer in C and run it to see push/pop in action.",
+        concept="`head` and `tail` indices wrap modulo CAP. `count` distinguishes empty from full. Real production buffers use atomic ops on the indices for SPSC lock-free use; this demo skips that — same pattern, single-threaded.",
+        example_code=(
+            "/* See the full source in c-demos/ring_buffer.c */\n"
+            "rb_push(&rb, 10);   // pushes succeed until count == CAP\n"
+            "rb_pop(&rb, &out);  // pops out the oldest value (FIFO)"
+        ),
+        source=(
+            "#include <stdio.h>\n"
+            "#include <stdbool.h>\n"
+            "\n"
+            "#define CAP 4\n"
+            "\n"
+            "typedef struct {\n"
+            "    int slots[CAP];\n"
+            "    int head, tail, count;\n"
+            "} RingBuffer;\n"
+            "\n"
+            "static bool rb_push(RingBuffer *rb, int x) {\n"
+            "    if (rb->count == CAP) return false;\n"
+            "    rb->slots[rb->head] = x;\n"
+            "    rb->head = (rb->head + 1) % CAP;\n"
+            "    rb->count++;\n"
+            "    return true;\n"
+            "}\n"
+            "\n"
+            "static bool rb_pop(RingBuffer *rb, int *out) {\n"
+            "    if (rb->count == 0) return false;\n"
+            "    *out = rb->slots[rb->tail];\n"
+            "    rb->tail = (rb->tail + 1) % CAP;\n"
+            "    rb->count--;\n"
+            "    return true;\n"
+            "}\n"
+            "\n"
+            "int main(void) {\n"
+            "    RingBuffer rb = {0};\n"
+            "    for (int i = 1; i <= 6; i++)\n"
+            "        printf(\"push(%d) %s  count=%d\\n\",\n"
+            "               i * 10, rb_push(&rb, i * 10) ? \"ok\" : \"FULL\", rb.count);\n"
+            "    int v;\n"
+            "    while (rb_pop(&rb, &v))\n"
+            "        printf(\"pop -> %d  count=%d\\n\", v, rb.count);\n"
+            "    return 0;\n"
+            "}\n"
+        ),
+        wasm_demo="ring_buffer",
+        expected_stdout_contains="push(50) FULL",
+        your_turn="Click Run demo. Watch what happens when push 5 hits a CAP=4 buffer.",
+        hint="One push will fail; pops drain in FIFO order.",
+        skills=["quant", "c-language", "low-latency", "memory"],
+    ),
+    Lesson(
+        n=46, stage=5, mode="fillblank",
+        title="The same ring buffer in Python",
+        scenario="The Python translation works. It's also slow. Same algorithm, same memory pattern — what's missing is the compiled inner loop.",
+        learner_goal="Implement a fixed-size ring buffer in Python and time it.",
+        concept="A Python list with manual head/tail indices reproduces the C ring buffer's logic. Each push or pop is one method call — Python's per-call overhead is roughly 1µs, so a million ops takes ~1s where C takes ~10ms.",
+        example_code=(
+            "import time\n"
+            "class RingBuffer:\n"
+            "    def __init__(self, cap):\n"
+            "        self.slots = [0]*cap; self.cap = cap; self.head = self.tail = self.count = 0\n"
+            "    def push(self, x):\n"
+            "        if self.count == self.cap: return False\n"
+            "        self.slots[self.head] = x; self.head = (self.head + 1) % self.cap; self.count += 1\n"
+            "        return True\n"
+            "    def pop(self):\n"
+            "        if self.count == 0: return None\n"
+            "        v = self.slots[self.tail]; self.tail = (self.tail + 1) % self.cap; self.count -= 1\n"
+            "        return v\n"
+            "rb = RingBuffer(4)\n"
+            "for i in (10, 20, 30, 40, 50): rb.push(i)\n"
+            "out = []\n"
+            "while (v := rb.pop()) is not None:\n"
+            "    out.append(v)\n"
+            "print(out)"
+        ),
+        template=(
+            "import time\n"
+            "class RingBuffer:\n"
+            "    def __init__(self, cap):\n"
+            "        self.slots = [0]*cap; self.cap = cap; self.head = self.tail = self.count = 0\n"
+            "    def push(self, x):\n"
+            "        if self.count == self.cap: return False\n"
+            "        self.slots[self.head] = x; self.head = (self.head + 1) % self.cap; self.count += 1\n"
+            "        return True\n"
+            "    def pop(self):\n"
+            "        if self.count == 0: return None\n"
+            "        v = self.slots[self.tail]; self.tail = (self.tail + 1) % self.cap; self.count -= 1\n"
+            "        return v\n"
+            "rb = RingBuffer(4)\n"
+            "for i in (10, 20, 30, 40, 50): rb.___(i)\n"
+            "out = []\n"
+            "while (v := rb.pop()) is not None:\n"
+            "    out.append(v)\n"
+            "print(out)"
+        ),
+        your_turn="Replace `___` with the method name that adds items to the buffer.",
+        expected_stdout="[10, 20, 30, 40]",
+        hint="Same name as the C version.",
+        skills=["quant", "performance", "memory"],
+    ),
+    Lesson(
+        n=47, stage=5, mode="predict",
+        title="Cython preview",
+        scenario="Cython is Python with C type annotations. Add `cdef int` to a hot loop and you've trimmed most of the interpreter overhead — same code shape, 50–100× speedup.",
+        learner_goal="Read a Cython-style snippet and recognise the type annotations.",
+        concept="A Cython hot loop looks like Python with extra declarations: `cdef int i, n = len(arr)`. The compiler turns the loop body into a C loop with no Python object lookups. Real Cython needs a build step; here we read.",
+        example_code=(
+            "# This is what a Cython hot-loop sum looks like.\n"
+            "# In .pyx form, the compiler produces a tight C loop.\n"
+            "def cy_sum(arr):\n"
+            "    # cdef int i, n = len(arr); cdef long total = 0\n"
+            "    total = 0\n"
+            "    for i in range(len(arr)):\n"
+            "        total += arr[i]\n"
+            "    return total\n"
+            "print(cy_sum(list(range(100))))"
+        ),
+        code=(
+            "def cy_sum(arr):\n"
+            "    total = 0\n"
+            "    for i in range(len(arr)):\n"
+            "        total += arr[i]\n"
+            "    return total\n"
+            "print(cy_sum(list(range(100))))"
+        ),
+        your_turn="Predict the sum of 0..99 that the function prints.",
+        expected_stdout="4950",
+        prompt="Type the integer.",
+        skills=["quant", "performance", "c-language"],
+    ),
+    Lesson(
+        n=48, stage=5, mode="predict",
+        title="cffi preview",
+        scenario="cffi lets Python call functions from a `.so` you compiled yourself. The same loop in a C library, called from Python, is what numpy does internally for every ufunc.",
+        learner_goal="Recognise the cffi binding pattern — declare the function signature, load the shared object, call it.",
+        concept="cffi's pattern: `ffi.cdef('long c_sum(long *arr, int n);')`, `lib = ffi.dlopen('libsum.so')`, then `lib.c_sum(arr, len(arr))`. You're calling C from Python through a thin shim — the speed is the C code's, not Python's.",
+        example_code=(
+            "# Pseudo-cffi usage — the real call goes to a compiled .so.\n"
+            "# Here we simulate the same answer with a Python equivalent so\n"
+            "# you can see the call shape and result.\n"
+            "def c_sum_simulated(arr, n):\n"
+            "    return sum(arr[:n])\n"
+            "print(c_sum_simulated(list(range(50)), 50))"
+        ),
+        code=(
+            "def c_sum_simulated(arr, n):\n"
+            "    return sum(arr[:n])\n"
+            "print(c_sum_simulated(list(range(50)), 50))"
+        ),
+        your_turn="Predict the sum of 0..49 the (simulated) C call returns.",
+        expected_stdout="1225",
+        prompt="Type the integer.",
+        skills=["quant", "performance", "c-language"],
+    ),
 ]
 # fmt: on
 

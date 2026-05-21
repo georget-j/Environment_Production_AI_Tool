@@ -218,4 +218,123 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "spy"
   ]
 },
+  "quant-31-sklearn-fit-and-predict": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nfrom sklearn.linear_model import LinearRegression\nX = np.arange(10).reshape(-1, 1)\ny = 2 * X.ravel() + 3\nmodel = LinearRegression().___(X, y)\nprint(round(model.score(X, y), 4))",
+  "expected_stdout": "1.0",
+  "hint": "Three letters."
+},
+  "quant-32-lookahead-bias": {
+  "mode": "predict",
+  "code": "from sklearn.model_selection import train_test_split\nimport numpy as np\nX = np.arange(10).reshape(-1, 1); y = np.arange(10)\n_, X_test, _, _ = train_test_split(X, y, test_size=0.2, shuffle=False)\nprint(X_test.ravel().tolist())",
+  "expected_stdout": "[8, 9]",
+  "prompt": "Type the list as Python prints it."
+},
+  "quant-33-momentum-signal-regression": {
+  "mode": "fillblank",
+  "template": "import pandas as pd, numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import train_test_split\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\nX = df[['mom']].values; y = df['next'].values\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, ___=False)\nscore = LinearRegression().fit(Xtr, ytr).score(Xte, yte)\nprint(round(score, 4))",
+  "expected_stdout": "0.0049",
+  "hint": "Seven letters.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-34-random-forest-direction-classifier": {
+  "mode": "fillblank",
+  "template": "import pandas as pd, numpy as np\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import train_test_split\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({\n    'mom': r.shift(1).rolling(5).sum(),\n    'vol': r.shift(1).rolling(20).std(),\n    'next': np.sign(r),\n}).dropna()\nX = df[['mom','vol']].values; y = df['next'].values\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\nscore = RandomForestClassifier(n_estimators=100, random_state=0).___(Xtr, ytr).score(Xte, yte)\nprint(round(score, 3))",
+  "expected_stdout": "0.526",
+  "hint": "Same method as every sklearn estimator.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-35-time-series-cross-validation": {
+  "mode": "fillblank",
+  "template": "import pandas as pd, numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import TimeSeriesSplit, cross_val_score\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\nX = df[['mom']].values; y = df['next'].values\ntscv = ___(n_splits=5)\nscores = cross_val_score(LinearRegression(), X, y, cv=tscv)\nprint(round(scores.mean(), 4))",
+  "expected_stdout": "0.0",
+  "hint": "Imported above \u2014 three words run together.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-36-the-p-hacked-sharpe-trap": {
+  "mode": "predict",
+  "code": "import numpy as np\nrng = np.random.default_rng(42)\nR = rng.normal(0, 0.01, size=(1000, 1000))\nsharpe = R.mean(axis=1) / R.std(axis=1) * np.sqrt(252)\nprint(round(sharpe.max(), 2) > 1.5)",
+  "expected_stdout": "True",
+  "prompt": "True or False?"
+},
+  "quant-37-why-c": {
+  "mode": "cwasm",
+  "source": "#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct Order {\n    int order_id;\n    double price;\n    int qty;\n    struct Order *next;\n} Order;\n\n/* Insert sorted descending by price (best bid at head). */\nstatic Order *insert_bid(Order *head, int id, double price, int qty) {\n    Order *n = malloc(sizeof *n);\n    n->order_id = id; n->price = price; n->qty = qty; n->next = NULL;\n    if (head == NULL || price > head->price) {\n        n->next = head;\n        return n;\n    }\n    Order *cur = head;\n    while (cur->next != NULL && cur->next->price >= price) cur = cur->next;\n    n->next = cur->next;\n    cur->next = n;\n    return head;\n}\n\nint main(void) {\n    Order *bids = NULL;\n    bids = insert_bid(bids, 1, 100.05, 5);\n    bids = insert_bid(bids, 2, 100.10, 3);\n    bids = insert_bid(bids, 3, 99.95, 8);\n    bids = insert_bid(bids, 4, 100.10, 2);\n    bids = insert_bid(bids, 5, 100.07, 1);\n    printf(\"bids: \"); for (Order *c = bids; c; c = c->next)\n        printf(\"[#%d %.2f x %d] \", c->order_id, c->price, c->qty);\n    printf(\"\\nbest bid: %.2f (qty %d)\\n\", bids->price, bids->qty);\n    return 0;\n}\n",
+  "wasm_demo": "lob_node",
+  "expected_stdout_contains": "best bid: 100.10",
+  "hint": "The best bid should win on price, then time priority."
+},
+  "quant-38-hello-c": {
+  "mode": "cscript",
+  "template": "#include <stdio.h>\nint main() {\n    printf(\"___\\n\");\n    return 0;\n}",
+  "expected_stdout": "hello, C!",
+  "hint": "No quotes \u2014 those come from the surrounding code."
+},
+  "quant-39-types-and-arithmetic": {
+  "mode": "cscript",
+  "template": "#include <stdio.h>\nint main() {\n    printf(\"%d %.1f\\n\", 7 / 2, 7.0 / ___);\n    return 0;\n}",
+  "expected_stdout": "3 3.5",
+  "hint": "A single digit."
+},
+  "quant-40-conditionals-and-loops": {
+  "mode": "cscript",
+  "template": "#include <stdio.h>\nint main() {\n    for (int i = 1; i <= 5; ___) {\n        printf(\"%d \", i * i);\n    }\n    printf(\"\\n\");\n    return 0;\n}",
+  "expected_stdout": "1 4 9 16 25",
+  "hint": "Two characters."
+},
+  "quant-41-arrays-and-pointers": {
+  "mode": "cscript",
+  "template": "#include <stdio.h>\nint main() {\n    int a[5] = {10, 20, 30, 40, 50};\n    int *p = a;\n    printf(\"%d\\n\", *(p + ___));\n    return 0;\n}",
+  "expected_stdout": "30",
+  "hint": "Arrays are zero-indexed."
+},
+  "quant-42-structs": {
+  "mode": "cscript",
+  "template": "#include <stdio.h>\nstruct Bond {\n    double face;\n    int years;\n};\nint main() {\n    struct Bond b;\n    b.face = 1000.0;\n    b.years = 5;\n    printf(\"face=%.2f years=%d\\n\", b.face, b.___);\n    return 0;\n}",
+  "expected_stdout": "face=1000.00 years=5",
+  "hint": "It's right above \u2014 five letters."
+},
+  "quant-43-function-pointers": {
+  "mode": "cscript",
+  "template": "#include <stdio.h>\nint square(int x) { return x * x; }\nint apply(int (*f)(int), int x) { return f(x); }\nint main() {\n    printf(\"%d\\n\", apply(___, 7));\n    return 0;\n}",
+  "expected_stdout": "49",
+  "hint": "It's the function defined above main."
+},
+  "quant-44-malloc-and-free": {
+  "mode": "cscript",
+  "template": "#include <stdio.h>\n#include <stdlib.h>\nint main() {\n    int *p = (int *) malloc(3 * sizeof(int));\n    p[0] = 7; p[1] = 8; p[2] = 9;\n    printf(\"%d %d %d\\n\", p[0], p[1], p[2]);\n    ___(p);\n    return 0;\n}",
+  "expected_stdout": "7 8 9",
+  "hint": "Opposite of malloc \u2014 four letters."
+},
+  "quant-45-c-ring-buffer": {
+  "mode": "cwasm",
+  "source": "#include <stdio.h>\n#include <stdbool.h>\n\n#define CAP 4\n\ntypedef struct {\n    int slots[CAP];\n    int head, tail, count;\n} RingBuffer;\n\nstatic bool rb_push(RingBuffer *rb, int x) {\n    if (rb->count == CAP) return false;\n    rb->slots[rb->head] = x;\n    rb->head = (rb->head + 1) % CAP;\n    rb->count++;\n    return true;\n}\n\nstatic bool rb_pop(RingBuffer *rb, int *out) {\n    if (rb->count == 0) return false;\n    *out = rb->slots[rb->tail];\n    rb->tail = (rb->tail + 1) % CAP;\n    rb->count--;\n    return true;\n}\n\nint main(void) {\n    RingBuffer rb = {0};\n    for (int i = 1; i <= 6; i++)\n        printf(\"push(%d) %s  count=%d\\n\",\n               i * 10, rb_push(&rb, i * 10) ? \"ok\" : \"FULL\", rb.count);\n    int v;\n    while (rb_pop(&rb, &v))\n        printf(\"pop -> %d  count=%d\\n\", v, rb.count);\n    return 0;\n}\n",
+  "wasm_demo": "ring_buffer",
+  "expected_stdout_contains": "push(50) FULL",
+  "hint": "One push will fail; pops drain in FIFO order."
+},
+  "quant-46-the-same-ring-buffer-in-python": {
+  "mode": "fillblank",
+  "template": "import time\nclass RingBuffer:\n    def __init__(self, cap):\n        self.slots = [0]*cap; self.cap = cap; self.head = self.tail = self.count = 0\n    def push(self, x):\n        if self.count == self.cap: return False\n        self.slots[self.head] = x; self.head = (self.head + 1) % self.cap; self.count += 1\n        return True\n    def pop(self):\n        if self.count == 0: return None\n        v = self.slots[self.tail]; self.tail = (self.tail + 1) % self.cap; self.count -= 1\n        return v\nrb = RingBuffer(4)\nfor i in (10, 20, 30, 40, 50): rb.___(i)\nout = []\nwhile (v := rb.pop()) is not None:\n    out.append(v)\nprint(out)",
+  "expected_stdout": "[10, 20, 30, 40]",
+  "hint": "Same name as the C version."
+},
+  "quant-47-cython-preview": {
+  "mode": "predict",
+  "code": "def cy_sum(arr):\n    total = 0\n    for i in range(len(arr)):\n        total += arr[i]\n    return total\nprint(cy_sum(list(range(100))))",
+  "expected_stdout": "4950",
+  "prompt": "Type the integer."
+},
+  "quant-48-cffi-preview": {
+  "mode": "predict",
+  "code": "def c_sum_simulated(arr, n):\n    return sum(arr[:n])\nprint(c_sum_simulated(list(range(50)), 50))",
+  "expected_stdout": "1225",
+  "prompt": "Type the integer."
+},
 };
