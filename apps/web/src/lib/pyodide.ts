@@ -92,6 +92,12 @@ export async function ensureMatplotlib(): Promise<void> {
   await call<null>("ensureMatplotlib");
 }
 
+/** Fetch /data/quant/<slug>.csv and mount it inside Pyodide's FS so lessons
+ *  can `pd.read_csv("/data/quant/<slug>.csv")` without thinking about it. */
+export async function ensureDataset(slug: string): Promise<void> {
+  await call<null>("ensureDataset", { slug });
+}
+
 export async function runPythonStdout(
   code: string,
 ): Promise<{ stdout: string; error: string | null }> {

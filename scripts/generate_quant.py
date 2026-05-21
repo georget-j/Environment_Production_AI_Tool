@@ -96,6 +96,9 @@ class Lesson:
     prompt: str = ""
     hint: str = ""
     skills: list[str] = field(default_factory=list)
+    # Bundled CSV slugs the lesson reads. The worker pre-mounts each under
+    # /data/quant/<slug>.csv inside Pyodide's FS before the user code runs.
+    datasets: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.mode not in LESSON_MODES:
@@ -158,6 +161,8 @@ class Lesson:
             }
             if self.hint:
                 payload["hint"] = self.hint
+            if self.datasets:
+                payload["datasets"] = list(self.datasets)
             return payload
         if self.mode == "matplot":
             payload = {"mode": "matplot", "template": self.template}
@@ -165,6 +170,8 @@ class Lesson:
                 payload["expected_stdout"] = self.expected_stdout
             if self.hint:
                 payload["hint"] = self.hint
+            if self.datasets:
+                payload["datasets"] = list(self.datasets)
             return payload
         if self.mode == "cscript":
             payload = {
@@ -464,6 +471,281 @@ LESSONS: list[Lesson] = [
         expected_stdout="plotted",
         hint="It's a single variable name.",
         skills=["quant", "numpy", "matplotlib", "monte-carlo"],
+    ),
+
+    # ============ Stage 2 — Pandas & Statistics (10 lessons) ============
+    Lesson(
+        n=11, stage=2, mode="fillblank",
+        title="DataFrames from CSV",
+        scenario="A DataFrame is the workhorse of every research notebook. Loading 10 years of SPY prices takes one call.",
+        learner_goal="Load the bundled SPY CSV into a DataFrame and report its shape.",
+        concept="`pd.read_csv(path)` returns a DataFrame. `df.shape` gives `(rows, cols)`. The bundled file `/data/quant/spy.csv` has daily OHLCV bars 2015–2025.",
+        example_code=(
+            "import pandas as pd\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "print(df.shape)"
+        ),
+        template=(
+            "import pandas as pd\n"
+            "df = pd.___('/data/quant/spy.csv')\n"
+            "print(df.shape)"
+        ),
+        your_turn="Fill in the pandas function that reads a CSV.",
+        expected_stdout="(2766, 7)",
+        hint="Three letters, then _csv.",
+        skills=["quant", "pandas"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=12, stage=2, mode="predict",
+        title="Loc versus iloc",
+        scenario="`.loc` indexes by label, `.iloc` indexes by position. Mixing them up is the most common pandas bug.",
+        learner_goal="Predict the values returned by .iloc and .loc on a small frame.",
+        concept="`.iloc[0]` is always the first row. `.loc[0]` is the row labelled `0` — usually the same, until you sort or filter, then the label and the position diverge.",
+        example_code=(
+            "import pandas as pd\n"
+            "df = pd.DataFrame({'price': [100, 101, 99]}, index=['a', 'b', 'c'])\n"
+            "print(df.iloc[0]['price'], df.loc['b', 'price'])"
+        ),
+        code=(
+            "import pandas as pd\n"
+            "df = pd.DataFrame({'price': [100, 101, 99]}, index=['a', 'b', 'c'])\n"
+            "print(df.iloc[0]['price'], df.loc['b', 'price'])"
+        ),
+        your_turn="Predict what the print statement outputs.",
+        expected_stdout="100 101",
+        prompt="Two space-separated numbers.",
+        skills=["quant", "pandas"],
+    ),
+    Lesson(
+        n=13, stage=2, mode="fillblank",
+        title="Boolean filtering on real prices",
+        scenario="`(df['close'] > df['open'])` returns a boolean Series. Pass it to `df[...]` and you've filtered the frame — vectorised, fast, idiomatic.",
+        learner_goal="Count the SPY days where the close was above the open.",
+        concept="A comparison between two Series returns a boolean Series the same length. Using it as `df[mask]` keeps only rows where the mask is True. The number of up-days is `mask.sum()`.",
+        example_code=(
+            "import pandas as pd\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "up = (df['close'] > df['open']).sum()\n"
+            "print(up)"
+        ),
+        template=(
+            "import pandas as pd\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "up = (df['close'] ___ df['open']).sum()\n"
+            "print(up)"
+        ),
+        your_turn="Replace `___` with the operator that counts strictly-up days.",
+        expected_stdout="1487",
+        hint="Same comparison operator you'd use on plain numbers.",
+        skills=["quant", "pandas", "vectorisation"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=14, stage=2, mode="matplot",
+        title="Daily and log returns",
+        scenario="Two ways to express returns: simple `(p_t / p_{t-1}) - 1` and log `ln(p_t / p_{t-1})`. They're nearly identical for small moves and additively neat for the log version.",
+        learner_goal="Compute simple and log returns from SPY adj_close and plot a histogram of each.",
+        concept="`series.pct_change()` is the simple return. Log returns are `np.log(p / p.shift(1))`. Plot histograms with `plt.hist(series.dropna(), bins=50)`.",
+        example_code=(
+            "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "simple = df['adj_close'].pct_change().dropna()\n"
+            "log_r = np.log(df['adj_close'] / df['adj_close'].shift(1)).dropna()\n"
+            "plt.hist(log_r, bins=60)\n"
+            "plt.title('SPY log returns'); plt.xlabel('return'); plt.ylabel('count')\n"
+            "print(round(simple.std(), 4), round(log_r.std(), 4))"
+        ),
+        template=(
+            "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "simple = df['adj_close'].___().dropna()\n"
+            "log_r = np.log(df['adj_close'] / df['adj_close'].shift(1)).dropna()\n"
+            "plt.hist(log_r, bins=60)\n"
+            "plt.title('SPY log returns'); plt.xlabel('return'); plt.ylabel('count')\n"
+            "print(round(simple.std(), 4), round(log_r.std(), 4))"
+        ),
+        your_turn="Replace `___` with the pandas method that gives the simple return.",
+        expected_stdout="0.0112 0.0112",
+        hint="It's the method that gives one-period percentage change.",
+        skills=["quant", "pandas", "time-series", "statistics"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=15, stage=2, mode="matplot",
+        title="Rolling volatility",
+        scenario="A 30-day rolling standard deviation of returns, annualised, is the canonical 'realised vol' a strategy gates on.",
+        learner_goal="Compute SPY's 30-day rolling vol and plot it against time.",
+        concept="`r.rolling(window).std()` is the rolling std. Annualise daily vol with `* np.sqrt(252)`. The first 29 rows are NaN — that's expected.",
+        example_code=(
+            "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "r = df['adj_close'].pct_change()\n"
+            "vol = r.rolling(30).std() * np.sqrt(252)\n"
+            "plt.plot(vol)\n"
+            "plt.title('SPY 30-day rolling vol'); plt.xlabel('day'); plt.ylabel('annualised vol')\n"
+            "print(round(vol.max(), 3))"
+        ),
+        template=(
+            "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "r = df['adj_close'].pct_change()\n"
+            "vol = r.rolling(30).___() * np.sqrt(252)\n"
+            "plt.plot(vol)\n"
+            "plt.title('SPY 30-day rolling vol'); plt.xlabel('day'); plt.ylabel('annualised vol')\n"
+            "print(round(vol.max(), 3))"
+        ),
+        your_turn="Replace `___` with the reduction that gives standard deviation.",
+        expected_stdout="0.821",
+        hint="Three letters.",
+        skills=["quant", "pandas", "time-series", "statistics"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=16, stage=2, mode="fillblank",
+        title="Groupby year",
+        scenario="Pandas groupby is split-apply-combine. Group by calendar year and you can answer 'how did each year score?' in two lines.",
+        learner_goal="Compute SPY's mean daily return by calendar year.",
+        concept="`pd.to_datetime(df['date']).dt.year` extracts the year. `df.groupby(year_series)['adj_close'].pct_change().mean()` then averages within each group. Use `.agg(...)` or a single reduction.",
+        example_code=(
+            "import pandas as pd\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "df['year'] = pd.to_datetime(df['date']).dt.year\n"
+            "by_year = df.groupby('year')['adj_close'].apply(lambda s: s.pct_change().mean())\n"
+            "print(round(by_year[2020], 5))"
+        ),
+        template=(
+            "import pandas as pd\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "df['year'] = pd.to_datetime(df['date']).dt.year\n"
+            "by_year = df.___('year')['adj_close'].apply(lambda s: s.pct_change().mean())\n"
+            "print(round(by_year[2020], 5))"
+        ),
+        your_turn="Replace `___` with the pandas split-apply-combine method.",
+        expected_stdout="0.00085",
+        hint="Seven letters.",
+        skills=["quant", "pandas", "time-series"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=17, stage=2, mode="fillblank",
+        title="Aligning two series",
+        scenario="Real research mixes tickers with different calendars (BTC trades weekends; SPY doesn't). Aligning on a shared index is the first step of any cross-asset analysis.",
+        learner_goal="Merge SPY and AAPL on the date column and confirm row count.",
+        concept="`pd.merge(a, b, on='date', how='inner')` keeps rows where both have data. The result has all the columns of both frames, suffixed `_x` and `_y` when names collide.",
+        example_code=(
+            "import pandas as pd\n"
+            "spy = pd.read_csv('/data/quant/spy.csv')\n"
+            "aapl = pd.read_csv('/data/quant/aapl.csv')\n"
+            "joined = pd.merge(spy, aapl, on='date', how='inner', suffixes=('_spy', '_aapl'))\n"
+            "print(joined.shape)"
+        ),
+        template=(
+            "import pandas as pd\n"
+            "spy = pd.read_csv('/data/quant/spy.csv')\n"
+            "aapl = pd.read_csv('/data/quant/aapl.csv')\n"
+            "joined = pd.merge(spy, aapl, on='date', how='___', suffixes=('_spy', '_aapl'))\n"
+            "print(joined.shape)"
+        ),
+        your_turn="Replace `___` with the join type that keeps only common dates.",
+        expected_stdout="(2766, 13)",
+        hint="Same name as the SQL join.",
+        skills=["quant", "pandas", "time-series"],
+        datasets=["spy", "aapl"],
+    ),
+    Lesson(
+        n=18, stage=2, mode="matplot",
+        title="Fitting a normal to returns",
+        scenario="Daily returns look gaussian-ish until you check the tails. Plotting a normal pdf over the empirical histogram makes the mismatch visible.",
+        learner_goal="Fit a normal to SPY's daily returns and overlay it on the histogram.",
+        concept="`scipy.stats.norm.fit(data)` returns `(mu, sigma)`. Generate the pdf with `norm.pdf(xs, mu, sigma)` and overlay with `plt.plot(xs, pdf)`. Set `plt.hist(..., density=True)` so the histogram is on the same scale.",
+        example_code=(
+            "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+            "from scipy.stats import norm\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "r = df['adj_close'].pct_change().dropna()\n"
+            "mu, sigma = norm.fit(r)\n"
+            "xs = np.linspace(r.min(), r.max(), 200)\n"
+            "plt.hist(r, bins=80, density=True, alpha=0.6)\n"
+            "plt.plot(xs, norm.pdf(xs, mu, sigma))\n"
+            "plt.title('SPY daily returns vs normal fit')\n"
+            "print(round(sigma, 4))"
+        ),
+        template=(
+            "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+            "from scipy.stats import norm\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "r = df['adj_close'].pct_change().dropna()\n"
+            "mu, sigma = norm.___(r)\n"
+            "xs = np.linspace(r.min(), r.max(), 200)\n"
+            "plt.hist(r, bins=80, density=True, alpha=0.6)\n"
+            "plt.plot(xs, norm.pdf(xs, mu, sigma))\n"
+            "plt.title('SPY daily returns vs normal fit')\n"
+            "print(round(sigma, 4))"
+        ),
+        your_turn="Replace `___` with scipy's MLE call.",
+        expected_stdout="0.0112",
+        hint="Three letters.",
+        skills=["quant", "pandas", "statistics"],
+        datasets=["spy"],
+    ),
+    Lesson(
+        n=19, stage=2, mode="fillblank",
+        title="OLS beta of AAPL on SPY",
+        scenario="Beta of a single stock to the market is the simplest factor regression. statsmodels reports an inference summary — coefficient, std error, p-value, R².",
+        learner_goal="Run OLS of AAPL returns on SPY returns and read the slope coefficient.",
+        concept="`statsmodels.api.OLS(y, X).fit()` returns a result. `X` must include a constant (use `sm.add_constant`). `.params` is the coefficient vector; the slope is index 1.",
+        example_code=(
+            "import pandas as pd, statsmodels.api as sm\n"
+            "spy = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
+            "aapl = pd.read_csv('/data/quant/aapl.csv')['adj_close'].pct_change()\n"
+            "df = pd.concat([spy, aapl], axis=1).dropna()\n"
+            "X = sm.add_constant(df.iloc[:, 0])\n"
+            "res = sm.OLS(df.iloc[:, 1], X).fit()\n"
+            "print(round(res.params.iloc[1], 2))"
+        ),
+        template=(
+            "import pandas as pd, statsmodels.api as sm\n"
+            "spy = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
+            "aapl = pd.read_csv('/data/quant/aapl.csv')['adj_close'].pct_change()\n"
+            "df = pd.concat([spy, aapl], axis=1).dropna()\n"
+            "X = sm.add_constant(df.iloc[:, 0])\n"
+            "res = sm.___(df.iloc[:, 1], X).fit()\n"
+            "print(round(res.params.iloc[1], 2))"
+        ),
+        your_turn="Replace `___` with the linear-regression constructor.",
+        expected_stdout="1.21",
+        hint="Three letters in caps.",
+        skills=["quant", "pandas", "statistics", "regression"],
+        datasets=["spy", "aapl"],
+    ),
+    Lesson(
+        n=20, stage=2, mode="predict",
+        title="Stationarity preview",
+        scenario="An ARIMA model needs stationary input. The Augmented Dickey-Fuller test gives a p-value: small p → reject 'unit root' → series is stationary.",
+        learner_goal="Read an ADF p-value on SPY prices vs returns and predict which is stationary.",
+        concept="`statsmodels.tsa.stattools.adfuller(s)` returns a tuple; element `[1]` is the p-value. Price series usually have p ≈ 1 (random walk, non-stationary); returns usually have p << 0.05.",
+        example_code=(
+            "import pandas as pd\n"
+            "from statsmodels.tsa.stattools import adfuller\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "p_price = adfuller(df['adj_close'])[1]\n"
+            "p_ret = adfuller(df['adj_close'].pct_change().dropna())[1]\n"
+            "print(p_price > 0.05, p_ret < 0.05)"
+        ),
+        code=(
+            "import pandas as pd\n"
+            "from statsmodels.tsa.stattools import adfuller\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "p_price = adfuller(df['adj_close'])[1]\n"
+            "p_ret = adfuller(df['adj_close'].pct_change().dropna())[1]\n"
+            "print(p_price > 0.05, p_ret < 0.05)"
+        ),
+        your_turn="Predict the two booleans. The first asks 'is prices non-stationary?'; the second asks 'are returns stationary?'.",
+        expected_stdout="True True",
+        prompt="Two booleans.",
+        skills=["quant", "pandas", "time-series", "statistics"],
+        datasets=["spy"],
     ),
 ]
 # fmt: on

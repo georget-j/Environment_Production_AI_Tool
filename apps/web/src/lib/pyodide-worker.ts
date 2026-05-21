@@ -9,6 +9,7 @@
  *   init                       — load Pyodide. Resolves when ready.
  *   ensurePytest               — install pytest via micropip. Idempotent.
  *   ensureMatplotlib           — install matplotlib (Agg backend). Idempotent.
+ *   ensureDataset              — fetch /data/quant/<slug>.csv into the FS.
  *   runPythonStdout            — run user code with the step watchdog.
  *   runPythonAndCaptureFigure  — run user code + grab the active figure as SVG.
  *   runPytest                  — write a file tree + run pytest.
@@ -116,6 +117,28 @@ async function ensurePytest(): Promise<void> {
     throw exc;
   });
   return pytestPromise;
+}
+
+const loadedDatasets = new Set<string>();
+
+async function ensureDataset(slug: string): Promise<void> {
+  if (!pyodide) throw new Error("Pyodide not ready");
+  if (loadedDatasets.has(slug)) return;
+  // Tight allow-list — only the known bundled tickers can be requested.
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    throw new Error(`Invalid dataset slug: ${slug}`);
+  }
+  const url = `/data/quant/${slug}.csv`;
+  const res = await fetch(url, { credentials: "omit" });
+  if (!res.ok) throw new Error(`Couldn't fetch ${url} (HTTP ${res.status})`);
+  const body = await res.text();
+  // Write to a stable in-FS path mirroring the URL.
+  const fsPath = `/data/quant/${slug}.csv`;
+  const dir = "/data/quant";
+  if (!pyodide.FS.analyzePath("/data").exists) pyodide.FS.mkdir("/data");
+  if (!pyodide.FS.analyzePath(dir).exists) pyodide.FS.mkdir(dir);
+  pyodide.FS.writeFile(fsPath, body);
+  loadedDatasets.add(slug);
 }
 
 async function ensureMatplotlib(): Promise<void> {
@@ -412,6 +435,11 @@ workerSelf.addEventListener(
           await ensureMatplotlib();
           reply({ id, result: null });
           return;
+        case "ensureDataset":
+          await ensureInit();
+          await ensureDataset((args as { slug: string }).slug);
+          reply({ id, result: null });
+          return;
         case "runPythonStdout": {
           await ensureInit();
           const result = await runPythonStdout((args as { code: string }).code);
@@ -446,6 +474,7 @@ workerSelf.addEventListener(
           initPromise = null;
           pytestPromise = null;
           matplotlibPromise = null;
+          loadedDatasets.clear();
           lastTreeSignature = null;
           reply({ id, result: null });
           return;

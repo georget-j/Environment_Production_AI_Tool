@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { celebrate } from "@/lib/celebrate";
 import type { MatplotLessonConfig } from "@/lib/featured-files";
 import {
+  ensureDataset,
   ensureMatplotlib,
   getPyodide,
   resetPyodide,
@@ -87,6 +88,9 @@ export function LessonMatplot({ config, nextSlug, onCodeChange }: Props) {
         await getPyodide();
         setRuntime({ kind: "warming-matplotlib" });
         await ensureMatplotlib();
+        for (const slug of config.datasets ?? []) {
+          await ensureDataset(slug);
+        }
         setRuntime({ kind: "ready" });
       } catch (exc) {
         setRuntime({
@@ -95,7 +99,7 @@ export function LessonMatplot({ config, nextSlug, onCodeChange }: Props) {
         });
       }
     })();
-  }, [runtime.kind]);
+  }, [runtime.kind, config.datasets]);
 
   async function run() {
     if (runtime.kind !== "ready") return;

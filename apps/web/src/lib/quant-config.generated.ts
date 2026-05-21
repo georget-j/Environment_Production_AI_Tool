@@ -64,4 +64,90 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "expected_stdout": "plotted",
   "hint": "It's a single variable name."
 },
+  "quant-11-dataframes-from-csv": {
+  "mode": "fillblank",
+  "template": "import pandas as pd\ndf = pd.___('/data/quant/spy.csv')\nprint(df.shape)",
+  "expected_stdout": "(2766, 7)",
+  "hint": "Three letters, then _csv.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-12-loc-versus-iloc": {
+  "mode": "predict",
+  "code": "import pandas as pd\ndf = pd.DataFrame({'price': [100, 101, 99]}, index=['a', 'b', 'c'])\nprint(df.iloc[0]['price'], df.loc['b', 'price'])",
+  "expected_stdout": "100 101",
+  "prompt": "Two space-separated numbers."
+},
+  "quant-13-boolean-filtering-on-real-prices": {
+  "mode": "fillblank",
+  "template": "import pandas as pd\ndf = pd.read_csv('/data/quant/spy.csv')\nup = (df['close'] ___ df['open']).sum()\nprint(up)",
+  "expected_stdout": "1487",
+  "hint": "Same comparison operator you'd use on plain numbers.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-14-daily-and-log-returns": {
+  "mode": "matplot",
+  "template": "import pandas as pd, numpy as np, matplotlib.pyplot as plt\ndf = pd.read_csv('/data/quant/spy.csv')\nsimple = df['adj_close'].___().dropna()\nlog_r = np.log(df['adj_close'] / df['adj_close'].shift(1)).dropna()\nplt.hist(log_r, bins=60)\nplt.title('SPY log returns'); plt.xlabel('return'); plt.ylabel('count')\nprint(round(simple.std(), 4), round(log_r.std(), 4))",
+  "expected_stdout": "0.0112 0.0112",
+  "hint": "It's the method that gives one-period percentage change.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-15-rolling-volatility": {
+  "mode": "matplot",
+  "template": "import pandas as pd, numpy as np, matplotlib.pyplot as plt\ndf = pd.read_csv('/data/quant/spy.csv')\nr = df['adj_close'].pct_change()\nvol = r.rolling(30).___() * np.sqrt(252)\nplt.plot(vol)\nplt.title('SPY 30-day rolling vol'); plt.xlabel('day'); plt.ylabel('annualised vol')\nprint(round(vol.max(), 3))",
+  "expected_stdout": "0.821",
+  "hint": "Three letters.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-16-groupby-year": {
+  "mode": "fillblank",
+  "template": "import pandas as pd\ndf = pd.read_csv('/data/quant/spy.csv')\ndf['year'] = pd.to_datetime(df['date']).dt.year\nby_year = df.___('year')['adj_close'].apply(lambda s: s.pct_change().mean())\nprint(round(by_year[2020], 5))",
+  "expected_stdout": "0.00085",
+  "hint": "Seven letters.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-17-aligning-two-series": {
+  "mode": "fillblank",
+  "template": "import pandas as pd\nspy = pd.read_csv('/data/quant/spy.csv')\naapl = pd.read_csv('/data/quant/aapl.csv')\njoined = pd.merge(spy, aapl, on='date', how='___', suffixes=('_spy', '_aapl'))\nprint(joined.shape)",
+  "expected_stdout": "(2766, 13)",
+  "hint": "Same name as the SQL join.",
+  "datasets": [
+    "spy",
+    "aapl"
+  ]
+},
+  "quant-18-fitting-a-normal-to-returns": {
+  "mode": "matplot",
+  "template": "import pandas as pd, numpy as np, matplotlib.pyplot as plt\nfrom scipy.stats import norm\ndf = pd.read_csv('/data/quant/spy.csv')\nr = df['adj_close'].pct_change().dropna()\nmu, sigma = norm.___(r)\nxs = np.linspace(r.min(), r.max(), 200)\nplt.hist(r, bins=80, density=True, alpha=0.6)\nplt.plot(xs, norm.pdf(xs, mu, sigma))\nplt.title('SPY daily returns vs normal fit')\nprint(round(sigma, 4))",
+  "expected_stdout": "0.0112",
+  "hint": "Three letters.",
+  "datasets": [
+    "spy"
+  ]
+},
+  "quant-19-ols-beta-of-aapl-on-spy": {
+  "mode": "fillblank",
+  "template": "import pandas as pd, statsmodels.api as sm\nspy = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\naapl = pd.read_csv('/data/quant/aapl.csv')['adj_close'].pct_change()\ndf = pd.concat([spy, aapl], axis=1).dropna()\nX = sm.add_constant(df.iloc[:, 0])\nres = sm.___(df.iloc[:, 1], X).fit()\nprint(round(res.params.iloc[1], 2))",
+  "expected_stdout": "1.21",
+  "hint": "Three letters in caps.",
+  "datasets": [
+    "spy",
+    "aapl"
+  ]
+},
+  "quant-20-stationarity-preview": {
+  "mode": "predict",
+  "code": "import pandas as pd\nfrom statsmodels.tsa.stattools import adfuller\ndf = pd.read_csv('/data/quant/spy.csv')\np_price = adfuller(df['adj_close'])[1]\np_ret = adfuller(df['adj_close'].pct_change().dropna())[1]\nprint(p_price > 0.05, p_ret < 0.05)",
+  "expected_stdout": "True True",
+  "prompt": "Two booleans."
+},
 };

@@ -53,6 +53,8 @@ export type FillBlankLessonConfig = {
   expected_stdout: string;
   /** One-line hint shown under the editor. */
   hint?: string;
+  /** Optional dataset slugs to pre-load into Pyodide's FS at /data/quant/<slug>.csv. */
+  datasets?: string[];
 };
 
 /**
@@ -108,6 +110,8 @@ export type MatplotLessonConfig = {
   expected_stdout?: string;
   /** One-line hint shown under the editor. */
   hint?: string;
+  /** Optional dataset slugs to pre-load into Pyodide's FS. */
+  datasets?: string[];
 };
 
 export type ChallengeRunnerConfig =

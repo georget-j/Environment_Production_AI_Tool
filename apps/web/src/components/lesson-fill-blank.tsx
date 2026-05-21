@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { celebrate } from "@/lib/celebrate";
 import type { FillBlankLessonConfig } from "@/lib/featured-files";
-import { getPyodide, resetPyodide, runPythonStdout } from "@/lib/pyodide";
+import {
+  ensureDataset,
+  getPyodide,
+  resetPyodide,
+  runPythonStdout,
+} from "@/lib/pyodide";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -79,6 +84,9 @@ export function LessonFillBlank({ config, nextSlug, onCodeChange }: Props) {
     void (async () => {
       try {
         await getPyodide();
+        for (const slug of config.datasets ?? []) {
+          await ensureDataset(slug);
+        }
         setPyodideState({ kind: "ready" });
       } catch (exc) {
         setPyodideState({
@@ -87,7 +95,7 @@ export function LessonFillBlank({ config, nextSlug, onCodeChange }: Props) {
         });
       }
     })();
-  }, [pyodideState.kind]);
+  }, [pyodideState.kind, config.datasets]);
 
   async function run() {
     if (pyodideState.kind !== "ready") return;

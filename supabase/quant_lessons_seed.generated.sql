@@ -342,14 +342,357 @@ on conflict (slug) do update set
   is_free = excluded.is_free,
   order_index = excluded.order_index;
 
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000030a',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-11-dataframes-from-csv',
+  E'DataFrames from CSV',
+  E'A DataFrame is the workhorse of every research notebook. Loading 10 years of SPY prices takes one call.',
+  E'Load the bundled SPY CSV into a DataFrame and report its shape.',
+  E'**Concept.** `pd.read_csv(path)` returns a DataFrame. `df.shape` gives `(rows, cols)`. The bundled file `/data/quant/spy.csv` has daily OHLCV bars 2015–2025.\n\n**Example.**\n\n```python\nimport pandas as pd\ndf = pd.read_csv(''/data/quant/spy.csv'')\nprint(df.shape)\n```\n\n**Your turn.** Fill in the pandas function that reads a CSV.\n\n**Expected.** `(2766, 7)`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas'],
+  true,
+  11
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000030b',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-12-loc-versus-iloc',
+  E'Loc versus iloc',
+  E'`.loc` indexes by label, `.iloc` indexes by position. Mixing them up is the most common pandas bug.',
+  E'Predict the values returned by .iloc and .loc on a small frame.',
+  E'**Concept.** `.iloc[0]` is always the first row. `.loc[0]` is the row labelled `0` — usually the same, until you sort or filter, then the label and the position diverge.\n\n**Example.**\n\n```python\nimport pandas as pd\ndf = pd.DataFrame({''price'': [100, 101, 99]}, index=[''a'', ''b'', ''c''])\nprint(df.iloc[0][''price''], df.loc[''b'', ''price''])\n```\n\n**Predict.** Predict what the print statement outputs.\n\n**Expected.** `100 101`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas'],
+  true,
+  12
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000030c',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-13-boolean-filtering-on-real-prices',
+  E'Boolean filtering on real prices',
+  E'`(df[''close''] > df[''open''])` returns a boolean Series. Pass it to `df[...]` and you''ve filtered the frame — vectorised, fast, idiomatic.',
+  E'Count the SPY days where the close was above the open.',
+  E'**Concept.** A comparison between two Series returns a boolean Series the same length. Using it as `df[mask]` keeps only rows where the mask is True. The number of up-days is `mask.sum()`.\n\n**Example.**\n\n```python\nimport pandas as pd\ndf = pd.read_csv(''/data/quant/spy.csv'')\nup = (df[''close''] > df[''open'']).sum()\nprint(up)\n```\n\n**Your turn.** Replace `___` with the operator that counts strictly-up days.\n\n**Expected.** `1487`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'vectorisation'],
+  true,
+  13
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000030d',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-14-daily-and-log-returns',
+  E'Daily and log returns',
+  E'Two ways to express returns: simple `(p_t / p_{t-1}) - 1` and log `ln(p_t / p_{t-1})`. They''re nearly identical for small moves and additively neat for the log version.',
+  E'Compute simple and log returns from SPY adj_close and plot a histogram of each.',
+  E'**Concept.** `series.pct_change()` is the simple return. Log returns are `np.log(p / p.shift(1))`. Plot histograms with `plt.hist(series.dropna(), bins=50)`.\n\n**Example.**\n\n```python\nimport pandas as pd, numpy as np, matplotlib.pyplot as plt\ndf = pd.read_csv(''/data/quant/spy.csv'')\nsimple = df[''adj_close''].pct_change().dropna()\nlog_r = np.log(df[''adj_close''] / df[''adj_close''].shift(1)).dropna()\nplt.hist(log_r, bins=60)\nplt.title(''SPY log returns''); plt.xlabel(''return''); plt.ylabel(''count'')\nprint(round(simple.std(), 4), round(log_r.std(), 4))\n```\n\n**Your turn.** Replace `___` with the pandas method that gives the simple return.\n\n**Expected.** `0.0112 0.0112`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'time-series', 'statistics'],
+  true,
+  14
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000030e',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-15-rolling-volatility',
+  E'Rolling volatility',
+  E'A 30-day rolling standard deviation of returns, annualised, is the canonical ''realised vol'' a strategy gates on.',
+  E'Compute SPY''s 30-day rolling vol and plot it against time.',
+  E'**Concept.** `r.rolling(window).std()` is the rolling std. Annualise daily vol with `* np.sqrt(252)`. The first 29 rows are NaN — that''s expected.\n\n**Example.**\n\n```python\nimport pandas as pd, numpy as np, matplotlib.pyplot as plt\ndf = pd.read_csv(''/data/quant/spy.csv'')\nr = df[''adj_close''].pct_change()\nvol = r.rolling(30).std() * np.sqrt(252)\nplt.plot(vol)\nplt.title(''SPY 30-day rolling vol''); plt.xlabel(''day''); plt.ylabel(''annualised vol'')\nprint(round(vol.max(), 3))\n```\n\n**Your turn.** Replace `___` with the reduction that gives standard deviation.\n\n**Expected.** `0.821`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'time-series', 'statistics'],
+  true,
+  15
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000030f',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-16-groupby-year',
+  E'Groupby year',
+  E'Pandas groupby is split-apply-combine. Group by calendar year and you can answer ''how did each year score?'' in two lines.',
+  E'Compute SPY''s mean daily return by calendar year.',
+  E'**Concept.** `pd.to_datetime(df[''date'']).dt.year` extracts the year. `df.groupby(year_series)[''adj_close''].pct_change().mean()` then averages within each group. Use `.agg(...)` or a single reduction.\n\n**Example.**\n\n```python\nimport pandas as pd\ndf = pd.read_csv(''/data/quant/spy.csv'')\ndf[''year''] = pd.to_datetime(df[''date'']).dt.year\nby_year = df.groupby(''year'')[''adj_close''].apply(lambda s: s.pct_change().mean())\nprint(round(by_year[2020], 5))\n```\n\n**Your turn.** Replace `___` with the pandas split-apply-combine method.\n\n**Expected.** `0.00085`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'time-series'],
+  true,
+  16
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000310',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-17-aligning-two-series',
+  E'Aligning two series',
+  E'Real research mixes tickers with different calendars (BTC trades weekends; SPY doesn''t). Aligning on a shared index is the first step of any cross-asset analysis.',
+  E'Merge SPY and AAPL on the date column and confirm row count.',
+  E'**Concept.** `pd.merge(a, b, on=''date'', how=''inner'')` keeps rows where both have data. The result has all the columns of both frames, suffixed `_x` and `_y` when names collide.\n\n**Example.**\n\n```python\nimport pandas as pd\nspy = pd.read_csv(''/data/quant/spy.csv'')\naapl = pd.read_csv(''/data/quant/aapl.csv'')\njoined = pd.merge(spy, aapl, on=''date'', how=''inner'', suffixes=(''_spy'', ''_aapl''))\nprint(joined.shape)\n```\n\n**Your turn.** Replace `___` with the join type that keeps only common dates.\n\n**Expected.** `(2766, 13)`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'time-series'],
+  true,
+  17
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000311',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-18-fitting-a-normal-to-returns',
+  E'Fitting a normal to returns',
+  E'Daily returns look gaussian-ish until you check the tails. Plotting a normal pdf over the empirical histogram makes the mismatch visible.',
+  E'Fit a normal to SPY''s daily returns and overlay it on the histogram.',
+  E'**Concept.** `scipy.stats.norm.fit(data)` returns `(mu, sigma)`. Generate the pdf with `norm.pdf(xs, mu, sigma)` and overlay with `plt.plot(xs, pdf)`. Set `plt.hist(..., density=True)` so the histogram is on the same scale.\n\n**Example.**\n\n```python\nimport pandas as pd, numpy as np, matplotlib.pyplot as plt\nfrom scipy.stats import norm\ndf = pd.read_csv(''/data/quant/spy.csv'')\nr = df[''adj_close''].pct_change().dropna()\nmu, sigma = norm.fit(r)\nxs = np.linspace(r.min(), r.max(), 200)\nplt.hist(r, bins=80, density=True, alpha=0.6)\nplt.plot(xs, norm.pdf(xs, mu, sigma))\nplt.title(''SPY daily returns vs normal fit'')\nprint(round(sigma, 4))\n```\n\n**Your turn.** Replace `___` with scipy''s MLE call.\n\n**Expected.** `0.0112`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'statistics'],
+  true,
+  18
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000312',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-19-ols-beta-of-aapl-on-spy',
+  E'OLS beta of AAPL on SPY',
+  E'Beta of a single stock to the market is the simplest factor regression. statsmodels reports an inference summary — coefficient, std error, p-value, R².',
+  E'Run OLS of AAPL returns on SPY returns and read the slope coefficient.',
+  E'**Concept.** `statsmodels.api.OLS(y, X).fit()` returns a result. `X` must include a constant (use `sm.add_constant`). `.params` is the coefficient vector; the slope is index 1.\n\n**Example.**\n\n```python\nimport pandas as pd, statsmodels.api as sm\nspy = pd.read_csv(''/data/quant/spy.csv'')[''adj_close''].pct_change()\naapl = pd.read_csv(''/data/quant/aapl.csv'')[''adj_close''].pct_change()\ndf = pd.concat([spy, aapl], axis=1).dropna()\nX = sm.add_constant(df.iloc[:, 0])\nres = sm.OLS(df.iloc[:, 1], X).fit()\nprint(round(res.params.iloc[1], 2))\n```\n\n**Your turn.** Replace `___` with the linear-regression constructor.\n\n**Expected.** `1.21`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'statistics', 'regression'],
+  true,
+  19
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000313',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-20-stationarity-preview',
+  E'Stationarity preview',
+  E'An ARIMA model needs stationary input. The Augmented Dickey-Fuller test gives a p-value: small p → reject ''unit root'' → series is stationary.',
+  E'Read an ADF p-value on SPY prices vs returns and predict which is stationary.',
+  E'**Concept.** `statsmodels.tsa.stattools.adfuller(s)` returns a tuple; element `[1]` is the p-value. Price series usually have p ≈ 1 (random walk, non-stationary); returns usually have p << 0.05.\n\n**Example.**\n\n```python\nimport pandas as pd\nfrom statsmodels.tsa.stattools import adfuller\ndf = pd.read_csv(''/data/quant/spy.csv'')\np_price = adfuller(df[''adj_close''])[1]\np_ret = adfuller(df[''adj_close''].pct_change().dropna())[1]\nprint(p_price > 0.05, p_ret < 0.05)\n```\n\n**Predict.** Predict the two booleans. The first asks ''is prices non-stationary?''; the second asks ''are returns stationary?''.\n\n**Expected.** `True True`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'time-series', 'statistics'],
+  true,
+  20
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
 insert into public.skills (slug, name) values
   ('linear-algebra', 'Linear algebra'),
   ('matplotlib', 'Matplotlib'),
   ('monte-carlo', 'Monte Carlo'),
   ('numpy', 'NumPy'),
+  ('pandas', 'pandas'),
   ('performance', 'Performance engineering'),
   ('quant', 'Quantitative finance'),
   ('random-numbers', 'Random number generation'),
+  ('regression', 'Regression'),
   ('statistics', 'Statistics'),
+  ('time-series', 'Time series'),
   ('vectorisation', 'Vectorisation')
 on conflict (slug) do update set name = excluded.name;
