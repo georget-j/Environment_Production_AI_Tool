@@ -224,28 +224,37 @@ SKILL_TITLES: dict[str, str] = {
 
 # fmt: off
 LESSONS: list[Lesson] = [
-    # ============ Stage 1 — Numerical Python (10 lessons) ============
+    # ============ Stage 1 — Numerical Python (13 lessons, v2) ============
     Lesson(
         n=1, stage=1, mode="predict",
         title="Why numpy",
-        scenario="Python's for-loops feel friendly until you sum a million numbers. numpy's array operations push the work down into C — same answer, ~50× faster.",
-        learner_goal="See the speed gap between pure Python and numpy on a simple sum.",
-        concept="numpy arrays look like Python lists but store data contiguously in memory and operate on it in compiled code. The same logical work runs an order of magnitude faster — without any loop appearing in your Python.",
+        scenario="First morning at AQR. Your manager hands you a notebook with 7 years of minute-bar SPY data — 12 million rows — and wants a 10-day momentum signal by lunch. In pure Python the iteration would take 6 minutes per run; in numpy it's 4 seconds. That gap is the whole reason quants live in numpy.",
+        learner_goal="Measure the real speed gap between a Python sum and a numpy sum on a million numbers.",
+        concept="numpy arrays store fixed-size numbers contiguously in memory. A `.sum()` runs as one C loop with no Python interpreter overhead per element — typically 50-100× faster than the equivalent Python for-loop. The work being done is identical; the dispatch cost is what disappears.",
         example_code=(
             "import numpy as np, time\n"
             "n = 1_000_000\n"
             "xs = list(range(n))\n"
             "arr = np.arange(n)\n"
-            "print(sum(xs) == int(arr.sum()))"
+            "\n"
+            "t0 = time.perf_counter()\n"
+            "s1 = sum(xs)\n"
+            "t1 = time.perf_counter()\n"
+            "s2 = int(arr.sum())\n"
+            "t2 = time.perf_counter()\n"
+            "\n"
+            "print(f'loop:  {(t1-t0)*1e3:6.1f}ms')\n"
+            "print(f'numpy: {(t2-t1)*1e3:6.1f}ms')\n"
+            "print('answers match:', s1 == s2)"
         ),
         code=(
-            "import numpy as np, time\n"
+            "import numpy as np\n"
             "n = 1_000_000\n"
             "xs = list(range(n))\n"
             "arr = np.arange(n)\n"
             "print(sum(xs) == int(arr.sum()))"
         ),
-        your_turn="Both compute the same sum 0+1+…+999999. Predict the printed result.",
+        your_turn="Both compute the same sum 0+1+…+999999. Predict the boolean result.",
         expected_stdout="True",
         prompt="True or False?",
         skills=["quant", "numpy", "vectorisation"],
@@ -253,84 +262,159 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=2, stage=1, mode="fillblank",
         title="Creating arrays",
-        scenario="Three constructors handle 95% of real array creation: a literal list, all-zeros of a given shape, and an evenly-spaced range.",
-        learner_goal="Use np.array, np.zeros, and np.linspace to build arrays from different starting points.",
-        concept="`np.array([…])` lifts a Python list. `np.zeros(n)` allocates `n` zeros. `np.linspace(start, stop, n)` returns `n` evenly spaced points including both endpoints — the canonical x-axis builder.",
+        scenario="The Citadel research team's morning ritual: load yesterday's tape, slice it, line it up against a benchmark grid. Three constructors handle nearly every input you'll ever build — `np.array` for known data, `np.zeros` for pre-allocated buffers, `np.linspace` for evenly-spaced sampling grids (the canonical y-axis builder for IV surfaces).",
+        learner_goal="Use np.array, np.zeros, and np.linspace to build the three array shapes you'll actually use.",
+        concept="`np.array([…])` lifts a Python list. `np.zeros(n)` pre-allocates `n` zeros — useful when you'll fill values in a loop. `np.linspace(start, stop, n)` returns `n` evenly spaced points including both endpoints — used for plot grids and parameter sweeps.",
         example_code=(
             "import numpy as np\n"
-            "a = np.array([1.0, 2.0, 3.0])\n"
-            "b = np.zeros(3)\n"
-            "c = np.linspace(0, 1, 5)\n"
-            "print(a, b, c, sep=' | ')"
+            "# A literal list — known coupon rates on three bonds.\n"
+            "coupons = np.array([0.025, 0.032, 0.041])\n"
+            "# Pre-allocated buffer for tomorrow's signals.\n"
+            "signals = np.zeros(252)\n"
+            "# Evenly-spaced strikes for an IV surface — 80% to 120% of spot.\n"
+            "strikes = np.linspace(80, 120, 5)\n"
+            "print(coupons, signals[:3], strikes, sep=' | ')"
         ),
         template=(
             "import numpy as np\n"
-            "a = np.array([1.0, 2.0, 3.0])\n"
-            "b = np.___(3)\n"
-            "c = np.___(0, 1, 5)\n"
-            "print(a, b, c, sep=' | ')"
+            "coupons = np.array([0.025, 0.032, 0.041])\n"
+            "signals = np.___(252)\n"
+            "strikes = np.___(80, 120, 5)\n"
+            "print(coupons, signals[:3], strikes, sep=' | ')"
         ),
-        your_turn="Fill the blanks so the output shows the literal, three zeros, and five evenly-spaced points from 0 to 1.",
-        expected_stdout="[1. 2. 3.] | [0. 0. 0.] | [0.   0.25 0.5  0.75 1.  ]",
-        hint="One blank is `zeros`, the other is `linspace`.",
+        your_turn="Fill the two blanks: zero-buffer for `signals`, evenly-spaced grid for `strikes`.",
+        expected_stdout="[0.025 0.032 0.041] | [0. 0. 0.] | [ 80.  90. 100. 110. 120.]",
+        hint="One is `zeros`, the other is `linspace`.",
         skills=["quant", "numpy"],
     ),
     Lesson(
         n=3, stage=1, mode="predict",
-        title="Broadcasting",
-        scenario="When you add a 1-D array to a 2-D array, numpy stretches the smaller one along the missing axis. It saves you from writing nested loops.",
-        learner_goal="Read a broadcast expression and predict the resulting shape and values.",
-        concept="If a `(3,)` array meets a `(4, 3)` array, numpy treats the row as if repeated four times. The shapes must align from the trailing axis — `(3,)` vs `(4, 3)` works; `(4,)` vs `(4, 3)` doesn't.",
+        title="Broadcasting basics",
+        scenario="Your strategy holds 4 positions on each of 3 days. You want to subtract the risk-free rate (a single 3-day vector) from every row of returns. Two for-loops? No. numpy's broadcasting handles it as one expression — adds about a microsecond, regardless of how many positions you have.",
+        learner_goal="Read a broadcast subtraction and predict the resulting first row.",
+        concept="When a `(3,)` vector meets a `(4, 3)` matrix, numpy implicitly stretches the vector along the missing axis — as if you'd repeated it four times. Shapes must align from the *trailing* axis. The big win is no temporary copies — the C loop just reuses the smaller buffer.",
         example_code=(
             "import numpy as np\n"
-            "M = np.zeros((4, 3))\n"
-            "row = np.array([10, 20, 30])\n"
-            "print(M + row)"
+            "# 4 positions × 3 days of raw daily returns.\n"
+            "raw = np.full((4, 3), 0.012)\n"
+            "# Risk-free rate per day (3-vector).\n"
+            "rf = np.array([0.0001, 0.0001, 0.0002])\n"
+            "excess = raw - rf\n"
+            "print(excess[0])"
         ),
         code=(
             "import numpy as np\n"
-            "M = np.zeros((4, 3))\n"
-            "row = np.array([10, 20, 30])\n"
-            "print((M + row)[0])"
+            "raw = np.full((4, 3), 0.012)\n"
+            "rf = np.array([0.0001, 0.0001, 0.0002])\n"
+            "excess = raw - rf\n"
+            "print(excess[0])"
         ),
-        your_turn="The first row of `M + row` is printed. What does it look like?",
-        expected_stdout="[10. 20. 30.]",
-        prompt="Type the row exactly as numpy prints it.",
+        your_turn="Predict the first row of `excess` — the 4-position raw returns minus the 3-day risk-free vector.",
+        expected_stdout="[0.0119 0.0119 0.0118]",
+        prompt="Type the row as numpy prints it.",
         skills=["quant", "numpy", "vectorisation"],
     ),
     Lesson(
-        n=4, stage=1, mode="fillblank",
-        title="Boolean masks",
-        scenario="A boolean mask is an array of True/False the same shape as your data. Indexing with it keeps the True entries — a vectorised filter.",
-        learner_goal="Keep only the positive entries of an array using a boolean mask.",
-        concept="`arr > 0` returns a boolean array of the same shape. Using it as an index (`arr[mask]`) returns just the elements where the mask is True. No loops, no list comprehension — pure vectorised filtering.",
+        n=4, stage=1, mode="predict",
+        title="Broadcasting gotchas",
+        scenario="Most numpy errors a junior research engineer raises are shape mismatches. Take 30 seconds to learn what 'can't broadcast (4,) with (4, 3)' actually means — then you'll fix it in 30 seconds instead of 30 minutes.",
+        learner_goal="Recognise when shapes do not align and how to reshape to make them.",
+        concept="Broadcasting aligns dimensions from the *right*. A `(4,)` vector vs a `(4, 3)` matrix doesn't align — the trailing dimensions are 4 and 3. Reshape the vector to `(4, 1)` (a column) and now the trailing dimensions are 1 and 3 — broadcastable, because size-1 axes stretch.",
         example_code=(
             "import numpy as np\n"
-            "r = np.array([-0.02, 0.01, -0.005, 0.015, 0.0, 0.03])\n"
-            "positive = r[r > 0]\n"
-            "print(positive)"
+            "raw = np.full((4, 3), 0.01)\n"
+            "weights = np.array([1.0, 0.5, 2.0, 1.5])  # one per position\n"
+            "# This would fail: raw - weights  (shapes (4,3) vs (4,) — won't align)\n"
+            "# Reshape to a column so each row of `raw` gets its own weight:\n"
+            "scaled = raw * weights.reshape(4, 1)\n"
+            "print(scaled[:, 0])"
         ),
-        template=(
+        code=(
             "import numpy as np\n"
-            "r = np.array([-0.02, 0.01, -0.005, 0.015, 0.0, 0.03])\n"
-            "positive = r[r ___ 0]\n"
-            "print(positive)"
+            "raw = np.full((4, 3), 0.01)\n"
+            "weights = np.array([1.0, 0.5, 2.0, 1.5])\n"
+            "scaled = raw * weights.reshape(4, 1)\n"
+            "print(scaled[:, 0])"
         ),
-        your_turn="Replace `___` with the operator that keeps strictly positive returns only.",
-        expected_stdout="[0.01  0.015 0.03 ]",
-        hint="Strictly positive — zero doesn't count.",
+        your_turn="`scaled` is shape (4, 3) with each row multiplied by its weight. Predict its first column.",
+        expected_stdout="[0.01  0.005 0.02  0.015]",
+        prompt="Type the column as numpy prints it.",
         skills=["quant", "numpy", "vectorisation"],
     ),
     Lesson(
         n=5, stage=1, mode="fillblank",
-        title="Covariance via matrix algebra",
-        scenario="Covariance between asset returns underpins portfolio theory. The textbook formula `(X - μ).T @ (X - μ) / n` is one line of numpy.",
-        learner_goal="Compute a 2x2 covariance matrix from two return series using matrix multiplication.",
-        concept="Stack two demeaned return series as columns of `X` (shape `(n, 2)`). Then `X.T @ X / n` is the 2x2 covariance matrix. The diagonal is each series' variance; off-diagonal is their covariance.",
+        title="Boolean masks",
+        scenario="You're scanning a day of NYSE trade prints for outliers — anything more than 2 standard deviations above the running mean. The pure-Python way: a for-loop with an if. The numpy way: one comparison, one indexing operation, no loop. Every research desk uses this pattern daily.",
+        learner_goal="Filter an array of returns to keep only the strictly-positive entries.",
+        concept="`arr > 0` returns a boolean array of the same shape. Using it as an index (`arr[mask]`) keeps just the True entries. The comparison and indexing run in C — no Python iteration. This pattern scales: replace `> 0` with `> 2 * arr.std()` for outlier detection.",
+        example_code=(
+            "import numpy as np\n"
+            "# Six minutes of mid-quote returns.\n"
+            "r = np.array([-0.02, 0.01, -0.005, 0.015, 0.0, 0.03])\n"
+            "# Keep only minutes the price strictly went up.\n"
+            "up_only = r[r > 0]\n"
+            "print(up_only)\n"
+            "print(f'kept {len(up_only)} of {len(r)} minutes')"
+        ),
+        template=(
+            "import numpy as np\n"
+            "r = np.array([-0.02, 0.01, -0.005, 0.015, 0.0, 0.03])\n"
+            "up_only = r[r ___ 0]\n"
+            "print(up_only)\n"
+            "print(f'kept {len(up_only)} of {len(r)} minutes')"
+        ),
+        your_turn="Replace `___` with the operator that keeps strictly-positive returns only.",
+        expected_stdout="[0.01  0.015 0.03 ]\nkept 3 of 6 minutes",
+        hint="Strictly positive — zero doesn't count.",
+        skills=["quant", "numpy", "vectorisation"],
+    ),
+    Lesson(
+        n=6, stage=1, mode="fillblank",
+        title="Variance from scratch",
+        scenario="Before you reach for `arr.var()`, derive it once. Variance is the mean of squared deviations from the mean — three ops in numpy. Doing this by hand once is what makes a covariance matrix obvious later.",
+        learner_goal="Compute variance from the definition, without using `.var()`, and verify against numpy's built-in.",
+        concept="Variance σ² = mean((x - μ)²). In numpy: take the deviations (`x - x.mean()`), square them (`** 2`), take the mean. That's it. The square is elementwise broadcasting; the mean is a single reduction.",
         example_code=(
             "import numpy as np\n"
             "rng = np.random.default_rng(0)\n"
+            "x = rng.normal(loc=0.0, scale=0.02, size=10_000)\n"
+            "\n"
+            "# By hand — the textbook formula.\n"
+            "mu = x.mean()\n"
+            "deviations = x - mu\n"
+            "var_manual = (deviations ** 2).mean()\n"
+            "\n"
+            "# Sanity-check against numpy.\n"
+            "print(round(var_manual, 6), round(x.var(), 6))\n"
+            "print(np.isclose(var_manual, x.var()))"
+        ),
+        template=(
+            "import numpy as np\n"
+            "rng = np.random.default_rng(0)\n"
+            "x = rng.normal(loc=0.0, scale=0.02, size=10_000)\n"
+            "mu = x.mean()\n"
+            "deviations = x - mu\n"
+            "var_manual = (deviations ___ 2).mean()\n"
+            "print(round(var_manual, 6), round(x.var(), 6))\n"
+            "print(np.isclose(var_manual, x.var()))"
+        ),
+        your_turn="Replace `___` with the operator that elementwise-squares the deviations.",
+        expected_stdout="0.000408 0.000408\nTrue",
+        hint="Two asterisks.",
+        skills=["quant", "numpy", "statistics"],
+    ),
+    Lesson(
+        n=7, stage=1, mode="fillblank",
+        title="Covariance via matrix algebra",
+        scenario="Covariance between asset returns underpins everything in portfolio construction — Sharpe, Markowitz, principal components. The textbook formula `(X − μ)ᵀ(X − μ) / n` is one line in numpy and the building block of every Risk Engine you'll ever work on.",
+        learner_goal="Compute a 2×2 covariance matrix from two return series using matrix multiplication.",
+        concept="Stack two demeaned return series as columns of `X` (shape `(n, 2)`). Then `Xᵀ X / n` is the 2×2 covariance matrix. The diagonal is each series' variance; the off-diagonals are the covariance. The matrix product runs as one BLAS call — fastest possible.",
+        example_code=(
+            "import numpy as np\n"
+            "rng = np.random.default_rng(0)\n"
+            "# 1000 days of returns for two synthetic assets, independent.\n"
             "X = rng.normal(size=(1000, 2))\n"
+            "# Demean each column before the dot product.\n"
             "Xd = X - X.mean(axis=0)\n"
             "cov = Xd.T @ Xd / X.shape[0]\n"
             "print(np.round(cov, 2))"
@@ -349,61 +433,81 @@ LESSONS: list[Lesson] = [
         skills=["quant", "numpy", "linear-algebra", "statistics"],
     ),
     Lesson(
-        n=6, stage=1, mode="fillblank",
+        n=8, stage=1, mode="fillblank",
         title="Reproducible random numbers",
-        scenario="Every backtest you write touches a random number generator. Seeding it makes your work reproducible — same input, same answer.",
-        learner_goal="Generate two arrays of standard-normal draws and confirm the seed makes them identical.",
-        concept="`np.random.default_rng(seed)` returns a Generator. Same seed in, same draws out — every time. The legacy `np.random.seed` global is fine for scripts; default_rng is the modern, thread-safe API.",
+        scenario="Two Sigma's research review board will reject a backtest that can't be reproduced bit-for-bit. Every random draw in a research notebook gets a seed — usually a module-level constant, sometimes per-experiment. Reproducibility is non-negotiable.",
+        learner_goal="Seed two generators with the same value and confirm they produce identical draws.",
+        concept="`np.random.default_rng(seed)` returns a Generator object. Same seed → same draws, every time. The legacy `np.random.seed(...)` global is fine for scripts but `default_rng` is the modern, thread-safe API — use it.",
         example_code=(
             "import numpy as np\n"
-            "a = np.random.default_rng(42).normal(size=3)\n"
-            "b = np.random.default_rng(42).normal(size=3)\n"
-            "print(np.array_equal(a, b))"
+            "# Two researchers, same seed, must get the same sample.\n"
+            "alice = np.random.default_rng(42).normal(size=3)\n"
+            "bob   = np.random.default_rng(42).normal(size=3)\n"
+            "print('alice:', alice)\n"
+            "print('bob:  ', bob)\n"
+            "print('identical:', np.array_equal(alice, bob))"
         ),
         template=(
             "import numpy as np\n"
-            "a = np.random.default_rng(___).normal(size=3)\n"
-            "b = np.random.default_rng(42).normal(size=3)\n"
-            "print(np.array_equal(a, b))"
+            "alice = np.random.default_rng(___).normal(size=3)\n"
+            "bob   = np.random.default_rng(42).normal(size=3)\n"
+            "print('alice:', alice)\n"
+            "print('bob:  ', bob)\n"
+            "print('identical:', np.array_equal(alice, bob))"
         ),
         your_turn="Replace `___` so both generators draw the same sequence.",
-        expected_stdout="True",
-        hint="Use 42.",
+        expected_stdout="alice: [ 0.30471708 -1.03998411  0.7504512 ]\nbob:   [ 0.30471708 -1.03998411  0.7504512 ]\nidentical: True",
+        hint="Match the integer Bob used.",
         skills=["quant", "numpy", "random-numbers"],
     ),
     Lesson(
-        n=7, stage=1, mode="fillblank",
+        n=9, stage=1, mode="fillblank",
         title="Statistical reductions",
-        scenario="Mean, standard deviation, and percentiles let you summarise a return distribution in one line each — they're the vocabulary of every research note.",
-        learner_goal="Compute the mean, standard deviation, and 95th percentile of a sample.",
-        concept="numpy reductions take an axis (or none, for the whole array). `arr.mean()` and `arr.std()` are methods; `np.percentile(arr, q)` is a function — `q` is in 0–100, not 0–1.",
+        scenario="Every research note ends with a one-liner: 'over the period, mean daily return was X bps with σ = Y bps, 95th percentile drawdown Z.' Three reductions, one line, the whole story.",
+        learner_goal="Compute the mean, standard deviation, and 95th percentile of a 10k-sample return distribution.",
+        concept="numpy reductions take an axis (default: whole array). `arr.mean()` and `arr.std()` are methods; `np.percentile(arr, q)` is a function — `q` is in 0–100, NOT 0–1. They all run in C under the hood; on a million points each takes microseconds.",
         example_code=(
             "import numpy as np\n"
             "rng = np.random.default_rng(0)\n"
+            "# 10k daily returns from a slightly-positive-drift, 2%-vol distribution.\n"
             "r = rng.normal(loc=0.001, scale=0.02, size=10_000)\n"
-            "print(round(r.mean(), 4), round(r.std(), 4), round(np.percentile(r, 95), 4))"
+            "\n"
+            "mu    = r.mean()\n"
+            "sigma = r.std()\n"
+            "p95   = np.percentile(r, 95)\n"
+            "\n"
+            "print(f'mean  = {mu:.4f}')\n"
+            "print(f'std   = {sigma:.4f}')\n"
+            "print(f'p95   = {p95:.4f}')"
         ),
         template=(
             "import numpy as np\n"
             "rng = np.random.default_rng(0)\n"
             "r = rng.normal(loc=0.001, scale=0.02, size=10_000)\n"
-            "print(round(r.___(), 4), round(r.___(), 4), round(np.___(r, 95), 4))"
+            "mu    = r.___()\n"
+            "sigma = r.___()\n"
+            "p95   = np.___(r, 95)\n"
+            "print(f'mean  = {mu:.4f}')\n"
+            "print(f'std   = {sigma:.4f}')\n"
+            "print(f'p95   = {p95:.4f}')"
         ),
-        your_turn="Fill the three blanks with the reduction names.",
-        expected_stdout="0.0011 0.02 0.0338",
+        your_turn="Fill the three blanks with the reduction names: average, standard deviation, percentile.",
+        expected_stdout="mean  = 0.0011\nstd   = 0.0200\np95   = 0.0338",
         hint="Two methods, one function. All three are short, common names.",
         skills=["quant", "numpy", "statistics"],
     ),
     Lesson(
-        n=8, stage=1, mode="predict",
+        n=10, stage=1, mode="predict",
         title="Why numpy is fast",
-        scenario="numpy's headline numbers don't come from magic — they come from C. Real quant libraries like HFT-Orderbook ship pure-Python LOBs that show exactly what 'slow' looks like.",
-        learner_goal="Recognise that numpy is fast because the inner loop is compiled C, not Python.",
-        concept="numpy stores arrays as contiguous C buffers and runs ufuncs as tight C loops with no Python overhead per element. The same loop in pure Python pays interpreter overhead per iteration — typically 50–100× slower.",
+        scenario="numpy isn't magic. It's a thin Python skin over carefully-optimised C and BLAS libraries written over 30 years. When you call `arr.sum()`, what runs is roughly 8 lines of C with SIMD intrinsics. When you write a Python `for` loop, what runs is 1 million dispatches through the interpreter. Hence the gap.",
+        learner_goal="Run a sum of one million elements and recognise the printed value.",
+        concept="numpy stores arrays as contiguous C buffers and runs ufuncs as tight C loops with no per-element Python overhead. The same loop in pure Python pays interpreter overhead per iteration — 50-100× slower. Open one of numpy's C-level source files some weekend — they're surprisingly readable.",
         example_code=(
             "import numpy as np\n"
             "x = np.arange(1_000_000)\n"
-            "# Both compute (1+2+...+999999) but only one is a Python loop.\n"
+            "# Sum 0 + 1 + 2 + ... + 999999.\n"
+            "# In numpy: one C loop, no per-element Python overhead.\n"
+            "# In Python: 1,000,000 trips through the interpreter.\n"
             "print(int(x.sum()))"
         ),
         code=(
@@ -411,51 +515,90 @@ LESSONS: list[Lesson] = [
             "x = np.arange(1_000_000)\n"
             "print(int(x.sum()))"
         ),
-        your_turn="Predict the printed sum of 0..999999.",
+        your_turn="Predict the printed sum of 0..999999. (Hint: n(n−1)/2 with n = 1,000,000.)",
         expected_stdout="499999500000",
         prompt="Type the integer.",
         skills=["quant", "numpy", "performance"],
     ),
     Lesson(
-        n=9, stage=1, mode="fillblank",
-        title="Vectorising a rolling mean",
-        scenario="A 30-day rolling mean of returns is one of the most common features in quant work. The naive loop is O(n*window); numpy's cumulative-sum trick makes it O(n).",
-        learner_goal="Replace a Python for-loop with `np.cumsum` to compute a rolling mean.",
-        concept="If `c = np.cumsum(x)`, then the window-`w` sum ending at index `i` is `c[i] - c[i-w]`. Divide by `w` for the mean. One pass, no inner loop.",
+        n=11, stage=1, mode="predict",
+        title="The slow Python rolling-mean",
+        scenario="A junior at a prop shop writes a 30-day rolling mean as a Python double-loop. The desk's nightly batch goes from 4 minutes to 28. Senior glares. Tomorrow's lesson is `np.cumsum` — today, FEEL the slow path so you'll never write it.",
+        learner_goal="Read the naive Python rolling-mean loop and predict its output on a small input.",
+        concept="The naive rolling mean iterates outer × window times. For 100k points and window 30: 3 million Python operations. Same answer as numpy, but ~200× slower. The fix is the cumulative-sum trick (next lesson). First, see what it replaces.",
+        example_code=(
+            "x = [1, 2, 3, 4, 5, 6]\n"
+            "w = 3\n"
+            "rolling = []\n"
+            "for i in range(w - 1, len(x)):\n"
+            "    # Inner loop: w Python ops per output row.\n"
+            "    s = 0\n"
+            "    for j in range(i - w + 1, i + 1):\n"
+            "        s += x[j]\n"
+            "    rolling.append(s / w)\n"
+            "print(rolling)"
+        ),
+        code=(
+            "x = [1, 2, 3, 4, 5, 6]\n"
+            "w = 3\n"
+            "rolling = []\n"
+            "for i in range(w - 1, len(x)):\n"
+            "    s = 0\n"
+            "    for j in range(i - w + 1, i + 1):\n"
+            "        s += x[j]\n"
+            "    rolling.append(s / w)\n"
+            "print(rolling)"
+        ),
+        your_turn="Predict the printed list of rolling means.",
+        expected_stdout="[2.0, 3.0, 4.0, 5.0]",
+        prompt="Type the list as Python prints it.",
+        skills=["quant", "numpy", "performance"],
+    ),
+    Lesson(
+        n=12, stage=1, mode="fillblank",
+        title="Vectorising with cumsum",
+        scenario="Same answer as yesterday's double-loop, ~200× faster. The cumulative-sum trick — `c[i] − c[i−w]` — is one of the most useful identities in numerical Python. Every senior quant carries it in their head; you should too.",
+        learner_goal="Replace the Python rolling-mean loop with `np.cumsum`.",
+        concept="If `c = cumsum(x)`, then the window-`w` sum ending at index `i` equals `c[i] − c[i−w]`. Prepend a zero to `c` so the slice arithmetic is clean. One pass, no inner loop, all in C. The same trick gives you rolling sums of any cost function — drawdowns, exposures, anything.",
         example_code=(
             "import numpy as np\n"
             "x = np.array([1, 2, 3, 4, 5, 6], dtype=float)\n"
             "w = 3\n"
+            "# Prepend 0 so c[w:] - c[:-w] gives clean window sums.\n"
             "c = np.concatenate(([0], np.cumsum(x)))\n"
-            "roll = (c[w:] - c[:-w]) / w\n"
-            "print(roll)"
+            "rolling = (c[w:] - c[:-w]) / w\n"
+            "print(rolling)"
         ),
         template=(
             "import numpy as np\n"
             "x = np.array([1, 2, 3, 4, 5, 6], dtype=float)\n"
             "w = 3\n"
             "c = np.concatenate(([0], np.___(x)))\n"
-            "roll = (c[w:] - c[:-w]) / w\n"
-            "print(roll)"
+            "rolling = (c[w:] - c[:-w]) / w\n"
+            "print(rolling)"
         ),
-        your_turn="Fill in the cumulative-sum function name.",
+        your_turn="Replace `___` with the cumulative-sum function.",
         expected_stdout="[2. 3. 4. 5.]",
-        hint="It's literally called the cumulative sum.",
+        hint="Three letters then `sum`.",
         skills=["quant", "numpy", "vectorisation", "performance"],
     ),
     Lesson(
-        n=10, stage=1, mode="matplot",
+        n=13, stage=1, mode="matplot",
         title="Plot a price path",
-        scenario="Every quant chart starts with `plt.plot`. Get the first one right — labeled axes, a title — and the rest follow.",
-        learner_goal="Plot a simulated geometric Brownian motion price path with labelled axes.",
-        concept="`plt.plot(x, y)` draws a line. `plt.xlabel`, `plt.ylabel`, `plt.title` annotate the chart. matplotlib's pyplot API mirrors MATLAB — one statement per directive.",
+        scenario="Every research note ships with a chart. The first one's always the same: simulate a price path, plot it, label axes, title. Get that muscle memory and the rest of matplotlib is just more of the same.",
+        learner_goal="Simulate a geometric Brownian motion price path and plot it with labelled axes.",
+        concept="GBM in one line: `price = S0 * exp(cumsum(shocks))`. `plt.plot(price)` draws the line; `plt.xlabel`, `plt.ylabel`, `plt.title` annotate it. matplotlib's pyplot API mirrors MATLAB — one statement per directive, which makes it easy to read in code review.",
         example_code=(
             "import numpy as np, matplotlib.pyplot as plt\n"
             "rng = np.random.default_rng(0)\n"
+            "# 252 trading days of small daily shocks (~1% daily vol).\n"
             "shocks = rng.normal(0, 0.01, 252)\n"
+            "# GBM: log-returns sum, prices are the exp.\n"
             "price = 100 * np.exp(np.cumsum(shocks))\n"
             "plt.plot(price)\n"
-            "plt.title('Simulated price path'); plt.xlabel('day'); plt.ylabel('price')\n"
+            "plt.title('Simulated price path')\n"
+            "plt.xlabel('trading day')\n"
+            "plt.ylabel('price (USD)')\n"
             "print('plotted')"
         ),
         template=(
@@ -464,7 +607,9 @@ LESSONS: list[Lesson] = [
             "shocks = rng.normal(0, 0.01, 252)\n"
             "price = 100 * np.exp(np.cumsum(shocks))\n"
             "plt.plot(___)\n"
-            "plt.title('Simulated price path'); plt.xlabel('day'); plt.ylabel('price')\n"
+            "plt.title('Simulated price path')\n"
+            "plt.xlabel('trading day')\n"
+            "plt.ylabel('price (USD)')\n"
             "print('plotted')"
         ),
         your_turn="Replace `___` with the variable holding the price series.",
@@ -1674,6 +1819,10 @@ def write_sql() -> Path:
     lines.append("-- AUTO-GENERATED by scripts/generate_quant.py")
     lines.append("-- Quant track challenge inserts. Track + modules live in")
     lines.append("-- supabase/quant_programmer_seed.sql — apply that first.")
+    lines.append("")
+    # Wipe + reinsert so renames/renumbering don't leave orphans. Safe
+    # while the track has no live learner progress; revisit when it does.
+    lines.append("delete from public.challenges where slug like 'quant-%';")
     lines.append("")
 
     for lesson in LESSONS:

@@ -71,12 +71,18 @@ async function loadPicoc(): Promise<PicocApi> {
       throw new Error(`HTTP ${res.status} loading ${PICOC_UMD_URL}`);
     }
     const body = await res.text();
+    // The UMD's CommonJS-detection branch is `typeof exports === 'object' &&
+    // typeof module !== 'undefined'`. Webpack/Next pages have those globals,
+    // so the UMD takes the Node branch and tries to `require('fs')` — that
+    // throws and `window.picocjs` is never assigned. Wrap the body in an
+    // IIFE whose parameters shadow exports/module/define to undefined so
+    // the UMD falls through to the browser branch.
+    const wrapped =
+      "(function(exports, module, define){\n" + body + "\n}).call(this);";
     const inline = document.createElement("script");
     inline.dataset.picoc = PICOC_VERSION;
-    inline.text = body;
-    // Appending an inline script with text-content runs it synchronously
-    // (per HTML spec). After this line, the UMD's IIFE has finished and
-    // window.picocjs is populated.
+    inline.text = wrapped;
+    // Inline-text scripts run synchronously when appended.
     document.head.appendChild(inline);
     if (!w.picocjs?.runC) {
       throw new Error("picoc bundle evaluated but window.picocjs is missing");
