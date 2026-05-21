@@ -13,6 +13,7 @@ from app.ai.answers import AnswerInput, answer
 from app.ai.explainer import ExplainInput, explain
 from app.ai.mentor import ChallengeContext, chat
 from app.auth import AuthUser, get_current_user
+from app.cost_guard import enforce_ai_budget
 from app.db import get_db
 from app.models import AIMessage, Challenge, Submission, UserChallengeProgress
 
@@ -65,6 +66,8 @@ def chat_endpoint(
     challenge = db.get(Challenge, body.challenge_id)
     if challenge is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Challenge not found")
+
+    enforce_ai_budget(db, user.id, "chat")
 
     progress = db.scalar(
         select(UserChallengeProgress).where(
@@ -159,11 +162,13 @@ def explain_tests_endpoint(
     if challenge is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Challenge not found")
 
+    enforce_ai_budget(db, user.id, "explain_tests")
+
     # Truncate files defensively (the model has a context window).
     capped = {path: (body.files.get(path) or "")[:4000] for path in body.files}
 
     try:
-        payload, _metadata = explain(
+        payload, metadata = explain(
             ExplainInput(
                 challenge_title=challenge.title,
                 scenario=challenge.scenario,
@@ -174,6 +179,22 @@ def explain_tests_endpoint(
         )
     except RuntimeError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+
+    # Persist a thin audit row tagged source=explain_tests so the cost guard
+    # can count usage. Content kept short — the failure list is rendered
+    # client-side, this row exists for accounting.
+    db.add(
+        AIMessage(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            role="assistant",
+            content=f"Explained {len(payload.get('failures', []))} test failure(s).",
+            hint_level=None,
+            prompt_sha=metadata.get("prompt_sha") if isinstance(metadata, dict) else None,
+            metadata_json={**(metadata if isinstance(metadata, dict) else {}), "source": "explain_tests"},
+        )
+    )
+    db.commit()
 
     return ExplainTestsResponse(
         failures=[FailureExplanation(**f) for f in payload.get("failures", [])]
@@ -207,6 +228,8 @@ def show_answer_endpoint(
     if challenge is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Challenge not found")
 
+    enforce_ai_budget(db, user.id, "show_answer")
+
     editable = {p: (body.editable_files.get(p) or "")[:6000] for p in body.editable_files}
     readonly = {p: (body.readonly_files.get(p) or "")[:4000] for p in body.readonly_files}
 
@@ -225,21 +248,22 @@ def show_answer_endpoint(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
 
     summary = payload.get("summary", "")
-    if summary:
-        # Persist a server-side record so the show-answer summary survives
-        # page reload and admins can audit usage. Tagged via metadata_json.
-        db.add(
-            AIMessage(
-                user_id=user.id,
-                challenge_id=challenge.id,
-                role="assistant",
-                content=f"Here's a working version. {summary}",
-                hint_level=None,
-                prompt_sha=metadata.get("prompt_sha"),
-                metadata_json={**metadata, "source": "show_answer"},
-            )
+    # Persist a server-side record so the show-answer summary survives page
+    # reload, admins can audit usage, and the cost guard can count calls.
+    # Always written (even on empty summary) so an empty-response failure
+    # mode can't bypass the per-user daily quota.
+    db.add(
+        AIMessage(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            role="assistant",
+            content=f"Here's a working version. {summary}" if summary else "(show_answer: empty summary)",
+            hint_level=None,
+            prompt_sha=metadata.get("prompt_sha"),
+            metadata_json={**metadata, "source": "show_answer"},
         )
-        db.commit()
+    )
+    db.commit()
 
     return ShowAnswerResponse(
         fixed_files=[FixedFile(**f) for f in payload.get("fixed_files", [])],

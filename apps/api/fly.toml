@@ -18,10 +18,24 @@ primary_region = 'lhr'
 [http_service]
   internal_port = 8000
   force_https = true
+  # Aggressive auto-stop: machine stops as soon as it goes idle so we pay
+  # only for time actually serving requests. First request after idle eats
+  # a ~5s cold start — an explicit cost tradeoff (see docs/cost-guards.md).
   auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
+  # Hard cap: even under load Fly will never spin up more than 1 machine.
+  # Pair with `flyctl scale count 1` if you ever scale up by hand.
+  max_machines_running = 1
   processes = ['app']
+
+  # Request-concurrency limits per machine. soft_limit triggers autostart
+  # (capped at max_machines_running above); hard_limit makes Fly's proxy
+  # queue/shed beyond this point — protects against a burst inflating cost.
+  [http_service.concurrency]
+    type = 'requests'
+    soft_limit = 20
+    hard_limit = 25
 
   [[http_service.checks]]
     interval = '30s'
