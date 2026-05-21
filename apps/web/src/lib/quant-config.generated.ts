@@ -371,10 +371,35 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "hint": "Two asterisks."
 },
   "quant-25-bond-yield-to-maturity": {
-  "mode": "fillblank",
-  "template": "from scipy.optimize import brentq\nface, coupon, n, price = 100, 5, 5, 100\ndef npv(r):\n    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\nytm = ___(npv, 0.0001, 0.5)\nprint(round(ytm, 4))",
-  "expected_stdout": "0.05",
-  "hint": "Imported above. Six letters."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_par_bond_yields_coupon_rate",
+      "description": "Par bond's YTM equals the coupon rate."
+    },
+    {
+      "id": "tests/test_solution.py::test_discount_bond_yields_above_coupon",
+      "description": "Discount bond (price < par) has YTM above the coupon rate."
+    },
+    {
+      "id": "tests/test_solution.py::test_premium_bond_yields_below_coupon",
+      "description": "Premium bond (price > par) has YTM below the coupon rate."
+    },
+    {
+      "id": "tests/test_solution.py::test_zero_coupon_bond",
+      "description": "Zero-coupon bond's YTM matches the closed-form (price/face)^(1/n) - 1."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Bond yield-to-maturity via numerical root-finding.\"\"\"\nfrom scipy.optimize import brentq\n\n\ndef ytm(face: float, coupon: float, n_years: int, price: float) -> float:\n    \"\"\"Return the annual-compounding YTM of a vanilla coupon bond.\n\n    Parameters\n    ----------\n    face     : redemption value at maturity (e.g. 100)\n    coupon   : annual coupon payment in face units (e.g. 5 means 5%)\n    n_years  : whole years to maturity\n    price    : current market price\n\n    Returns\n    -------\n    float \u2014 the YTM as a decimal (0.05 for 5%).\n\n    Implementation:\n      - Define an `npv(r)` closure that returns\n        PV_of_all_cashflows(r) - price.\n      - Call brentq with bracket (0.0001, 0.5).\n    \"\"\"\n    raise NotImplementedError(\"Implement ytm\")\n",
+    "tests/test_solution.py": "\"\"\"YTM correctness across par / discount / premium pricings.\"\"\"\nimport pytest\n\nfrom solution import ytm\n\n\ndef test_par_bond_yields_coupon_rate():\n    # 5-year, 5% coupon, price == face \u2192 YTM == coupon rate.\n    assert abs(ytm(100, 5, 5, 100) - 0.05) < 1e-6\n\n\ndef test_discount_bond_yields_above_coupon():\n    # 10-year, 3% coupon, priced below par \u2192 YTM > 3%.\n    y = ytm(100, 3, 10, 90)\n    assert y > 0.03\n    # Hand-check approximation; tight tolerance against a known answer.\n    assert abs(y - 0.0428) < 0.001\n\n\ndef test_premium_bond_yields_below_coupon():\n    # 7-year, 6% coupon, priced above par \u2192 YTM < 6%.\n    y = ytm(100, 6, 7, 110)\n    assert y < 0.06\n    assert abs(y - 0.0432) < 0.001\n\n\ndef test_zero_coupon_bond():\n    # Zero-coupon, 5-year, face 100, price 78 \u2192 YTM \u2248 (100/78)^(1/5)-1 \u2248 5.09%.\n    y = ytm(100, 0, 5, 78)\n    assert abs(y - 0.0509) < 1e-3\n"
+  }
 },
   "quant-26-option-payoff-diagrams": {
   "mode": "matplot",
@@ -383,28 +408,132 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "hint": "It's `maximum`, not `max`."
 },
   "quant-27-put-call-parity": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nS, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\nP_from_parity = C - S + K * np.exp(___ * T)\nprint(round(P_from_parity, 2))",
-  "expected_stdout": "5.68",
-  "hint": "The exponent should be negative."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_at_money_textbook_example",
+      "description": "ATM example with r=4%, T=1y, call=9.60 \u2192 put \u2248 5.68."
+    },
+    {
+      "id": "tests/test_solution.py::test_zero_rate_collapses_to_call_minus_S_plus_K",
+      "description": "At r=0, exp(-rT)=1 \u2014 checks the discount factor doesn't blow up."
+    },
+    {
+      "id": "tests/test_solution.py::test_high_rate_pulls_put_below_call",
+      "description": "Higher rate \u2192 smaller PV(K) \u2192 smaller put price (catches sign flip)."
+    },
+    {
+      "id": "tests/test_solution.py::test_at_par_at_zero_rate_equals_call_when_S_equals_K",
+      "description": "Zero-rate ATM case has put == call exactly."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Put price implied by put-call parity from a call price.\"\"\"\nimport math\n\n\ndef parity_put_from_call(\n    call: float, S: float, K: float, r: float, T: float\n) -> float:\n    \"\"\"Return the no-arb put price implied by C - P = S - K*exp(-r*T).\n\n    Parameters\n    ----------\n    call : current call price\n    S    : spot\n    K    : strike\n    r    : risk-free rate (annualised)\n    T    : years to expiry\n    \"\"\"\n    # Discount factor sign is wrong. Strike's PV must use exp(-r*T).\n    return call - S + K * math.exp(r * T)\n",
+    "tests/test_solution.py": "\"\"\"parity_put_from_call: sign-of-exponent check on the discount.\"\"\"\nimport math\nimport pytest\n\nfrom solution import parity_put_from_call\n\n\ndef test_at_money_textbook_example():\n    # S=K=100, r=4%, T=1y, call=9.6 \u2192 put \u2248 5.68.\n    put = parity_put_from_call(9.6, 100, 100, 0.04, 1.0)\n    assert abs(put - 5.68) < 0.02\n\n\ndef test_zero_rate_collapses_to_call_minus_S_plus_K():\n    # With r=0, exp(-r*T)=1, so put = call - S + K.\n    put = parity_put_from_call(7.0, 100, 100, 0.0, 1.0)\n    assert abs(put - 7.0) < 1e-12  # call - S + K = 7 - 100 + 100\n\n\ndef test_high_rate_pulls_put_below_call():\n    # At higher rate, the PV(K) shrinks, so put should be SMALLER.\n    put_low = parity_put_from_call(9.6, 100, 100, 0.02, 1.0)\n    put_high = parity_put_from_call(9.6, 100, 100, 0.10, 1.0)\n    assert put_high < put_low\n\n\ndef test_at_par_at_zero_rate_equals_call_when_S_equals_K():\n    # Edge: zero rate, S=K. Then exp(-rT)=1 \u2192 put = call.\n    put = parity_put_from_call(7.5, 100, 100, 0.0, 1.0)\n    assert abs(put - 7.5) < 1e-12\n"
+  }
 },
   "quant-28-black-scholes-from-scratch": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nfrom scipy.stats import norm\nS, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\nd1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\nd2 = d1 - sigma*np.sqrt(T)\nC = S*norm.___(d1) - K*np.exp(-r*T)*norm.___(d2)\nprint(round(C, 4))",
-  "expected_stdout": "10.4506",
-  "hint": "Three letters \u2014 cumulative distribution function."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_hull_canonical_example",
+      "description": "Hull's textbook example (S=K=100, r=5%, \u03c3=20%, T=1y) \u2192 C \u2248 10.4506."
+    },
+    {
+      "id": "tests/test_solution.py::test_deep_itm_call_approaches_S_minus_PV_K",
+      "description": "Deep-ITM call price approaches the intrinsic minus the strike's PV."
+    },
+    {
+      "id": "tests/test_solution.py::test_deep_otm_call_is_near_zero",
+      "description": "Deep-OTM call (S=50, K=150) is essentially zero."
+    },
+    {
+      "id": "tests/test_solution.py::test_monotone_increasing_in_spot",
+      "description": "Call price is monotonically increasing in spot."
+    },
+    {
+      "id": "tests/test_solution.py::test_monotone_increasing_in_sigma",
+      "description": "Call price is monotonically increasing in volatility (positive vega)."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Black-Scholes European call from first principles.\"\"\"\nimport math\nfrom scipy.stats import norm\n\n\ndef bs_call(S: float, K: float, r: float, sigma: float, T: float) -> float:\n    \"\"\"Return the Black-Scholes call price.\n\n    Parameters\n    ----------\n    S     : spot price\n    K     : strike\n    r     : risk-free rate (annualised, continuous compounding)\n    sigma : volatility (annualised, > 0)\n    T     : time to expiry in years (> 0)\n\n    Steps:\n      d1 = (ln(S/K) + (r + sigma**2 / 2) * T) / (sigma * sqrt(T))\n      d2 = d1 - sigma * sqrt(T)\n      C  = S * N(d1) - K * exp(-r * T) * N(d2)\n    \"\"\"\n    raise NotImplementedError(\"Implement bs_call\")\n",
+    "tests/test_solution.py": "\"\"\"Black-Scholes call pricer correctness.\"\"\"\nimport math\nimport pytest\n\nfrom solution import bs_call\n\n\ndef test_hull_canonical_example():\n    # S=K=100, r=5%, \u03c3=20%, T=1y. Hull p.299: C \u2248 10.4506.\n    c = bs_call(100, 100, 0.05, 0.20, 1.0)\n    assert abs(c - 10.4506) < 1e-3\n\n\ndef test_deep_itm_call_approaches_S_minus_PV_K():\n    # S=200, K=100, very ITM. C \u2192 S - K*exp(-rT) = 200 - 100*exp(-0.05) \u2248 104.88.\n    c = bs_call(200, 100, 0.05, 0.20, 1.0)\n    expected = 200 - 100 * math.exp(-0.05)\n    assert abs(c - expected) < 0.05\n\n\ndef test_deep_otm_call_is_near_zero():\n    c = bs_call(50, 150, 0.05, 0.20, 1.0)\n    assert 0 <= c < 0.05\n\n\ndef test_monotone_increasing_in_spot():\n    # Higher spot \u2192 higher call price, all else equal.\n    a = bs_call(95, 100, 0.05, 0.20, 1.0)\n    b = bs_call(100, 100, 0.05, 0.20, 1.0)\n    c = bs_call(110, 100, 0.05, 0.20, 1.0)\n    assert a < b < c\n\n\ndef test_monotone_increasing_in_sigma():\n    # Higher vol \u2192 higher call price, all else equal.\n    low_vol = bs_call(100, 100, 0.05, 0.10, 1.0)\n    high_vol = bs_call(100, 100, 0.05, 0.40, 1.0)\n    assert low_vol < high_vol\n"
+  }
 },
   "quant-29-greeks-delta-of-a-call": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nfrom scipy.stats import norm\nS, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\nd1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\ndelta = ___.cdf(d1)\nprint(round(delta, 4))",
-  "expected_stdout": "0.6368",
-  "hint": "Four letters."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_atm_call_delta_is_above_half_from_drift",
+      "description": "ATM call with r=5%/\u03c3=20%/T=1y \u2192 delta \u2248 0.6368 (the bug gives ~0.58)."
+    },
+    {
+      "id": "tests/test_solution.py::test_deep_itm_call_delta_approaches_one",
+      "description": "Deep-ITM call (S=200, K=100) \u2192 delta > 0.99."
+    },
+    {
+      "id": "tests/test_solution.py::test_deep_otm_call_delta_approaches_zero",
+      "description": "Deep-OTM call (S=50, K=150) \u2192 delta < 0.05."
+    },
+    {
+      "id": "tests/test_solution.py::test_monotone_increasing_in_spot",
+      "description": "Call delta is monotonically increasing in spot."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Black-Scholes delta for a European call.\"\"\"\nimport math\nfrom scipy.stats import norm\n\n\ndef compute_delta(S: float, K: float, r: float, sigma: float, T: float) -> float:\n    \"\"\"Return the Black-Scholes delta of a European call: \u0394 = N(d1).\n\n    d1 = (ln(S/K) + (r + \u03c3\u00b2/2)\u00b7T) / (\u03c3\u00b7\u221aT)\n    \"\"\"\n    # Bug: the convexity term has the wrong sign.\n    d1 = (math.log(S / K) + (r - sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))\n    return float(norm.cdf(d1))\n",
+    "tests/test_solution.py": "\"\"\"Call-delta correctness against the Hull canonical numbers.\"\"\"\nimport pytest\n\nfrom solution import compute_delta\n\n\ndef test_atm_call_delta_is_above_half_from_drift():\n    # ATM call with r=5%, \u03c3=20%, T=1y \u2192 delta \u2248 0.6368.\n    # With the bug (- \u03c3\u00b2/2), the answer is \u2248 0.5793 \u2014 clearly below.\n    d = compute_delta(100, 100, 0.05, 0.20, 1.0)\n    assert abs(d - 0.6368) < 1e-3\n\n\ndef test_deep_itm_call_delta_approaches_one():\n    # Deep ITM call (S=200, K=100) \u2192 delta very close to 1.\n    d = compute_delta(200, 100, 0.05, 0.20, 1.0)\n    assert d > 0.99\n\n\ndef test_deep_otm_call_delta_approaches_zero():\n    d = compute_delta(50, 150, 0.05, 0.20, 1.0)\n    assert d < 0.05\n\n\ndef test_monotone_increasing_in_spot():\n    a = compute_delta(95, 100, 0.05, 0.20, 1.0)\n    b = compute_delta(100, 100, 0.05, 0.20, 1.0)\n    c = compute_delta(110, 100, 0.05, 0.20, 1.0)\n    assert a < b < c\n"
+  }
 },
   "quant-30-binomial-tree-pricer": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nS, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\ndt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\np = (np.exp(r*dt) - d)/(u - d)\nST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\nvals = np.maximum(ST - K, 0)\nfor _ in range(N):\n    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[___])\nprint(round(vals[0], 4))",
-  "expected_stdout": "10.4107",
-  "hint": "Two-character slice."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_n50_within_0_05_of_BS",
+      "description": "50-step tree within 0.05 of BS on Hull's example."
+    },
+    {
+      "id": "tests/test_solution.py::test_n500_within_0_01_of_BS",
+      "description": "500-step tree within 0.01 of BS \u2014 convergence with N."
+    },
+    {
+      "id": "tests/test_solution.py::test_500_step_is_closer_than_50_step",
+      "description": "More steps \u2192 closer to BS (convergence direction sanity)."
+    },
+    {
+      "id": "tests/test_solution.py::test_deep_otm_call_is_near_zero",
+      "description": "Deep-OTM call (S=50, K=150) \u2192 tree price \u2248 0."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"CRR (Cox-Ross-Rubinstein) binomial-tree European call pricer.\"\"\"\nimport numpy as np\n\n\ndef crr_call(S: float, K: float, r: float, sigma: float, T: float, N: int) -> float:\n    \"\"\"N-step CRR binomial price of a European call.\n\n    Steps:\n      dt = T / N\n      u  = exp(sigma * sqrt(dt));  d = 1 / u\n      p  = (exp(r * dt) - d) / (u - d)\n      Terminal prices: S * u**i * d**(N - i) for i in 0..N\n      Terminal payoffs: max(S_T - K, 0)\n      Backward induction N times:\n        vals = exp(-r * dt) * (p * vals[1:] + (1 - p) * vals[:-1])\n      Return vals[0].\n\n    Vectorised numpy is fine. A loop over N is fine \u2014 at N=50 it's microseconds.\n    \"\"\"\n    raise NotImplementedError(\"Implement crr_call\")\n",
+    "tests/test_solution.py": "\"\"\"CRR binomial pricer correctness + convergence-to-BS.\"\"\"\nimport math\nimport pytest\n\nfrom solution import crr_call\n\n\nHULL = dict(S=100, K=100, r=0.05, sigma=0.20, T=1.0)\nBS_CALL = 10.4506  # closed-form BS on Hull's example\n\n\ndef test_n50_within_0_05_of_BS():\n    c = crr_call(**HULL, N=50)\n    assert abs(c - BS_CALL) < 0.05\n\n\ndef test_n500_within_0_01_of_BS():\n    c = crr_call(**HULL, N=500)\n    assert abs(c - BS_CALL) < 0.01\n\n\ndef test_500_step_is_closer_than_50_step():\n    # CRR converges as N grows \u2014 not always monotone, but 500 should\n    # always be at least as close as 50.\n    c50 = crr_call(**HULL, N=50)\n    c500 = crr_call(**HULL, N=500)\n    assert abs(c500 - BS_CALL) <= abs(c50 - BS_CALL) + 1e-6\n\n\ndef test_deep_otm_call_is_near_zero():\n    c = crr_call(S=50, K=150, r=0.05, sigma=0.20, T=1.0, N=200)\n    assert 0 <= c < 0.05\n"
+  }
 },
   "quant-31-monte-carlo-option-pricing": {
   "mode": "matplot",
@@ -424,13 +553,35 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   ]
 },
   "quant-33-sharpe-max-drawdown": {
-  "mode": "fillblank",
-  "template": "import pandas as pd, numpy as np\ndf = pd.read_csv('/data/quant/spy.csv')\nr = df['adj_close'].pct_change().dropna()\nsharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\neq = (1 + r).cumprod()\ndd = (eq / eq.___() - 1).min()\nprint(round(sharpe, 2), round(dd, 3))",
-  "expected_stdout": "0.8 -0.337",
-  "hint": "`cum...` something \u2014 running maximum.",
-  "datasets": [
-    "spy"
-  ]
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_sharpe_on_known_series",
+      "description": "Sharpe matches the analytical formula (mean*252)/(std*\u221a252) on a controlled series."
+    },
+    {
+      "id": "tests/test_solution.py::test_sharpe_doesnt_blow_up_by_factor_of_sqrt_252",
+      "description": "Sharpe on a 10k-sample noise series stays under 5 \u2014 catches the missing \u221a252."
+    },
+    {
+      "id": "tests/test_solution.py::test_max_drawdown_is_negative_on_lossy_series",
+      "description": "Drawdown on a loss-heavy series is below -0.25 (sign + magnitude)."
+    },
+    {
+      "id": "tests/test_solution.py::test_max_drawdown_zero_on_monotone_up",
+      "description": "Monotone-up returns have zero drawdown."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Annualised Sharpe ratio and max drawdown for daily returns.\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef risk_metrics(r: pd.Series) -> dict:\n    \"\"\"Return {sharpe, max_drawdown} for a daily-return series.\n\n    - sharpe       : annualised Sharpe = (mean*252) / (std*sqrt(252))\n    - max_drawdown : worst peak-to-trough loss as a negative fraction\n    \"\"\"\n    # Bug: std isn't scaled by sqrt(252). Sharpe ends up \u221a252\u00d7 too large.\n    sharpe = (r.mean() * 252) / r.std()\n    eq = (1 + r).cumprod()\n    dd = (eq / eq.cummax() - 1).min()\n    return {\"sharpe\": float(sharpe), \"max_drawdown\": float(dd)}\n",
+    "tests/test_solution.py": "\"\"\"risk_metrics: Sharpe annualisation + drawdown direction.\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import risk_metrics\n\n\ndef test_sharpe_on_known_series():\n    # Constructed: mean = 0.001 daily, std = 0.012 daily.\n    # Expected annualised Sharpe = 0.001*252 / (0.012*sqrt(252))\n    #                            = 0.252 / 0.1904... \u2248 1.323.\n    rng = np.random.default_rng(0)\n    raw = rng.normal(0.001, 0.012, 10_000)\n    raw -= raw.mean() - 0.001\n    raw *= 0.012 / raw.std()\n    s = pd.Series(raw)\n    m = risk_metrics(s)\n    expected = (s.mean() * 252) / (s.std() * np.sqrt(252))\n    assert abs(m[\"sharpe\"] - expected) < 1e-9\n\n\ndef test_sharpe_doesnt_blow_up_by_factor_of_sqrt_252():\n    # With the bug present, Sharpe is \u221a252 (~15.87) too large.\n    # Reasonable strategies have Sharpe well under 5.\n    rng = np.random.default_rng(1)\n    s = pd.Series(rng.normal(0.0005, 0.012, 5000))\n    m = risk_metrics(s)\n    assert abs(m[\"sharpe\"]) < 5\n\n\ndef test_max_drawdown_is_negative_on_lossy_series():\n    # 30%-drop pattern \u2192 drawdown \u2248 -0.3.\n    s = pd.Series([0.0, -0.10, -0.10, -0.15])\n    m = risk_metrics(s)\n    assert m[\"max_drawdown\"] < -0.25\n\n\ndef test_max_drawdown_zero_on_monotone_up():\n    s = pd.Series([0.01] * 100)\n    m = risk_metrics(s)\n    assert abs(m[\"max_drawdown\"]) < 1e-9\n"
+  }
 },
   "quant-34-sklearn-fit-and-predict": {
   "mode": "fillblank",

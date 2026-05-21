@@ -1665,34 +1665,103 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options"],
     ),
     Lesson(
-        n=25, stage=3, mode="fillblank",
+        n=25, stage=3, mode="skeleton",
         title="Bond yield to maturity",
-        scenario="The Treasury desk at a primary dealer quotes prices, the buy-side asks for YTMs. There's no closed-form for YTM — you solve `price = sum_of_discounted_cashflows(r)` for `r` numerically. Every desk uses `brentq` or Newton-Raphson under the hood; the bond math doesn't care which.",
-        learner_goal="Find the YTM of a 5-year bond paying a 5% coupon, priced at par (face=100).",
-        concept="An annual-coupon bond's fair price is `sum(c / (1+r)**t for t in 1..N) + face / (1+r)**N` — coupons plus principal, all discounted at YTM `r`. `scipy.optimize.brentq(f, lo, hi)` does a robust bisection that needs `f(lo)` and `f(hi)` to straddle zero. At par (price = face) the YTM exactly equals the coupon rate — useful sanity check.",
-        example_code=(
+        scenario="The treasury desk at a primary dealer quotes prices on a hundred-strong universe of bonds; the buy-side queries the system in YTM space. The function below sits between those two views — given face, coupon, term, and current price, return the YTM. No closed form exists; you root-find. Same code shape ships at every fund running a fixed-income book.",
+        learner_goal="Implement `ytm(face, coupon, n_years, price)` using scipy's brentq root-finder.",
+        concept="An annual-coupon bond's fair price is `sum(c / (1+r)**t for t in 1..N) + face / (1+r)**N`. The YTM is the rate `r` that makes this equation balance against the market price. `scipy.optimize.brentq(f, lo, hi)` does a robust bisection — needs `f(lo)` and `f(hi)` to straddle zero. A 0.0001..0.50 bracket covers any realistic bond. At par (price == face), YTM exactly equals the coupon rate — your cheapest sanity check.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Bond yield-to-maturity via numerical root-finding.\"\"\"\n"
             "from scipy.optimize import brentq\n"
-            "# 5-year coupon bond, 5% annual coupon, face 100, priced at par.\n"
-            "face, coupon, n, price = 100, 5, 5, 100\n"
-            "# NPV(r) = PV of all cash flows minus the price — zero at the YTM.\n"
-            "def npv(r):\n"
-            "    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\n"
-            "# brentq bisects between 0.01% and 50% — finds the root reliably.\n"
-            "ytm = brentq(npv, 0.0001, 0.5)\n"
-            "# At par, YTM == coupon rate exactly.\n"
-            "print(round(ytm, 4))"
+            "\n"
+            "\n"
+            "def ytm(face: float, coupon: float, n_years: int, price: float) -> float:\n"
+            "    \"\"\"Return the annual-compounding YTM of a vanilla coupon bond.\n"
+            "\n"
+            "    Parameters\n"
+            "    ----------\n"
+            "    face     : redemption value at maturity (e.g. 100)\n"
+            "    coupon   : annual coupon payment in face units (e.g. 5 means 5%)\n"
+            "    n_years  : whole years to maturity\n"
+            "    price    : current market price\n"
+            "\n"
+            "    Returns\n"
+            "    -------\n"
+            "    float — the YTM as a decimal (0.05 for 5%).\n"
+            "\n"
+            "    Implementation:\n"
+            "      - Define an `npv(r)` closure that returns\n"
+            "        PV_of_all_cashflows(r) - price.\n"
+            "      - Call brentq with bracket (0.0001, 0.5).\n"
+            "    \"\"\"\n"
+            "    raise NotImplementedError(\"Implement ytm\")\n"
         ),
-        template=(
+        reference_solution=(
             "from scipy.optimize import brentq\n"
-            "face, coupon, n, price = 100, 5, 5, 100\n"
-            "def npv(r):\n"
-            "    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\n"
-            "ytm = ___(npv, 0.0001, 0.5)\n"
-            "print(round(ytm, 4))"
+            "\n"
+            "\n"
+            "def ytm(face: float, coupon: float, n_years: int, price: float) -> float:\n"
+            "    def npv(r: float) -> float:\n"
+            "        return (\n"
+            "            sum(coupon / (1 + r) ** t for t in range(1, n_years + 1))\n"
+            "            + face / (1 + r) ** n_years\n"
+            "            - price\n"
+            "        )\n"
+            "    return float(brentq(npv, 0.0001, 0.5))\n"
         ),
-        your_turn="Replace `___` with the root-finder we imported.",
-        expected_stdout="0.05",
-        hint="Imported above. Six letters.",
+        tests_py=(
+            "\"\"\"YTM correctness across par / discount / premium pricings.\"\"\"\n"
+            "import pytest\n"
+            "\n"
+            "from solution import ytm\n"
+            "\n"
+            "\n"
+            "def test_par_bond_yields_coupon_rate():\n"
+            "    # 5-year, 5% coupon, price == face → YTM == coupon rate.\n"
+            "    assert abs(ytm(100, 5, 5, 100) - 0.05) < 1e-6\n"
+            "\n"
+            "\n"
+            "def test_discount_bond_yields_above_coupon():\n"
+            "    # 10-year, 3% coupon, priced below par → YTM > 3%.\n"
+            "    y = ytm(100, 3, 10, 90)\n"
+            "    assert y > 0.03\n"
+            "    # Hand-check approximation; tight tolerance against a known answer.\n"
+            "    assert abs(y - 0.0428) < 0.001\n"
+            "\n"
+            "\n"
+            "def test_premium_bond_yields_below_coupon():\n"
+            "    # 7-year, 6% coupon, priced above par → YTM < 6%.\n"
+            "    y = ytm(100, 6, 7, 110)\n"
+            "    assert y < 0.06\n"
+            "    assert abs(y - 0.0432) < 0.001\n"
+            "\n"
+            "\n"
+            "def test_zero_coupon_bond():\n"
+            "    # Zero-coupon, 5-year, face 100, price 78 → YTM ≈ (100/78)^(1/5)-1 ≈ 5.09%.\n"
+            "    y = ytm(100, 0, 5, 78)\n"
+            "    assert abs(y - 0.0509) < 1e-3\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_par_bond_yields_coupon_rate",
+                "Par bond's YTM equals the coupon rate.",
+            ),
+            (
+                "tests/test_solution.py::test_discount_bond_yields_above_coupon",
+                "Discount bond (price < par) has YTM above the coupon rate.",
+            ),
+            (
+                "tests/test_solution.py::test_premium_bond_yields_below_coupon",
+                "Premium bond (price > par) has YTM below the coupon rate.",
+            ),
+            (
+                "tests/test_solution.py::test_zero_coupon_bond",
+                "Zero-coupon bond's YTM matches the closed-form (price/face)^(1/n) - 1.",
+            ),
+        ],
+        your_turn="Implement `ytm`. Define the NPV closure that returns PV minus price; root-find with brentq on (0.0001, 0.5). The docstring spells out both steps.",
+        hint="`brentq(npv, 0.0001, 0.5)` — your NPV closure returns 0 at the YTM.",
         skills=["quant", "options"],
     ),
     Lesson(
@@ -1730,129 +1799,385 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options", "matplotlib"],
     ),
     Lesson(
-        n=27, stage=3, mode="fillblank",
+        n=27, stage=3, mode="debug",
         title="Put-call parity",
-        scenario="Put-call parity is the model-free no-arbitrage relation that every options market-maker checks intuitively on every quote. If the relationship breaks by more than the bid-offer spread, that's free money — and the market-makers' algos snap it up in microseconds. A junior who can derive it has demonstrated they understand derivatives. One who can't, hasn't.",
-        learner_goal="Verify put-call parity numerically using the Black-Scholes prices.",
-        concept="Parity: `C - P = S - K * exp(-r*T)`. It comes from a no-arbitrage portfolio argument that needs no distributional assumption — it holds for any model, any vol surface, any underlying. Rearranged: given a call price, the matching put is `P = C - S + K * exp(-r*T)`. Memorise the sign convention: the `-r*T` term goes inside the exp.",
-        example_code=(
-            "import numpy as np\n"
-            "# Spot=100, Strike=100, rate=4%, T=1y, call=9.6 (textbook example).\n"
-            "S, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\n"
-            "# Parity-implied put price — should match a direct BS put calc.\n"
-            "P_from_parity = C - S + K * np.exp(-r * T)\n"
-            "print(round(P_from_parity, 2))"
+        scenario="Vol-desk arb-checking script: every option quote streams in, gets compared against put-call parity, and any violation greater than the bid-ask spread fires an alert. The junior who wrote `parity_put_from_call` got the sign convention wrong on the discount factor — so the script's flagging *all* the quotes as arbitrages. Find the one-character bug before the trading floor mutes the alarm.",
+        learner_goal="Find the sign error in the discount factor that makes the parity-implied put inflate instead of deflate the strike.",
+        concept="Put-call parity: `C − P = S − K · exp(−rT)`. Solve for P: `P = C − S + K · exp(−rT)`. The discount factor `exp(−rT)` is always < 1 for positive `r` (today's worth of a future strike is less than face). Flipping the sign — `exp(+rT)` — inflates the future strike, gives you a put price hundreds of dollars too high, and turns every quote into a false-positive arb signal.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Put price implied by put-call parity from a call price.\"\"\"\n"
+            "import math\n"
+            "\n"
+            "\n"
+            "def parity_put_from_call(\n"
+            "    call: float, S: float, K: float, r: float, T: float\n"
+            ") -> float:\n"
+            "    \"\"\"Return the no-arb put price implied by C - P = S - K*exp(-r*T).\n"
+            "\n"
+            "    Parameters\n"
+            "    ----------\n"
+            "    call : current call price\n"
+            "    S    : spot\n"
+            "    K    : strike\n"
+            "    r    : risk-free rate (annualised)\n"
+            "    T    : years to expiry\n"
+            "    \"\"\"\n"
+            "    # Discount factor sign is wrong. Strike's PV must use exp(-r*T).\n"
+            "    return call - S + K * math.exp(r * T)\n"
         ),
-        template=(
-            "import numpy as np\n"
-            "S, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\n"
-            "P_from_parity = C - S + K * np.exp(___ * T)\n"
-            "print(round(P_from_parity, 2))"
+        reference_solution=(
+            "import math\n"
+            "\n"
+            "\n"
+            "def parity_put_from_call(\n"
+            "    call: float, S: float, K: float, r: float, T: float\n"
+            ") -> float:\n"
+            "    return call - S + K * math.exp(-r * T)\n"
         ),
-        your_turn="Replace `___` so the discount factor is correct (negative rate times time).",
-        expected_stdout="5.68",
-        hint="The exponent should be negative.",
+        tests_py=(
+            "\"\"\"parity_put_from_call: sign-of-exponent check on the discount.\"\"\"\n"
+            "import math\n"
+            "import pytest\n"
+            "\n"
+            "from solution import parity_put_from_call\n"
+            "\n"
+            "\n"
+            "def test_at_money_textbook_example():\n"
+            "    # S=K=100, r=4%, T=1y, call=9.6 → put ≈ 5.68.\n"
+            "    put = parity_put_from_call(9.6, 100, 100, 0.04, 1.0)\n"
+            "    assert abs(put - 5.68) < 0.02\n"
+            "\n"
+            "\n"
+            "def test_zero_rate_collapses_to_call_minus_S_plus_K():\n"
+            "    # With r=0, exp(-r*T)=1, so put = call - S + K.\n"
+            "    put = parity_put_from_call(7.0, 100, 100, 0.0, 1.0)\n"
+            "    assert abs(put - 7.0) < 1e-12  # call - S + K = 7 - 100 + 100\n"
+            "\n"
+            "\n"
+            "def test_high_rate_pulls_put_below_call():\n"
+            "    # At higher rate, the PV(K) shrinks, so put should be SMALLER.\n"
+            "    put_low = parity_put_from_call(9.6, 100, 100, 0.02, 1.0)\n"
+            "    put_high = parity_put_from_call(9.6, 100, 100, 0.10, 1.0)\n"
+            "    assert put_high < put_low\n"
+            "\n"
+            "\n"
+            "def test_at_par_at_zero_rate_equals_call_when_S_equals_K():\n"
+            "    # Edge: zero rate, S=K. Then exp(-rT)=1 → put = call.\n"
+            "    put = parity_put_from_call(7.5, 100, 100, 0.0, 1.0)\n"
+            "    assert abs(put - 7.5) < 1e-12\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_at_money_textbook_example",
+                "ATM example with r=4%, T=1y, call=9.60 → put ≈ 5.68.",
+            ),
+            (
+                "tests/test_solution.py::test_zero_rate_collapses_to_call_minus_S_plus_K",
+                "At r=0, exp(-rT)=1 — checks the discount factor doesn't blow up.",
+            ),
+            (
+                "tests/test_solution.py::test_high_rate_pulls_put_below_call",
+                "Higher rate → smaller PV(K) → smaller put price (catches sign flip).",
+            ),
+            (
+                "tests/test_solution.py::test_at_par_at_zero_rate_equals_call_when_S_equals_K",
+                "Zero-rate ATM case has put == call exactly.",
+            ),
+        ],
+        your_turn="The function uses `exp(r*T)` where the no-arb formula needs `exp(-r*T)`. One character flip.",
+        hint="Negative rate times time goes inside the exponent.",
         skills=["quant", "options"],
     ),
     Lesson(
-        n=28, stage=3, mode="fillblank",
+        n=28, stage=3, mode="skeleton",
         title="Black-Scholes from scratch",
-        scenario="In any options interview at a market-maker — Citadel Securities, IMC, Optiver — you will be asked to derive or implement Black-Scholes from first principles. It's the equivalent of FizzBuzz for derivatives engineers. Today you implement it once, by hand, no library, and verify against Hull's textbook example. Twenty years from now it'll still be one of the five formulas you remember cold.",
-        learner_goal="Implement the Black-Scholes call price and verify against a textbook example.",
-        concept="Call price = `S·N(d1) − K·exp(−rT)·N(d2)` where `d1 = (ln(S/K) + (r + σ²/2)·T) / (σ·√T)` and `d2 = d1 − σ·√T`. `N(·)` is the standard normal CDF — `scipy.stats.norm.cdf`. Intuition: `N(d1)` is the risk-neutral delta (probability-weighted exposure); `N(d2)` is the risk-neutral probability of finishing in the money. Hull's example (S=K=100, r=5%, σ=20%, T=1y) gives C ≈ 10.45.",
-        example_code=(
-            "import numpy as np\n"
+        scenario="Options interview at any market-maker — Citadel Securities, IMC, Optiver, Jane Street — opens with: 'implement Black-Scholes from first principles, no libraries beyond a normal CDF.' It's FizzBuzz for derivatives engineers. The function you write here is the same one that's been hand-rolled in every options-trading codebase since 1973. After today it's muscle memory.",
+        learner_goal="Implement `bs_call(S, K, r, sigma, T)` from the closed-form Black-Scholes formula.",
+        concept="Call price `C = S·N(d1) − K·exp(−rT)·N(d2)` where `d1 = (ln(S/K) + (r + σ²/2)·T) / (σ·√T)` and `d2 = d1 − σ·√T`. `N(·)` is the standard normal CDF (`scipy.stats.norm.cdf`). The canonical Hull example (S=K=100, r=5%, σ=20%, T=1y) gives C ≈ 10.4506 — every BS implementation in the world matches that number, and tests usually verify it first.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Black-Scholes European call from first principles.\"\"\"\n"
+            "import math\n"
             "from scipy.stats import norm\n"
-            "# Hull's canonical example, used to verify any new BS implementation.\n"
-            "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
-            "# d1 and d2 are the standardised log-moneyness terms.\n"
-            "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
-            "d2 = d1 - sigma*np.sqrt(T)\n"
-            "# Call = spot * N(d1) - PV(strike) * N(d2). N(·) is the standard normal CDF.\n"
-            "C = S*norm.cdf(d1) - K*np.exp(-r*T)*norm.cdf(d2)\n"
-            "# Hull p.299: C ≈ 10.45. Verify to 4 dp.\n"
-            "print(round(C, 4))"
+            "\n"
+            "\n"
+            "def bs_call(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    \"\"\"Return the Black-Scholes call price.\n"
+            "\n"
+            "    Parameters\n"
+            "    ----------\n"
+            "    S     : spot price\n"
+            "    K     : strike\n"
+            "    r     : risk-free rate (annualised, continuous compounding)\n"
+            "    sigma : volatility (annualised, > 0)\n"
+            "    T     : time to expiry in years (> 0)\n"
+            "\n"
+            "    Steps:\n"
+            "      d1 = (ln(S/K) + (r + sigma**2 / 2) * T) / (sigma * sqrt(T))\n"
+            "      d2 = d1 - sigma * sqrt(T)\n"
+            "      C  = S * N(d1) - K * exp(-r * T) * N(d2)\n"
+            "    \"\"\"\n"
+            "    raise NotImplementedError(\"Implement bs_call\")\n"
         ),
-        template=(
-            "import numpy as np\n"
+        reference_solution=(
+            "import math\n"
             "from scipy.stats import norm\n"
-            "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
-            "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
-            "d2 = d1 - sigma*np.sqrt(T)\n"
-            "C = S*norm.___(d1) - K*np.exp(-r*T)*norm.___(d2)\n"
-            "print(round(C, 4))"
+            "\n"
+            "\n"
+            "def bs_call(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    d1 = (math.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))\n"
+            "    d2 = d1 - sigma * math.sqrt(T)\n"
+            "    return float(S * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2))\n"
         ),
-        your_turn="Fill the two blanks with the normal CDF function.",
-        expected_stdout="10.4506",
-        hint="Three letters — cumulative distribution function.",
+        tests_py=(
+            "\"\"\"Black-Scholes call pricer correctness.\"\"\"\n"
+            "import math\n"
+            "import pytest\n"
+            "\n"
+            "from solution import bs_call\n"
+            "\n"
+            "\n"
+            "def test_hull_canonical_example():\n"
+            "    # S=K=100, r=5%, σ=20%, T=1y. Hull p.299: C ≈ 10.4506.\n"
+            "    c = bs_call(100, 100, 0.05, 0.20, 1.0)\n"
+            "    assert abs(c - 10.4506) < 1e-3\n"
+            "\n"
+            "\n"
+            "def test_deep_itm_call_approaches_S_minus_PV_K():\n"
+            "    # S=200, K=100, very ITM. C → S - K*exp(-rT) = 200 - 100*exp(-0.05) ≈ 104.88.\n"
+            "    c = bs_call(200, 100, 0.05, 0.20, 1.0)\n"
+            "    expected = 200 - 100 * math.exp(-0.05)\n"
+            "    assert abs(c - expected) < 0.05\n"
+            "\n"
+            "\n"
+            "def test_deep_otm_call_is_near_zero():\n"
+            "    c = bs_call(50, 150, 0.05, 0.20, 1.0)\n"
+            "    assert 0 <= c < 0.05\n"
+            "\n"
+            "\n"
+            "def test_monotone_increasing_in_spot():\n"
+            "    # Higher spot → higher call price, all else equal.\n"
+            "    a = bs_call(95, 100, 0.05, 0.20, 1.0)\n"
+            "    b = bs_call(100, 100, 0.05, 0.20, 1.0)\n"
+            "    c = bs_call(110, 100, 0.05, 0.20, 1.0)\n"
+            "    assert a < b < c\n"
+            "\n"
+            "\n"
+            "def test_monotone_increasing_in_sigma():\n"
+            "    # Higher vol → higher call price, all else equal.\n"
+            "    low_vol = bs_call(100, 100, 0.05, 0.10, 1.0)\n"
+            "    high_vol = bs_call(100, 100, 0.05, 0.40, 1.0)\n"
+            "    assert low_vol < high_vol\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_hull_canonical_example",
+                "Hull's textbook example (S=K=100, r=5%, σ=20%, T=1y) → C ≈ 10.4506.",
+            ),
+            (
+                "tests/test_solution.py::test_deep_itm_call_approaches_S_minus_PV_K",
+                "Deep-ITM call price approaches the intrinsic minus the strike's PV.",
+            ),
+            (
+                "tests/test_solution.py::test_deep_otm_call_is_near_zero",
+                "Deep-OTM call (S=50, K=150) is essentially zero.",
+            ),
+            (
+                "tests/test_solution.py::test_monotone_increasing_in_spot",
+                "Call price is monotonically increasing in spot.",
+            ),
+            (
+                "tests/test_solution.py::test_monotone_increasing_in_sigma",
+                "Call price is monotonically increasing in volatility (positive vega).",
+            ),
+        ],
+        your_turn="Implement `bs_call`. The docstring has the three lines you need. The Hull example (S=K=100, r=5%, σ=20%, T=1y) → 10.4506 is your first sanity check.",
+        hint="`math.log`, `math.sqrt`, `math.exp`, `norm.cdf`. Five lines total.",
         skills=["quant", "options", "black-scholes"],
     ),
     Lesson(
-        n=29, stage=3, mode="fillblank",
+        n=29, stage=3, mode="debug",
         title="Greeks: delta of a call",
-        scenario="The vol-trading desk at any market-maker runs a 'delta-neutral' book — for every short option they're long the corresponding delta in the underlying. The system recomputes the desk's net delta many times a second from positions × Black-Scholes Greeks. A trader who can't quote N(d1) on a whiteboard hasn't earned the seat. Today: compute it.",
-        learner_goal="Compute the delta of an at-the-money call.",
-        concept="Delta is `∂C/∂S` — the change in option value per unit change in spot. Take the partial derivative of the BS formula and the terms collapse: `Δ_call = N(d1)`, exactly. At-the-money (S = K), d1 ≈ 0.35 for typical parameters, so delta ≈ 0.64. Out-of-the-money calls have low delta (small N(d1)); deep-in-the-money calls have delta near 1 (large N(d1)).",
-        example_code=(
-            "import numpy as np\n"
+        scenario="The vol-trading desk runs `compute_delta` against every open option position thousands of times a second to keep the book delta-neutral. The junior ships an implementation, the smoke test passes (ATM call delta in the right ballpark), but the senior risk auditor reviewing the PR notices the d1 formula uses `(r − σ²/2)` instead of `(r + σ²/2)`. Subtle, but it gives systematically wrong deltas — and the desk's hedges drift. Find and fix the sign.",
+        learner_goal="Spot the sign error in the d1 numerator and correct it.",
+        concept="d1 in the Black-Scholes formula is `(ln(S/K) + (r + σ²/2)·T) / (σ·√T)`. The `+ σ²/2` is sometimes called the *convexity correction* on the log-normal drift — confusing it with `− σ²/2` is THE common slip when you're writing BS from memory. The two terms appear in the same paper but on different lines: the `r + σ²/2` in d1, the `r − σ²/2` in the GBM exponent. Mix them up and call deltas are silently a few percent off — exactly the kind of bug a delta-hedging book is sensitive to.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Black-Scholes delta for a European call.\"\"\"\n"
+            "import math\n"
             "from scipy.stats import norm\n"
-            "# Same parameters as Hull's BS example.\n"
-            "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
-            "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
-            "# Δ_call = N(d1) — falls straight out of the BS derivation.\n"
-            "delta = norm.cdf(d1)\n"
-            "# ATM call delta ≈ 0.64 — not 0.5, because of the (r + σ²/2)·T drift.\n"
-            "print(round(delta, 4))"
+            "\n"
+            "\n"
+            "def compute_delta(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    \"\"\"Return the Black-Scholes delta of a European call: Δ = N(d1).\n"
+            "\n"
+            "    d1 = (ln(S/K) + (r + σ²/2)·T) / (σ·√T)\n"
+            "    \"\"\"\n"
+            "    # Bug: the convexity term has the wrong sign.\n"
+            "    d1 = (math.log(S / K) + (r - sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))\n"
+            "    return float(norm.cdf(d1))\n"
         ),
-        template=(
-            "import numpy as np\n"
+        reference_solution=(
+            "import math\n"
             "from scipy.stats import norm\n"
-            "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
-            "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
-            "delta = ___.cdf(d1)\n"
-            "print(round(delta, 4))"
+            "\n"
+            "\n"
+            "def compute_delta(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    d1 = (math.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))\n"
+            "    return float(norm.cdf(d1))\n"
         ),
-        your_turn="Replace `___` with the scipy.stats object we imported.",
-        expected_stdout="0.6368",
-        hint="Four letters.",
+        tests_py=(
+            "\"\"\"Call-delta correctness against the Hull canonical numbers.\"\"\"\n"
+            "import pytest\n"
+            "\n"
+            "from solution import compute_delta\n"
+            "\n"
+            "\n"
+            "def test_atm_call_delta_is_above_half_from_drift():\n"
+            "    # ATM call with r=5%, σ=20%, T=1y → delta ≈ 0.6368.\n"
+            "    # With the bug (- σ²/2), the answer is ≈ 0.5793 — clearly below.\n"
+            "    d = compute_delta(100, 100, 0.05, 0.20, 1.0)\n"
+            "    assert abs(d - 0.6368) < 1e-3\n"
+            "\n"
+            "\n"
+            "def test_deep_itm_call_delta_approaches_one():\n"
+            "    # Deep ITM call (S=200, K=100) → delta very close to 1.\n"
+            "    d = compute_delta(200, 100, 0.05, 0.20, 1.0)\n"
+            "    assert d > 0.99\n"
+            "\n"
+            "\n"
+            "def test_deep_otm_call_delta_approaches_zero():\n"
+            "    d = compute_delta(50, 150, 0.05, 0.20, 1.0)\n"
+            "    assert d < 0.05\n"
+            "\n"
+            "\n"
+            "def test_monotone_increasing_in_spot():\n"
+            "    a = compute_delta(95, 100, 0.05, 0.20, 1.0)\n"
+            "    b = compute_delta(100, 100, 0.05, 0.20, 1.0)\n"
+            "    c = compute_delta(110, 100, 0.05, 0.20, 1.0)\n"
+            "    assert a < b < c\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_atm_call_delta_is_above_half_from_drift",
+                "ATM call with r=5%/σ=20%/T=1y → delta ≈ 0.6368 (the bug gives ~0.58).",
+            ),
+            (
+                "tests/test_solution.py::test_deep_itm_call_delta_approaches_one",
+                "Deep-ITM call (S=200, K=100) → delta > 0.99.",
+            ),
+            (
+                "tests/test_solution.py::test_deep_otm_call_delta_approaches_zero",
+                "Deep-OTM call (S=50, K=150) → delta < 0.05.",
+            ),
+            (
+                "tests/test_solution.py::test_monotone_increasing_in_spot",
+                "Call delta is monotonically increasing in spot.",
+            ),
+        ],
+        your_turn="The first test is the giveaway: ATM call delta should be ≈ 0.6368 with the given parameters, but the function returns ~0.58. The d1 numerator has the wrong sign on the σ²/2 term.",
+        hint="d1's numerator carries `(r + σ²/2)·T`, not `(r − σ²/2)·T`. One character.",
         skills=["quant", "options", "greeks"],
     ),
     Lesson(
-        n=30, stage=3, mode="fillblank",
+        n=30, stage=3, mode="skeleton",
         title="Binomial tree pricer",
-        scenario="Before Black-Scholes' PDE became standard in vol-desk software, the CRR (Cox-Ross-Rubinstein) tree was *the* pricing algorithm. It still is for American options — early exercise needs a backward induction that the closed-form BS can't do. Every Hull chapter on exotic options starts here; every options engineer can sketch the recurrence on a whiteboard.",
-        learner_goal="Price a European call with a 50-step binomial tree.",
-        concept="Set `u = exp(σ·√dt)`, `d = 1/u` (Cox-Ross-Rubinstein parameterisation, multiplicatively symmetric). Risk-neutral up-probability `p = (exp(r·dt) − d) / (u − d)`. Build terminal payoffs at expiry, then walk back to t=0: at each node, value = `exp(−r·dt) · (p·V_up + (1−p)·V_down)`. As N → ∞ the price converges to Black-Scholes.",
-        example_code=(
+        scenario="Before Black-Scholes' PDE became the standard solver in vol-desk software, the CRR (Cox-Ross-Rubinstein) tree was *the* pricing algorithm. It still is for American options — early exercise needs a backward induction that the closed-form BS can't do. Every options engineer can sketch the recurrence on a whiteboard; today you write it as code.",
+        learner_goal="Implement `crr_call(S, K, r, sigma, T, N)` — an N-step CRR binomial tree pricer for a European call.",
+        concept="Set `dt = T / N`, `u = exp(σ·√dt)`, `d = 1/u` (multiplicatively symmetric). Risk-neutral up-probability `p = (exp(r·dt) − d) / (u − d)`. Terminal prices at expiry: `S · u^i · d^(N−i)` for `i = 0..N`. Terminal call payoffs: `max(S_T − K, 0)`. Backward-induct: at each step, `vals_new = exp(−r·dt) · (p·vals[1:] + (1−p)·vals[:-1])`. After N iterations, `vals[0]` is the price at t=0. As N → ∞ the price converges monotonically to BS.",
+        example_code="",
+        editable_template=(
+            "\"\"\"CRR (Cox-Ross-Rubinstein) binomial-tree European call pricer.\"\"\"\n"
             "import numpy as np\n"
-            "# 50-step CRR tree on Hull's BS example.\n"
-            "S, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\n"
-            "# Up/down factors and risk-neutral probability.\n"
-            "dt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\n"
-            "p = (np.exp(r*dt) - d)/(u - d)\n"
-            "# Terminal prices at expiry: S * u^i * d^(N-i) for i = 0..N.\n"
-            "ST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\n"
-            "vals = np.maximum(ST - K, 0)\n"
-            "# Backward induction — discount + risk-neutral average at each step.\n"
-            "for _ in range(N):\n"
-            "    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[:-1])\n"
-            "# vals[0] is t=0. Compare to BS 10.4506 — convergence is monotonic in N.\n"
-            "print(round(vals[0], 4))"
+            "\n"
+            "\n"
+            "def crr_call(S: float, K: float, r: float, sigma: float, T: float, N: int) -> float:\n"
+            "    \"\"\"N-step CRR binomial price of a European call.\n"
+            "\n"
+            "    Steps:\n"
+            "      dt = T / N\n"
+            "      u  = exp(sigma * sqrt(dt));  d = 1 / u\n"
+            "      p  = (exp(r * dt) - d) / (u - d)\n"
+            "      Terminal prices: S * u**i * d**(N - i) for i in 0..N\n"
+            "      Terminal payoffs: max(S_T - K, 0)\n"
+            "      Backward induction N times:\n"
+            "        vals = exp(-r * dt) * (p * vals[1:] + (1 - p) * vals[:-1])\n"
+            "      Return vals[0].\n"
+            "\n"
+            "    Vectorised numpy is fine. A loop over N is fine — at N=50 it's microseconds.\n"
+            "    \"\"\"\n"
+            "    raise NotImplementedError(\"Implement crr_call\")\n"
         ),
-        template=(
+        reference_solution=(
             "import numpy as np\n"
-            "S, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\n"
-            "dt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\n"
-            "p = (np.exp(r*dt) - d)/(u - d)\n"
-            "ST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\n"
-            "vals = np.maximum(ST - K, 0)\n"
-            "for _ in range(N):\n"
-            "    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[___])\n"
-            "print(round(vals[0], 4))"
+            "\n"
+            "\n"
+            "def crr_call(S: float, K: float, r: float, sigma: float, T: float, N: int) -> float:\n"
+            "    dt = T / N\n"
+            "    u = np.exp(sigma * np.sqrt(dt))\n"
+            "    d = 1 / u\n"
+            "    p = (np.exp(r * dt) - d) / (u - d)\n"
+            "    ST = S * u ** np.arange(N + 1) * d ** (N - np.arange(N + 1))\n"
+            "    vals = np.maximum(ST - K, 0)\n"
+            "    for _ in range(N):\n"
+            "        vals = np.exp(-r * dt) * (p * vals[1:] + (1 - p) * vals[:-1])\n"
+            "    return float(vals[0])\n"
         ),
-        your_turn="Replace `___` with the slice that gives 'all but the last' (the down-branch values).",
-        expected_stdout="10.4107",
-        hint="Two-character slice.",
+        tests_py=(
+            "\"\"\"CRR binomial pricer correctness + convergence-to-BS.\"\"\"\n"
+            "import math\n"
+            "import pytest\n"
+            "\n"
+            "from solution import crr_call\n"
+            "\n"
+            "\n"
+            "HULL = dict(S=100, K=100, r=0.05, sigma=0.20, T=1.0)\n"
+            "BS_CALL = 10.4506  # closed-form BS on Hull's example\n"
+            "\n"
+            "\n"
+            "def test_n50_within_0_05_of_BS():\n"
+            "    c = crr_call(**HULL, N=50)\n"
+            "    assert abs(c - BS_CALL) < 0.05\n"
+            "\n"
+            "\n"
+            "def test_n500_within_0_01_of_BS():\n"
+            "    c = crr_call(**HULL, N=500)\n"
+            "    assert abs(c - BS_CALL) < 0.01\n"
+            "\n"
+            "\n"
+            "def test_500_step_is_closer_than_50_step():\n"
+            "    # CRR converges as N grows — not always monotone, but 500 should\n"
+            "    # always be at least as close as 50.\n"
+            "    c50 = crr_call(**HULL, N=50)\n"
+            "    c500 = crr_call(**HULL, N=500)\n"
+            "    assert abs(c500 - BS_CALL) <= abs(c50 - BS_CALL) + 1e-6\n"
+            "\n"
+            "\n"
+            "def test_deep_otm_call_is_near_zero():\n"
+            "    c = crr_call(S=50, K=150, r=0.05, sigma=0.20, T=1.0, N=200)\n"
+            "    assert 0 <= c < 0.05\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_n50_within_0_05_of_BS",
+                "50-step tree within 0.05 of BS on Hull's example.",
+            ),
+            (
+                "tests/test_solution.py::test_n500_within_0_01_of_BS",
+                "500-step tree within 0.01 of BS — convergence with N.",
+            ),
+            (
+                "tests/test_solution.py::test_500_step_is_closer_than_50_step",
+                "More steps → closer to BS (convergence direction sanity).",
+            ),
+            (
+                "tests/test_solution.py::test_deep_otm_call_is_near_zero",
+                "Deep-OTM call (S=50, K=150) → tree price ≈ 0.",
+            ),
+        ],
+        your_turn="Implement `crr_call`. The docstring spells out the six steps; the cleanest code is ~10 lines.",
+        hint="`S * u ** np.arange(N + 1) * d ** (N - np.arange(N + 1))` gives the terminal price vector in one line.",
         skills=["quant", "options", "black-scholes"],
     ),
     Lesson(
@@ -1929,37 +2254,106 @@ LESSONS: list[Lesson] = [
         datasets=["spy", "aapl", "tlt"],
     ),
     Lesson(
-        n=33, stage=3, mode="fillblank",
+        n=33, stage=3, mode="debug",
         title="Sharpe, max drawdown",
-        scenario="The two numbers every allocator asks about a strategy before reading the deck: 'what's the Sharpe and what's the max drawdown?' Sharpe summarises risk-adjusted return; max drawdown summarises the worst the investor would have felt holding it. Compute them in one cell — every backtest framework (vectorbt, zipline, bt) gives them to you, but every quant has at some point implemented them by hand on a whiteboard during an interview.",
-        learner_goal="Compute SPY's annualised Sharpe ratio and max drawdown.",
-        concept="Annualised Sharpe for daily returns: `(mean × 252) / (std × √252)` — the 252 in the numerator turns daily mean to annual, the √252 in the denominator turns daily std to annual. Max drawdown: build the cumulative equity curve, take running max, divide — the minimum of that ratio minus 1 is the worst peak-to-trough loss as a fraction.",
-        example_code=(
-            "import pandas as pd, numpy as np\n"
-            "df = pd.read_csv('/data/quant/spy.csv')\n"
-            "r = df['adj_close'].pct_change().dropna()\n"
-            "# Annualised Sharpe: scale mean by 252, std by √252.\n"
-            "sharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\n"
-            "# Equity curve = compounded returns. cummax tracks the running peak.\n"
-            "eq = (1 + r).cumprod()\n"
-            "dd = (eq / eq.cummax() - 1).min()\n"
-            "# SPY 2015-2025: Sharpe ≈ 0.8, max DD ≈ -34% (COVID March 2020).\n"
-            "print(round(sharpe, 2), round(dd, 3))"
+        scenario="The strategy deck goes to the IC tomorrow. The junior writes `risk_metrics(returns)` and the numbers look fine to her — until the senior risk officer pastes a known-good return series through it and the Sharpe comes out √252 too large. Same bug ships every quarter across the industry: someone scales the mean by 252 but forgets to scale the std the right way. Find it.",
+        learner_goal="Spot the annualisation slip on the Sharpe ratio and fix the std scaling.",
+        concept="Annualised Sharpe for daily returns is `(mean × 252) / (std × √252)`. Equivalently: `(mean / std) × √252`. The intuition: returns sum *linearly* over time (so mean scales by 252 over a year), but std scales by `√n` (so daily std becomes annual std at `× √252`). Forgetting the √ on the denominator inflates Sharpe by `√252 ≈ 15.87` — turns a respectable 0.8 into a comically wrong 12.7. Max drawdown's `cummax / cummin` direction is also a common slip: peak-to-trough is `equity / equity.cummax() - 1`, then take the *min* (most negative). Mirror it (`.min()`/`.cummin()`) and you measure trough-to-peak which is always positive.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Annualised Sharpe ratio and max drawdown for daily returns.\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "\n"
+            "\n"
+            "def risk_metrics(r: pd.Series) -> dict:\n"
+            "    \"\"\"Return {sharpe, max_drawdown} for a daily-return series.\n"
+            "\n"
+            "    - sharpe       : annualised Sharpe = (mean*252) / (std*sqrt(252))\n"
+            "    - max_drawdown : worst peak-to-trough loss as a negative fraction\n"
+            "    \"\"\"\n"
+            "    # Bug: std isn't scaled by sqrt(252). Sharpe ends up √252× too large.\n"
+            "    sharpe = (r.mean() * 252) / r.std()\n"
+            "    eq = (1 + r).cumprod()\n"
+            "    dd = (eq / eq.cummax() - 1).min()\n"
+            "    return {\"sharpe\": float(sharpe), \"max_drawdown\": float(dd)}\n"
         ),
-        template=(
-            "import pandas as pd, numpy as np\n"
-            "df = pd.read_csv('/data/quant/spy.csv')\n"
-            "r = df['adj_close'].pct_change().dropna()\n"
-            "sharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\n"
-            "eq = (1 + r).cumprod()\n"
-            "dd = (eq / eq.___() - 1).min()\n"
-            "print(round(sharpe, 2), round(dd, 3))"
+        reference_solution=(
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "\n"
+            "\n"
+            "def risk_metrics(r: pd.Series) -> dict:\n"
+            "    sharpe = (r.mean() * 252) / (r.std() * np.sqrt(252))\n"
+            "    eq = (1 + r).cumprod()\n"
+            "    dd = (eq / eq.cummax() - 1).min()\n"
+            "    return {\"sharpe\": float(sharpe), \"max_drawdown\": float(dd)}\n"
         ),
-        your_turn="Replace `___` with the running-max method.",
-        expected_stdout="0.8 -0.337",
-        hint="`cum...` something — running maximum.",
+        tests_py=(
+            "\"\"\"risk_metrics: Sharpe annualisation + drawdown direction.\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import risk_metrics\n"
+            "\n"
+            "\n"
+            "def test_sharpe_on_known_series():\n"
+            "    # Constructed: mean = 0.001 daily, std = 0.012 daily.\n"
+            "    # Expected annualised Sharpe = 0.001*252 / (0.012*sqrt(252))\n"
+            "    #                            = 0.252 / 0.1904... ≈ 1.323.\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    raw = rng.normal(0.001, 0.012, 10_000)\n"
+            "    raw -= raw.mean() - 0.001\n"
+            "    raw *= 0.012 / raw.std()\n"
+            "    s = pd.Series(raw)\n"
+            "    m = risk_metrics(s)\n"
+            "    expected = (s.mean() * 252) / (s.std() * np.sqrt(252))\n"
+            "    assert abs(m[\"sharpe\"] - expected) < 1e-9\n"
+            "\n"
+            "\n"
+            "def test_sharpe_doesnt_blow_up_by_factor_of_sqrt_252():\n"
+            "    # With the bug present, Sharpe is √252 (~15.87) too large.\n"
+            "    # Reasonable strategies have Sharpe well under 5.\n"
+            "    rng = np.random.default_rng(1)\n"
+            "    s = pd.Series(rng.normal(0.0005, 0.012, 5000))\n"
+            "    m = risk_metrics(s)\n"
+            "    assert abs(m[\"sharpe\"]) < 5\n"
+            "\n"
+            "\n"
+            "def test_max_drawdown_is_negative_on_lossy_series():\n"
+            "    # 30%-drop pattern → drawdown ≈ -0.3.\n"
+            "    s = pd.Series([0.0, -0.10, -0.10, -0.15])\n"
+            "    m = risk_metrics(s)\n"
+            "    assert m[\"max_drawdown\"] < -0.25\n"
+            "\n"
+            "\n"
+            "def test_max_drawdown_zero_on_monotone_up():\n"
+            "    s = pd.Series([0.01] * 100)\n"
+            "    m = risk_metrics(s)\n"
+            "    assert abs(m[\"max_drawdown\"]) < 1e-9\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_sharpe_on_known_series",
+                "Sharpe matches the analytical formula (mean*252)/(std*√252) on a controlled series.",
+            ),
+            (
+                "tests/test_solution.py::test_sharpe_doesnt_blow_up_by_factor_of_sqrt_252",
+                "Sharpe on a 10k-sample noise series stays under 5 — catches the missing √252.",
+            ),
+            (
+                "tests/test_solution.py::test_max_drawdown_is_negative_on_lossy_series",
+                "Drawdown on a loss-heavy series is below -0.25 (sign + magnitude).",
+            ),
+            (
+                "tests/test_solution.py::test_max_drawdown_zero_on_monotone_up",
+                "Monotone-up returns have zero drawdown.",
+            ),
+        ],
+        your_turn="The Sharpe value is √252 too large. The annualisation needs to scale BOTH the numerator (by 252) and the denominator (by √252).",
+        hint="`r.std() * np.sqrt(252)`.",
         skills=["quant", "pandas", "risk-metrics"],
-        datasets=["spy"],
     ),
 
     # ============ Stage 4 — Machine Learning for Finance (6 lessons) ============
