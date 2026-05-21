@@ -51,58 +51,38 @@ type PicocApi = {
 
 let picocPromise: Promise<PicocApi> | null = null;
 
-function loadPicoc(): Promise<PicocApi> {
+/** Load picoc into the page. We fetch the bundle body and run it via an
+ *  INLINE script element — that's executed synchronously when appended,
+ *  so we never have to negotiate with `script.onload` event timing.
+ *  After the inline script runs, `window.picocjs.runC` is set. */
+async function loadPicoc(): Promise<PicocApi> {
   if (picocPromise) return picocPromise;
   if (typeof window === "undefined") {
-    return Promise.reject(new Error("C runtime only loads in the browser"));
+    throw new Error("C runtime only loads in the browser");
   }
   const w = window as typeof window & { picocjs?: PicocApi };
-  if (w.picocjs?.runC) return Promise.resolve(w.picocjs);
-  picocPromise = new Promise<PicocApi>((resolve, reject) => {
-    const settle = () => {
-      const picoc = (window as typeof window & { picocjs?: PicocApi }).picocjs;
-      if (picoc?.runC) resolve(picoc);
-      else
-        reject(
-          new Error(
-            "picoc-js script loaded but window.picocjs is missing — vendored bundle may be corrupt",
-          ),
-        );
-    };
-    const existing = document.querySelector(
-      `script[data-picoc="${PICOC_VERSION}"]`,
-    ) as HTMLScriptElement | null;
-    if (existing) {
-      // Another caller already kicked off the load. If the global is set,
-      // resolve now; otherwise wait for the in-flight script's load event.
-      if ((window as typeof window & { picocjs?: PicocApi }).picocjs?.runC) {
-        settle();
-        return;
-      }
-      existing.addEventListener("load", settle, { once: true });
-      existing.addEventListener(
-        "error",
-        () => {
-          picocPromise = null;
-          reject(new Error("Couldn't load the C runtime"));
-        },
-        { once: true },
-      );
-      return;
+  if (w.picocjs?.runC) {
+    picocPromise = Promise.resolve(w.picocjs);
+    return picocPromise;
+  }
+  picocPromise = (async () => {
+    const res = await fetch(PICOC_UMD_URL, { credentials: "omit" });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} loading ${PICOC_UMD_URL}`);
     }
-    const script = document.createElement("script");
-    // Attach handlers BEFORE src — avoids a race where a cached script
-    // can execute before onload is attached (rare but real on warm reloads).
-    script.onload = settle;
-    script.onerror = () => {
-      picocPromise = null;
-      reject(new Error("Couldn't load /vendor/picoc.umd.js"));
-    };
-    script.async = true;
-    script.dataset.picoc = PICOC_VERSION;
-    script.src = PICOC_UMD_URL;
-    document.head.appendChild(script);
-  }).catch((exc) => {
+    const body = await res.text();
+    const inline = document.createElement("script");
+    inline.dataset.picoc = PICOC_VERSION;
+    inline.text = body;
+    // Appending an inline script with text-content runs it synchronously
+    // (per HTML spec). After this line, the UMD's IIFE has finished and
+    // window.picocjs is populated.
+    document.head.appendChild(inline);
+    if (!w.picocjs?.runC) {
+      throw new Error("picoc bundle evaluated but window.picocjs is missing");
+    }
+    return w.picocjs;
+  })().catch((exc) => {
     picocPromise = null;
     throw exc;
   });
