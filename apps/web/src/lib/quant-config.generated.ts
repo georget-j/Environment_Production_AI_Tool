@@ -207,14 +207,41 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   ]
 },
   "quant-22-ols-beta-of-aapl-on-spy": {
-  "mode": "fillblank",
-  "template": "import pandas as pd, statsmodels.api as sm\nspy = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\naapl = pd.read_csv('/data/quant/aapl.csv')['adj_close'].pct_change()\ndf = pd.concat([spy, aapl], axis=1).dropna()\nX = sm.add_constant(df.iloc[:, 0])\nres = sm.___(df.iloc[:, 1], X).fit()\nprint(round(res.params.iloc[1], 2))",
-  "expected_stdout": "1.21",
-  "hint": "Three letters in caps.",
-  "datasets": [
-    "spy",
-    "aapl"
-  ]
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "mock_api.py",
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_aapl_beta_lands_in_expected_range",
+      "description": "AAPL beta on SPY lands between 1.15 and 1.25 (true value \u2248 1.20)."
+    },
+    {
+      "id": "tests/test_solution.py::test_qqq_beta_lands_in_expected_range",
+      "description": "QQQ beta on SPY lands between 1.05 and 1.15."
+    },
+    {
+      "id": "tests/test_solution.py::test_unknown_ticker_raises_with_api_error_message",
+      "description": "Unknown ticker 'NVDA' raises ValueError with the API's error message."
+    },
+    {
+      "id": "tests/test_solution.py::test_unknown_market_raises",
+      "description": "Unknown market 'NIKKEI' raises ValueError."
+    },
+    {
+      "id": "tests/test_solution.py::test_beta_of_market_against_itself_is_one",
+      "description": "Beta of SPY on itself is exactly 1.0."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Fetch returns via the mock API and compute beta of one ticker on another.\"\"\"\nimport numpy as np\nimport statsmodels.api as sm\n\nimport mock_api\n\n\ndef compute_beta(ticker: str, market: str = \"SPY\") -> float:\n    \"\"\"Single-stock beta from the mock returns API.\n\n    Steps:\n      1. GET /returns/<market> and /returns/<ticker> via mock_api.\n      2. If either response is not .ok, raise ValueError with the\n         API's error message (read it from response.json()['error']).\n      3. Align the two return series \u2014 drop the first index of each\n         (they're synthesised lock-step, but a real API might not be).\n      4. Run OLS: `sm.OLS(y, sm.add_constant(x)).fit()`.\n      5. Return the slope (params index 1) as a float.\n\n    Parameters\n    ----------\n    ticker : the stock whose beta to measure (e.g. 'AAPL')\n    market : the index series to regress on (default 'SPY')\n    \"\"\"\n    raise NotImplementedError(\"Implement compute_beta\")\n",
+    "tests/test_solution.py": "\"\"\"Beta computation + error-path tests for the mock returns API.\"\"\"\nimport pytest\n\nfrom solution import compute_beta\n\n\ndef test_aapl_beta_lands_in_expected_range():\n    beta = compute_beta(\"AAPL\")\n    # AAPL constructed as 1.20 * SPY + noise; OLS recovers ~1.2.\n    assert 1.15 < beta < 1.25\n\n\ndef test_qqq_beta_lands_in_expected_range():\n    beta = compute_beta(\"QQQ\")\n    # QQQ constructed as 1.10 * SPY + smaller noise; OLS recovers ~1.1.\n    assert 1.05 < beta < 1.15\n\n\ndef test_unknown_ticker_raises_with_api_error_message():\n    with pytest.raises(ValueError) as exc:\n        compute_beta(\"NVDA\")\n    assert \"NVDA\" in str(exc.value)\n\n\ndef test_unknown_market_raises():\n    with pytest.raises(ValueError):\n        compute_beta(\"AAPL\", market=\"NIKKEI\")\n\n\ndef test_beta_of_market_against_itself_is_one():\n    beta = compute_beta(\"SPY\")\n    assert abs(beta - 1.0) < 1e-9\n",
+    "mock_api.py": "\"\"\"In-process mock of a `/returns/<ticker>` HTTP API.\n\nImitates the `requests` library so your solution.py reads like\nproduction code. No network involved: routes return deterministic\nsynthetic return series so tests reproduce bit-for-bit.\n\"\"\"\nfrom dataclasses import dataclass\nfrom typing import Any\nimport numpy as np\n\n\n@dataclass\nclass Response:\n    status_code: int\n    _payload: dict\n\n    @property\n    def ok(self) -> bool:\n        return 200 <= self.status_code < 300\n\n    def json(self) -> Any:\n        return self._payload\n\n\n# Deterministic per-ticker return series. SPY is the market.\n# AAPL is constructed as 1.2 * SPY + idiosyncratic noise so the\n# OLS beta lands near 1.2 \u2014 a realistic ballpark for AAPL.\ndef _build_series() -> dict[str, list[float]]:\n    rng = np.random.default_rng(2025)\n    spy = rng.normal(0.0004, 0.011, 1_000)\n    aapl = 1.20 * spy + rng.normal(0.0, 0.008, 1_000)\n    qqq = 1.10 * spy + rng.normal(0.0, 0.006, 1_000)\n    return {\n        \"SPY\": spy.tolist(),\n        \"AAPL\": aapl.tolist(),\n        \"QQQ\": qqq.tolist(),\n    }\n\n\n_DATA = _build_series()\n\n\ndef get(path: str) -> Response:\n    \"\"\"Mock HTTP GET. Supports /returns/<ticker> only.\n\n    200 + payload {ticker, returns: [...]}  for known tickers.\n    404 + payload {error: 'unknown ticker'} otherwise.\n    \"\"\"\n    if path.startswith(\"/returns/\"):\n        ticker = path[len(\"/returns/\"):].upper()\n        if ticker in _DATA:\n            return Response(200, {\"ticker\": ticker, \"returns\": _DATA[ticker]})\n        return Response(404, {\"error\": f\"unknown ticker: {ticker}\"})\n    return Response(404, {\"error\": f\"unknown path: {path}\"})\n"
+  }
 },
   "quant-23-stationarity-preview": {
   "mode": "predict",

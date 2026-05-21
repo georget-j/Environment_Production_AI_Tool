@@ -49,7 +49,16 @@ STAGE_MODULE_UUID = {
 }
 
 LESSON_MODES = frozenset(
-    {"predict", "fillblank", "matplot", "cscript", "cwasm", "debug", "skeleton"}
+    {
+        "predict",
+        "fillblank",
+        "matplot",
+        "cscript",
+        "cwasm",
+        "debug",
+        "skeleton",
+        "apifetch",
+    }
 )
 EXAMPLE_LANGUAGE_FOR_MODE = {
     "predict": "python",
@@ -59,6 +68,7 @@ EXAMPLE_LANGUAGE_FOR_MODE = {
     "cwasm": "c",
     "debug": "python",
     "skeleton": "python",
+    "apifetch": "python",
 }
 
 
@@ -104,12 +114,14 @@ class Lesson:
     # /data/quant/<slug>.csv inside Pyodide's FS before the user code runs.
     datasets: list[str] = field(default_factory=list)
 
-    # debug / skeleton modes:
+    # debug / skeleton / apifetch modes share these fields:
     #   editable_template: contents of solution.py the learner edits.
     #     - For "debug": working-LOOKING code with one (occasionally two)
     #       subtle bug(s) that make at least one test fail.
     #     - For "skeleton": function signature + docstring + raise
     #       NotImplementedError(...) — the learner implements the body.
+    #     - For "apifetch": same shape as skeleton but the body must
+    #       use the mock_api.py module's HTTP-like client to fetch data.
     #   tests_py: contents of tests/test_solution.py (readonly). Discovered
     #     by pytest automatically; same shape as the project tests.
     #   reference_solution: the correct implementation. NEVER shipped to
@@ -117,6 +129,11 @@ class Lesson:
     editable_template: str = ""
     tests_py: str = ""
     reference_solution: str = ""
+    # apifetch-only: contents of mock_api.py (readonly). A small module
+    # that imitates a requests-shaped HTTP client. The learner reads it
+    # to discover the available endpoints, then writes the client code
+    # in solution.py.
+    mock_api_py: str = ""
     # List of (pytest_id, description) pairs for the TestCase[] array in
     # the generated TS config. Description shown in the runner's tests
     # panel before the learner clicks Run.
@@ -143,16 +160,16 @@ class Lesson:
         return STAGE_MODULE_UUID[self.stage]
 
     def instructions(self) -> str:
-        # debug / skeleton lessons render a different shape — no
-        # "**Example.**" block (which would give away the bug or solution),
-        # and the action label changes to fit the task. The editor itself
-        # IS the example in those modes.
-        if self.mode in ("debug", "skeleton"):
-            action_label = (
-                "**Find the bug.** "
-                if self.mode == "debug"
-                else "**Implement the function.** "
-            )
+        # debug / skeleton / apifetch lessons render a different shape —
+        # no "**Example.**" block (which would give away the bug or
+        # solution), and the action label changes to fit the task. The
+        # editor itself IS the example in those modes.
+        if self.mode in ("debug", "skeleton", "apifetch"):
+            action_label = {
+                "debug": "**Find the bug.** ",
+                "skeleton": "**Implement the function.** ",
+                "apifetch": "**Build the client.** ",
+            }[self.mode]
             lines = [
                 f"**Concept.** {self.concept.strip()}",
                 "",
@@ -160,6 +177,14 @@ class Lesson:
                 "",
                 "**Expected.** All tests pass.",
             ]
+            if self.mode == "apifetch":
+                lines.insert(
+                    -2,
+                    "Read **`mock_api.py`** for the available endpoints and the "
+                    "shape of the `Response` object. Use it from "
+                    "`solution.py` to fetch what you need.",
+                )
+                lines.insert(-2, "")
             return "\n".join(lines)
         lang = EXAMPLE_LANGUAGE_FOR_MODE[self.mode]
         lines = [
@@ -232,23 +257,27 @@ class Lesson:
             if self.hint:
                 payload["hint"] = self.hint
             return payload
-        if self.mode in ("debug", "skeleton"):
-            # Both modes emit the same shape — only the editable_template
-            # content differs (broken code vs. NotImplementedError skeleton).
-            # We reuse the existing pyodide runner: one editable solution
-            # file, one readonly test file, real pytest discovery.
+        if self.mode in ("debug", "skeleton", "apifetch"):
+            # All three modes emit the same pyodide shape; only the inline
+            # file map differs. apifetch adds a readonly mock_api.py the
+            # learner reads to discover the available endpoints.
+            readonly_files = ["tests/test_solution.py"]
+            inline_map: dict[str, str] = {
+                "solution.py": self.editable_template,
+                "tests/test_solution.py": self.tests_py,
+            }
+            if self.mode == "apifetch":
+                readonly_files.insert(0, "mock_api.py")
+                inline_map["mock_api.py"] = self.mock_api_py
             payload = {
                 "mode": "pyodide",
                 "editable": ["solution.py"],
-                "readonly": ["tests/test_solution.py"],
+                "readonly": readonly_files,
                 "tests": [
                     {"id": pid, "description": desc}
                     for pid, desc in self.pytest_targets
                 ],
-                "inline": {
-                    "solution.py": self.editable_template,
-                    "tests/test_solution.py": self.tests_py,
-                },
+                "inline": inline_map,
             }
             if self.datasets:
                 payload["datasets"] = list(self.datasets)
@@ -1051,37 +1080,177 @@ LESSONS: list[Lesson] = [
         datasets=["spy"],
     ),
     Lesson(
-        n=22, stage=2, mode="fillblank",
+        n=22, stage=2, mode="apifetch",
         title="OLS beta of AAPL on SPY",
-        scenario="Beta is the simplest factor: how much does a stock move per unit of market move? Single-stock beta is a one-line OLS that any risk system will check before sizing a position. Hedge-fund risk reports lead with the desk's gross beta, net beta, and beta-to-VIX. The arithmetic of all three starts here.",
-        learner_goal="Run OLS of AAPL returns on SPY returns and read the slope coefficient.",
-        concept="`statsmodels.api.OLS(y, X).fit()` runs ordinary least squares and returns a results object. The X matrix needs a column of ones for the intercept — `sm.add_constant` adds it. `.params` is the coefficient vector with the intercept at index 0 and the slope (beta) at index 1. AAPL's beta to SPY tends to be 1.1–1.3 across recent decades.",
-        example_code=(
-            "import pandas as pd, statsmodels.api as sm\n"
-            "spy = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
-            "aapl = pd.read_csv('/data/quant/aapl.csv')['adj_close'].pct_change()\n"
-            "# Concat side-by-side, drop the first NaN row from pct_change.\n"
-            "df = pd.concat([spy, aapl], axis=1).dropna()\n"
-            "# OLS needs an explicit constant column for the intercept term.\n"
-            "X = sm.add_constant(df.iloc[:, 0])\n"
-            "res = sm.OLS(df.iloc[:, 1], X).fit()\n"
-            "# params[0] = intercept (alpha), params[1] = slope (beta).\n"
-            "print(round(res.params.iloc[1], 2))"
+        scenario="Day three on a hedge-fund risk desk. The senior asks for the beta of AAPL on SPY — but the return series don't live in a CSV; they sit behind an internal /returns/<ticker> HTTP API, with the usual realities: 200 means OK, 404 means the ticker isn't known, and an unknown ticker should bubble up as a real exception so the trade ticket gets blocked. Today's task: build the client.",
+        learner_goal="Implement `compute_beta(ticker, market)` so it fetches both return series from the mock API, runs OLS, and returns the slope. Unknown tickers must raise.",
+        concept="In production, return data comes through a service boundary — HTTP, gRPC, an internal feed library. The mock API in `mock_api.py` behaves like `requests`: `mock_api.get(path)` returns a `Response` with `.status_code` (int), `.ok` (bool), and `.json()` (dict). Routes: `/returns/SPY`, `/returns/AAPL`, and `/returns/QQQ` exist; anything else returns 404. Your job is to check `.ok` before reading `.json()`, raise on errors, then run an OLS regression on the two series to get the slope (beta).",
+        # Unused for apifetch rendering.
+        example_code="",
+        mock_api_py=(
+            "\"\"\"In-process mock of a `/returns/<ticker>` HTTP API.\n"
+            "\n"
+            "Imitates the `requests` library so your solution.py reads like\n"
+            "production code. No network involved: routes return deterministic\n"
+            "synthetic return series so tests reproduce bit-for-bit.\n"
+            "\"\"\"\n"
+            "from dataclasses import dataclass\n"
+            "from typing import Any\n"
+            "import numpy as np\n"
+            "\n"
+            "\n"
+            "@dataclass\n"
+            "class Response:\n"
+            "    status_code: int\n"
+            "    _payload: dict\n"
+            "\n"
+            "    @property\n"
+            "    def ok(self) -> bool:\n"
+            "        return 200 <= self.status_code < 300\n"
+            "\n"
+            "    def json(self) -> Any:\n"
+            "        return self._payload\n"
+            "\n"
+            "\n"
+            "# Deterministic per-ticker return series. SPY is the market.\n"
+            "# AAPL is constructed as 1.2 * SPY + idiosyncratic noise so the\n"
+            "# OLS beta lands near 1.2 — a realistic ballpark for AAPL.\n"
+            "def _build_series() -> dict[str, list[float]]:\n"
+            "    rng = np.random.default_rng(2025)\n"
+            "    spy = rng.normal(0.0004, 0.011, 1_000)\n"
+            "    aapl = 1.20 * spy + rng.normal(0.0, 0.008, 1_000)\n"
+            "    qqq = 1.10 * spy + rng.normal(0.0, 0.006, 1_000)\n"
+            "    return {\n"
+            "        \"SPY\": spy.tolist(),\n"
+            "        \"AAPL\": aapl.tolist(),\n"
+            "        \"QQQ\": qqq.tolist(),\n"
+            "    }\n"
+            "\n"
+            "\n"
+            "_DATA = _build_series()\n"
+            "\n"
+            "\n"
+            "def get(path: str) -> Response:\n"
+            "    \"\"\"Mock HTTP GET. Supports /returns/<ticker> only.\n"
+            "\n"
+            "    200 + payload {ticker, returns: [...]}  for known tickers.\n"
+            "    404 + payload {error: 'unknown ticker'} otherwise.\n"
+            "    \"\"\"\n"
+            "    if path.startswith(\"/returns/\"):\n"
+            "        ticker = path[len(\"/returns/\"):].upper()\n"
+            "        if ticker in _DATA:\n"
+            "            return Response(200, {\"ticker\": ticker, \"returns\": _DATA[ticker]})\n"
+            "        return Response(404, {\"error\": f\"unknown ticker: {ticker}\"})\n"
+            "    return Response(404, {\"error\": f\"unknown path: {path}\"})\n"
         ),
-        template=(
-            "import pandas as pd, statsmodels.api as sm\n"
-            "spy = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
-            "aapl = pd.read_csv('/data/quant/aapl.csv')['adj_close'].pct_change()\n"
-            "df = pd.concat([spy, aapl], axis=1).dropna()\n"
-            "X = sm.add_constant(df.iloc[:, 0])\n"
-            "res = sm.___(df.iloc[:, 1], X).fit()\n"
-            "print(round(res.params.iloc[1], 2))"
+        editable_template=(
+            "\"\"\"Fetch returns via the mock API and compute beta of one ticker on another.\"\"\"\n"
+            "import numpy as np\n"
+            "import statsmodels.api as sm\n"
+            "\n"
+            "import mock_api\n"
+            "\n"
+            "\n"
+            "def compute_beta(ticker: str, market: str = \"SPY\") -> float:\n"
+            "    \"\"\"Single-stock beta from the mock returns API.\n"
+            "\n"
+            "    Steps:\n"
+            "      1. GET /returns/<market> and /returns/<ticker> via mock_api.\n"
+            "      2. If either response is not .ok, raise ValueError with the\n"
+            "         API's error message (read it from response.json()['error']).\n"
+            "      3. Align the two return series — drop the first index of each\n"
+            "         (they're synthesised lock-step, but a real API might not be).\n"
+            "      4. Run OLS: `sm.OLS(y, sm.add_constant(x)).fit()`.\n"
+            "      5. Return the slope (params index 1) as a float.\n"
+            "\n"
+            "    Parameters\n"
+            "    ----------\n"
+            "    ticker : the stock whose beta to measure (e.g. 'AAPL')\n"
+            "    market : the index series to regress on (default 'SPY')\n"
+            "    \"\"\"\n"
+            "    raise NotImplementedError(\"Implement compute_beta\")\n"
         ),
-        your_turn="Replace `___` with the linear-regression constructor.",
-        expected_stdout="1.21",
-        hint="Three letters in caps.",
+        reference_solution=(
+            "import numpy as np\n"
+            "import statsmodels.api as sm\n"
+            "\n"
+            "import mock_api\n"
+            "\n"
+            "\n"
+            "def compute_beta(ticker: str, market: str = \"SPY\") -> float:\n"
+            "    m_resp = mock_api.get(f\"/returns/{market}\")\n"
+            "    if not m_resp.ok:\n"
+            "        raise ValueError(m_resp.json()[\"error\"])\n"
+            "    t_resp = mock_api.get(f\"/returns/{ticker}\")\n"
+            "    if not t_resp.ok:\n"
+            "        raise ValueError(t_resp.json()[\"error\"])\n"
+            "    market_returns = np.asarray(m_resp.json()[\"returns\"])\n"
+            "    ticker_returns = np.asarray(t_resp.json()[\"returns\"])\n"
+            "    n = min(len(market_returns), len(ticker_returns))\n"
+            "    x = market_returns[:n]\n"
+            "    y = ticker_returns[:n]\n"
+            "    res = sm.OLS(y, sm.add_constant(x)).fit()\n"
+            "    return float(res.params[1])\n"
+        ),
+        tests_py=(
+            "\"\"\"Beta computation + error-path tests for the mock returns API.\"\"\"\n"
+            "import pytest\n"
+            "\n"
+            "from solution import compute_beta\n"
+            "\n"
+            "\n"
+            "def test_aapl_beta_lands_in_expected_range():\n"
+            "    beta = compute_beta(\"AAPL\")\n"
+            "    # AAPL constructed as 1.20 * SPY + noise; OLS recovers ~1.2.\n"
+            "    assert 1.15 < beta < 1.25\n"
+            "\n"
+            "\n"
+            "def test_qqq_beta_lands_in_expected_range():\n"
+            "    beta = compute_beta(\"QQQ\")\n"
+            "    # QQQ constructed as 1.10 * SPY + smaller noise; OLS recovers ~1.1.\n"
+            "    assert 1.05 < beta < 1.15\n"
+            "\n"
+            "\n"
+            "def test_unknown_ticker_raises_with_api_error_message():\n"
+            "    with pytest.raises(ValueError) as exc:\n"
+            "        compute_beta(\"NVDA\")\n"
+            "    assert \"NVDA\" in str(exc.value)\n"
+            "\n"
+            "\n"
+            "def test_unknown_market_raises():\n"
+            "    with pytest.raises(ValueError):\n"
+            "        compute_beta(\"AAPL\", market=\"NIKKEI\")\n"
+            "\n"
+            "\n"
+            "def test_beta_of_market_against_itself_is_one():\n"
+            "    beta = compute_beta(\"SPY\")\n"
+            "    assert abs(beta - 1.0) < 1e-9\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_aapl_beta_lands_in_expected_range",
+                "AAPL beta on SPY lands between 1.15 and 1.25 (true value ≈ 1.20).",
+            ),
+            (
+                "tests/test_solution.py::test_qqq_beta_lands_in_expected_range",
+                "QQQ beta on SPY lands between 1.05 and 1.15.",
+            ),
+            (
+                "tests/test_solution.py::test_unknown_ticker_raises_with_api_error_message",
+                "Unknown ticker 'NVDA' raises ValueError with the API's error message.",
+            ),
+            (
+                "tests/test_solution.py::test_unknown_market_raises",
+                "Unknown market 'NIKKEI' raises ValueError.",
+            ),
+            (
+                "tests/test_solution.py::test_beta_of_market_against_itself_is_one",
+                "Beta of SPY on itself is exactly 1.0.",
+            ),
+        ],
+        your_turn="`compute_beta` is empty. Read `mock_api.py` for the route shape, then fetch both series, check `.ok`, parse `.json()`, and regress.",
+        hint="Two calls to `mock_api.get`, one if-not-ok-raise on each, then `sm.OLS(y, sm.add_constant(x)).fit().params[1]`.",
         skills=["quant", "pandas", "statistics", "regression"],
-        datasets=["spy", "aapl"],
     ),
     Lesson(
         n=23, stage=2, mode="predict",

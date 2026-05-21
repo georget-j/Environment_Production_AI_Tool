@@ -59,8 +59,9 @@ def run_example(code: str) -> tuple[str, str | None]:
 
 
 def verify_pytest_lesson(lesson) -> tuple[bool, str]:
-    """For debug/skeleton lessons, write a temp pytest project and assert
-    that the editable_template fails AND the reference_solution passes."""
+    """For debug/skeleton/apifetch lessons, write a temp pytest project and
+    assert that the editable_template fails AND the reference_solution
+    passes. For apifetch, also mount the readonly mock_api.py module."""
     with tempfile.TemporaryDirectory(prefix=f"qverify_{lesson.slug}_") as raw:
         d = Path(raw)
         (d / "tests").mkdir(parents=True, exist_ok=True)
@@ -68,6 +69,10 @@ def verify_pytest_lesson(lesson) -> tuple[bool, str]:
         (d / "tests" / "test_solution.py").write_text(
             lesson.tests_py, encoding="utf-8"
         )
+        if lesson.mode == "apifetch":
+            (d / "mock_api.py").write_text(
+                lesson.mock_api_py, encoding="utf-8"
+            )
 
         def run() -> int:
             res = subprocess.run(
@@ -102,7 +107,7 @@ def main() -> int:
         if lesson.mode in ("cscript", "cwasm"):
             # Browser-only runtimes; skip here.
             continue
-        if lesson.mode in ("debug", "skeleton"):
+        if lesson.mode in ("debug", "skeleton", "apifetch"):
             success, message = verify_pytest_lesson(lesson)
             if success:
                 ok += 1
