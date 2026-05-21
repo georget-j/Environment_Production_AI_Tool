@@ -193,22 +193,27 @@ export function ChallengeView({
   } else
     switch (config?.mode) {
       case "pyodide":
-        runner = repoTemplateUrl ? (
-          <ChallengeRunner
-            ref={runnerRef}
-            challengeSlug={challengeSlug}
-            challengeId={challengeId}
-            repoTemplateUrl={repoTemplateUrl}
-            branch={repoBranch ?? "main"}
-            config={config}
-            onStuck={handleStuck}
-            onFilesChange={handleFilesChange}
-          />
-        ) : (
-          <p className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-            This challenge is missing a template URL — please contact support.
-          </p>
-        );
+        // Pyodide projects can ship inline file scaffolds (Quant mini-
+        // projects) OR fetch them from a GitHub mirror (FastAPI commerce
+        // challenges). Either source is fine; only error if neither is
+        // available.
+        runner =
+          config.inline || repoTemplateUrl ? (
+            <ChallengeRunner
+              ref={runnerRef}
+              challengeSlug={challengeSlug}
+              challengeId={challengeId}
+              repoTemplateUrl={repoTemplateUrl}
+              branch={repoBranch ?? "main"}
+              config={config}
+              onStuck={handleStuck}
+              onFilesChange={handleFilesChange}
+            />
+          ) : (
+            <p className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+              This challenge is missing a template URL — please contact support.
+            </p>
+          );
         break;
       case "predict":
         runner = <LessonPredict config={config} nextSlug={nextSlug} />;

@@ -70,7 +70,12 @@ const SUBMIT_REPO_URL = "https://prodready-ai.vercel.app/in-browser";
 type Props = {
   challengeSlug: string;
   challengeId: string;
-  repoTemplateUrl: string;
+  /**
+   * Source repo for the file scaffolds. `null` when `config.inline` is set
+   * (Quant mini-projects ship their scaffolds inline so they don't need a
+   * GitHub mirror).
+   */
+  repoTemplateUrl: string | null;
   branch: string;
   config: Extract<ChallengeRunnerConfig, { mode: "pyodide" }>;
   /** Called when the learner clicks 'Stuck?'. Receives a pre-baked
@@ -103,7 +108,10 @@ type SubmitState =
   | { kind: "submitting" }
   | { kind: "error"; message: string };
 
-function parseOwnerRepo(url: string): { owner: string; repo: string } | null {
+function parseOwnerRepo(
+  url: string | null,
+): { owner: string; repo: string } | null {
+  if (!url) return null;
   try {
     const u = new URL(url);
     const [, owner, repo] = u.pathname.split("/");
@@ -168,7 +176,12 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     },
     ref,
   ) {
-    const meta = parseOwnerRepo(repoTemplateUrl);
+    // When `config.inline` is set, file contents come from the generated
+    // TS config and we never hit the network. Used by the Quant mini-
+    // projects so we don't need a per-project GitHub mirror. Otherwise
+    // we fall back to fetching from raw.githubusercontent.com.
+    const inlineFiles = config.inline ?? null;
+    const meta = inlineFiles ? null : parseOwnerRepo(repoTemplateUrl);
     const allPaths = [...config.editable, ...config.readonly];
 
     const [files, setFiles] = useState<Record<string, string>>({});
@@ -218,6 +231,20 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     }, []);
 
     useEffect(() => {
+      if (inlineFiles) {
+        // Inline-scaffold path: contents come from the generated config.
+        const next: Record<string, string> = {};
+        for (const path of allPaths) next[path] = inlineFiles[path] ?? "";
+        for (const path of config.editable) {
+          const saved =
+            typeof window !== "undefined"
+              ? window.localStorage.getItem(storageKey(challengeSlug, path))
+              : null;
+          if (saved !== null) next[path] = saved;
+        }
+        setFiles(next);
+        return;
+      }
       if (!meta) {
         setLoadError("Invalid repo URL");
         return;
@@ -253,7 +280,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
         cancelled = true;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [meta?.owner, meta?.repo, branch, challengeSlug]);
+    }, [meta?.owner, meta?.repo, branch, challengeSlug, inlineFiles !== null]);
 
     const handleEdit = useCallback(
       (value: string | undefined) => {
@@ -270,12 +297,23 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     );
 
     const handleReset = useCallback(async () => {
-      if (!meta) return;
       if (
         !confirm("Reset your edits to the original code? This can't be undone.")
       )
         return;
       const next = { ...files };
+      if (inlineFiles) {
+        for (const path of config.editable) {
+          next[path] = inlineFiles[path] ?? "";
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem(storageKey(challengeSlug, path));
+          }
+        }
+        setFiles(next);
+        setRunState({ kind: "idle" });
+        return;
+      }
+      if (!meta) return;
       const fresh = await Promise.all(
         config.editable.map(async (path) => {
           const url = `${RAW_BASE}/${meta.owner}/${meta.repo}/${branch}/${path}`;
@@ -295,7 +333,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
       }
       setFiles(next);
       setRunState({ kind: "idle" });
-    }, [meta, files, config.editable, branch, challengeSlug]);
+    }, [meta, inlineFiles, files, config.editable, branch, challengeSlug]);
 
     const explainFailures = useCallback(
       async (testOutput: string, currentFiles: Record<string, string>) => {

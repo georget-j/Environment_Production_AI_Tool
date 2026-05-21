@@ -120,6 +120,16 @@ export type ChallengeRunnerConfig =
       editable: string[];
       readonly: string[];
       tests: TestCase[];
+      /**
+       * Optional inline file map. When set, the runner uses these contents
+       * verbatim instead of fetching them from `repo_template_url`. Used by
+       * the Quant mini-projects, which ship scaffolds in the generated TS
+       * config so we don't need a per-project GitHub mirror.
+       *
+       * Every path listed in `editable` and `readonly` must appear as a key
+       * here. Missing keys would surface to the learner as an empty file.
+       */
+      inline?: Record<string, string>;
     }
   | {
       mode: "reading";
@@ -133,10 +143,12 @@ export type ChallengeRunnerConfig =
 
 import { PYTHON_BASICS_CONFIG } from "@/lib/python-basics-config.generated";
 import { QUANT_CONFIG } from "@/lib/quant-config.generated";
+import { QUANT_PROJECTS_CONFIG } from "@/lib/quant-projects-config.generated";
 
 export const CHALLENGE_CONFIG: Record<string, ChallengeRunnerConfig> = {
   ...PYTHON_BASICS_CONFIG,
   ...QUANT_CONFIG,
+  ...QUANT_PROJECTS_CONFIG,
 
   "fastapi-commerce-run-and-explore": {
     mode: "reading",
