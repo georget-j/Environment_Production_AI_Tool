@@ -48,13 +48,17 @@ STAGE_MODULE_UUID = {
     5: "00000000-0000-0000-0000-000000000035",
 }
 
-LESSON_MODES = frozenset({"predict", "fillblank", "matplot", "cscript", "cwasm"})
+LESSON_MODES = frozenset(
+    {"predict", "fillblank", "matplot", "cscript", "cwasm", "debug", "skeleton"}
+)
 EXAMPLE_LANGUAGE_FOR_MODE = {
     "predict": "python",
     "fillblank": "python",
     "matplot": "python",
     "cscript": "c",
     "cwasm": "c",
+    "debug": "python",
+    "skeleton": "python",
 }
 
 
@@ -100,6 +104,24 @@ class Lesson:
     # /data/quant/<slug>.csv inside Pyodide's FS before the user code runs.
     datasets: list[str] = field(default_factory=list)
 
+    # debug / skeleton modes:
+    #   editable_template: contents of solution.py the learner edits.
+    #     - For "debug": working-LOOKING code with one (occasionally two)
+    #       subtle bug(s) that make at least one test fail.
+    #     - For "skeleton": function signature + docstring + raise
+    #       NotImplementedError(...) — the learner implements the body.
+    #   tests_py: contents of tests/test_solution.py (readonly). Discovered
+    #     by pytest automatically; same shape as the project tests.
+    #   reference_solution: the correct implementation. NEVER shipped to
+    #     the learner — verifier-only, proves the tests are well-formed.
+    editable_template: str = ""
+    tests_py: str = ""
+    reference_solution: str = ""
+    # List of (pytest_id, description) pairs for the TestCase[] array in
+    # the generated TS config. Description shown in the runner's tests
+    # panel before the learner clicks Run.
+    pytest_targets: list[tuple[str, str]] = field(default_factory=list)
+
     def __post_init__(self) -> None:
         if self.mode not in LESSON_MODES:
             raise ValueError(f"lesson {self.n}: unknown mode {self.mode!r}")
@@ -121,6 +143,24 @@ class Lesson:
         return STAGE_MODULE_UUID[self.stage]
 
     def instructions(self) -> str:
+        # debug / skeleton lessons render a different shape — no
+        # "**Example.**" block (which would give away the bug or solution),
+        # and the action label changes to fit the task. The editor itself
+        # IS the example in those modes.
+        if self.mode in ("debug", "skeleton"):
+            action_label = (
+                "**Find the bug.** "
+                if self.mode == "debug"
+                else "**Implement the function.** "
+            )
+            lines = [
+                f"**Concept.** {self.concept.strip()}",
+                "",
+                f"{action_label}{self.your_turn.strip()}",
+                "",
+                "**Expected.** All tests pass.",
+            ]
+            return "\n".join(lines)
         lang = EXAMPLE_LANGUAGE_FOR_MODE[self.mode]
         lines = [
             f"**Concept.** {self.concept.strip()}",
@@ -191,6 +231,27 @@ class Lesson:
             }
             if self.hint:
                 payload["hint"] = self.hint
+            return payload
+        if self.mode in ("debug", "skeleton"):
+            # Both modes emit the same shape — only the editable_template
+            # content differs (broken code vs. NotImplementedError skeleton).
+            # We reuse the existing pyodide runner: one editable solution
+            # file, one readonly test file, real pytest discovery.
+            payload = {
+                "mode": "pyodide",
+                "editable": ["solution.py"],
+                "readonly": ["tests/test_solution.py"],
+                "tests": [
+                    {"id": pid, "description": desc}
+                    for pid, desc in self.pytest_targets
+                ],
+                "inline": {
+                    "solution.py": self.editable_template,
+                    "tests/test_solution.py": self.tests_py,
+                },
+            }
+            if self.datasets:
+                payload["datasets"] = list(self.datasets)
             return payload
         raise ValueError(f"unhandled mode {self.mode}")
 
@@ -369,38 +430,94 @@ LESSONS: list[Lesson] = [
         skills=["quant", "numpy", "vectorisation"],
     ),
     Lesson(
-        n=6, stage=1, mode="fillblank",
+        n=6, stage=1, mode="debug",
         title="Variance from scratch",
-        scenario="Before you reach for `arr.var()`, derive it once. Variance is the mean of squared deviations from the mean — three ops in numpy. Doing this by hand once is what makes a covariance matrix obvious later.",
-        learner_goal="Compute variance from the definition, without using `.var()`, and verify against numpy's built-in.",
-        concept="Variance σ² = mean((x - μ)²). In numpy: take the deviations (`x - x.mean()`), square them (`** 2`), take the mean. That's it. The square is elementwise broadcasting; the mean is a single reduction.",
-        example_code=(
-            "import numpy as np\n"
-            "rng = np.random.default_rng(0)\n"
-            "x = rng.normal(loc=0.0, scale=0.02, size=10_000)\n"
+        scenario="Junior on the risk team ships a position-sizing script. Production runs fine for two weeks; vol-targeting numbers look believable. Until the head of risk runs the same calculation in a spreadsheet and the numbers don't match. The function below — same shape as what landed in production — divides by the wrong denominator. Spot the bug, then read the test that catches it.",
+        learner_goal="Find the one-character bug in `sample_variance` that makes its output disagree with numpy's `.var(ddof=1)`.",
+        concept="Sample variance divides the sum of squared deviations by `n - 1`, not `n`. The `n` form is *population* variance — correct when your data IS the whole population, wrong when it's a sample. numpy defaults to `ddof=0` (population); statisticians and pandas default to `ddof=1` (sample). For finance returns, sample is correct — you only ever have a sample of the future.",
+        # Unused for debug-mode rendering — kept empty so the dataclass stays uniform.
+        example_code="",
+        editable_template=(
+            "\"\"\"Compute sample variance from first principles.\n"
             "\n"
-            "# By hand — the textbook formula.\n"
-            "mu = x.mean()\n"
-            "deviations = x - mu\n"
-            "var_manual = (deviations ** 2).mean()\n"
-            "\n"
-            "# Sanity-check against numpy.\n"
-            "print(round(var_manual, 6), round(x.var(), 6))\n"
-            "print(np.isclose(var_manual, x.var()))"
-        ),
-        template=(
+            "This is the function we ship to production. It's been reviewed by\n"
+            "two engineers and passes a smoke test against a small array. But\n"
+            "the head of risk has just emailed: 'your vol numbers are\n"
+            "systematically smaller than mine.' Find why.\n"
+            "\"\"\"\n"
             "import numpy as np\n"
-            "rng = np.random.default_rng(0)\n"
-            "x = rng.normal(loc=0.0, scale=0.02, size=10_000)\n"
-            "mu = x.mean()\n"
-            "deviations = x - mu\n"
-            "var_manual = (deviations ___ 2).mean()\n"
-            "print(round(var_manual, 6), round(x.var(), 6))\n"
-            "print(np.isclose(var_manual, x.var()))"
+            "\n"
+            "\n"
+            "def sample_variance(x: np.ndarray) -> float:\n"
+            "    \"\"\"Sample variance: sum of squared deviations from the mean,\n"
+            "    divided by the appropriate denominator for an unbiased estimator.\n"
+            "    \"\"\"\n"
+            "    mu = x.mean()\n"
+            "    deviations = x - mu\n"
+            "    squared = deviations ** 2\n"
+            "    # Bug lives on the next line. Read the docstring above.\n"
+            "    return float(squared.sum() / len(x))\n"
         ),
-        your_turn="Replace `___` with the operator that elementwise-squares the deviations.",
-        expected_stdout="0.000398 0.000398\nTrue",
-        hint="Two asterisks.",
+        reference_solution=(
+            "import numpy as np\n"
+            "\n"
+            "\n"
+            "def sample_variance(x: np.ndarray) -> float:\n"
+            "    mu = x.mean()\n"
+            "    deviations = x - mu\n"
+            "    squared = deviations ** 2\n"
+            "    return float(squared.sum() / (len(x) - 1))\n"
+        ),
+        tests_py=(
+            "\"\"\"Sample-variance correctness against numpy's ddof=1 reference.\"\"\"\n"
+            "import numpy as np\n"
+            "import pytest\n"
+            "\n"
+            "from solution import sample_variance\n"
+            "\n"
+            "\n"
+            "def test_matches_numpy_ddof_1_on_small_array():\n"
+            "    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n"
+            "    assert abs(sample_variance(x) - x.var(ddof=1)) < 1e-12\n"
+            "\n"
+            "\n"
+            "def test_matches_numpy_ddof_1_on_returns_like_array():\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    x = rng.normal(0.0, 0.02, 1000)\n"
+            "    assert abs(sample_variance(x) - x.var(ddof=1)) < 1e-12\n"
+            "\n"
+            "\n"
+            "def test_two_element_sample_variance_is_half_squared_diff():\n"
+            "    # For a 2-element sample, var = (x1 - x2)^2 / 2.\n"
+            "    assert abs(sample_variance(np.array([10.0, 12.0])) - 2.0) < 1e-12\n"
+            "\n"
+            "\n"
+            "def test_constant_array_has_zero_variance():\n"
+            "    x = np.full(50, 3.14)\n"
+            "    # `mean()` of a constant array can leave a tiny float residual,\n"
+            "    # so allow numerical-precision slack rather than == 0.\n"
+            "    assert sample_variance(x) < 1e-20\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_matches_numpy_ddof_1_on_small_array",
+                "sample_variance on [1..5] matches numpy's ddof=1 result.",
+            ),
+            (
+                "tests/test_solution.py::test_matches_numpy_ddof_1_on_returns_like_array",
+                "Matches numpy on a 1000-element return-like series.",
+            ),
+            (
+                "tests/test_solution.py::test_two_element_sample_variance_is_half_squared_diff",
+                "For [10, 12], sample variance is 2.0 (=(12-10)^2 / 2).",
+            ),
+            (
+                "tests/test_solution.py::test_constant_array_has_zero_variance",
+                "Constant array has zero variance — must hold even with the fix.",
+            ),
+        ],
+        your_turn="The function looks right but ships the wrong number. Read its docstring carefully and adjust the denominator on the return line.",
+        hint="The docstring says 'unbiased estimator' — for a sample, that means dividing by n-1.",
         skills=["quant", "numpy", "statistics"],
     ),
     Lesson(
@@ -555,31 +672,108 @@ LESSONS: list[Lesson] = [
         skills=["quant", "numpy", "performance"],
     ),
     Lesson(
-        n=12, stage=1, mode="fillblank",
+        n=12, stage=1, mode="skeleton",
         title="Vectorising with cumsum",
-        scenario="Same answer as yesterday's double-loop, ~200× faster. The cumulative-sum trick — `c[i] − c[i−w]` — is one of the most useful identities in numerical Python. Every senior quant carries it in their head; you should too.",
-        learner_goal="Replace the Python rolling-mean loop with `np.cumsum`.",
-        concept="If `c = cumsum(x)`, then the window-`w` sum ending at index `i` equals `c[i] − c[i−w]`. Prepend a zero to `c` so the slice arithmetic is clean. One pass, no inner loop, all in C. The same trick gives you rolling sums of any cost function — drawdowns, exposures, anything.",
-        example_code=(
+        scenario="Yesterday's double-loop ran in 28 minutes. Your manager wants the same answer in 8 seconds before tomorrow's standup. The cumulative-sum identity `c[i] − c[i−w]` is the canonical trick — every senior quant carries it in their head; pandas, vectorbt, and every market-data smoother use it internally. Today you build it from the function signature.",
+        learner_goal="Implement `rolling_mean(x, w)` using numpy's `cumsum` so it matches the naive double-loop on every input.",
+        concept="If `c = cumsum(x)` (with a 0 prepended so the slice arithmetic is clean), then the sum of the window of width `w` ending at index `i` equals `c[i+1] − c[i+1-w]`. One numpy pass, no inner loop. The output has shape `(len(x) - w + 1,)` — the first `w-1` positions have no full window. Same identity drives rolling sums of drawdowns, exposures, anything cumulative.",
+        # Skeleton mode doesn't render the **Example.** block; field stays empty.
+        example_code="",
+        editable_template=(
+            "\"\"\"Vectorised rolling mean via the cumulative-sum identity.\"\"\"\n"
             "import numpy as np\n"
-            "x = np.array([1, 2, 3, 4, 5, 6], dtype=float)\n"
-            "w = 3\n"
-            "# Prepend 0 so c[w:] - c[:-w] gives clean window sums.\n"
-            "c = np.concatenate(([0], np.cumsum(x)))\n"
-            "rolling = (c[w:] - c[:-w]) / w\n"
-            "print(rolling)"
+            "\n"
+            "\n"
+            "def rolling_mean(x: np.ndarray, w: int) -> np.ndarray:\n"
+            "    \"\"\"Mean of every contiguous window of width `w` in `x`.\n"
+            "\n"
+            "    Use the cumsum trick: prepend a zero to cumsum(x), then\n"
+            "    each window sum is one subtraction of two prefix sums.\n"
+            "    Divide by `w` to get the mean.\n"
+            "\n"
+            "    Parameters\n"
+            "    ----------\n"
+            "    x : 1-D float ndarray\n"
+            "    w : window width (1 <= w <= len(x))\n"
+            "\n"
+            "    Returns\n"
+            "    -------\n"
+            "    ndarray of shape (len(x) - w + 1,) with the rolling means.\n"
+            "    \"\"\"\n"
+            "    raise NotImplementedError(\"Implement rolling_mean\")\n"
         ),
-        template=(
+        reference_solution=(
             "import numpy as np\n"
-            "x = np.array([1, 2, 3, 4, 5, 6], dtype=float)\n"
-            "w = 3\n"
-            "c = np.concatenate(([0], np.___(x)))\n"
-            "rolling = (c[w:] - c[:-w]) / w\n"
-            "print(rolling)"
+            "\n"
+            "\n"
+            "def rolling_mean(x: np.ndarray, w: int) -> np.ndarray:\n"
+            "    c = np.concatenate(([0.0], np.cumsum(x)))\n"
+            "    return (c[w:] - c[:-w]) / w\n"
         ),
-        your_turn="Replace `___` with the cumulative-sum function.",
-        expected_stdout="[2. 3. 4. 5.]",
-        hint="Three letters then `sum`.",
+        tests_py=(
+            "\"\"\"Tests for the vectorised rolling mean.\"\"\"\n"
+            "import numpy as np\n"
+            "import pytest\n"
+            "\n"
+            "from solution import rolling_mean\n"
+            "\n"
+            "\n"
+            "def test_simple_input_matches_hand_calc():\n"
+            "    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])\n"
+            "    out = rolling_mean(x, 3)\n"
+            "    assert np.allclose(out, [2.0, 3.0, 4.0, 5.0])\n"
+            "\n"
+            "\n"
+            "def test_window_one_returns_input():\n"
+            "    x = np.array([10.0, 20.0, 30.0])\n"
+            "    assert np.allclose(rolling_mean(x, 1), x)\n"
+            "\n"
+            "\n"
+            "def test_window_equals_length_returns_single_mean():\n"
+            "    x = np.array([1.0, 2.0, 3.0, 4.0])\n"
+            "    out = rolling_mean(x, 4)\n"
+            "    assert out.shape == (1,)\n"
+            "    assert abs(out[0] - 2.5) < 1e-12\n"
+            "\n"
+            "\n"
+            "def test_shape_is_n_minus_w_plus_1():\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    x = rng.normal(size=100)\n"
+            "    out = rolling_mean(x, 7)\n"
+            "    assert out.shape == (100 - 7 + 1,)\n"
+            "\n"
+            "\n"
+            "def test_matches_naive_loop_on_random_input():\n"
+            "    rng = np.random.default_rng(42)\n"
+            "    x = rng.normal(size=200)\n"
+            "    w = 12\n"
+            "    naive = np.array([x[i : i + w].mean() for i in range(len(x) - w + 1)])\n"
+            "    assert np.allclose(rolling_mean(x, w), naive)\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_simple_input_matches_hand_calc",
+                "rolling_mean([1..6], 3) is [2, 3, 4, 5].",
+            ),
+            (
+                "tests/test_solution.py::test_window_one_returns_input",
+                "Window of 1 returns the input unchanged.",
+            ),
+            (
+                "tests/test_solution.py::test_window_equals_length_returns_single_mean",
+                "Window equal to len(x) returns a single mean.",
+            ),
+            (
+                "tests/test_solution.py::test_shape_is_n_minus_w_plus_1",
+                "Output shape is (len(x) - w + 1,).",
+            ),
+            (
+                "tests/test_solution.py::test_matches_naive_loop_on_random_input",
+                "Matches a Python double-loop reference on a 200-element random series.",
+            ),
+        ],
+        your_turn="The body is empty. Read the docstring, then implement the cumsum identity in two or three lines.",
+        hint="`np.concatenate(([0.0], np.cumsum(x)))` is your friend; then a single slice subtraction divided by w.",
         skills=["quant", "numpy", "vectorisation", "performance"],
     ),
     Lesson(

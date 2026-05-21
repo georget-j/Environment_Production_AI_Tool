@@ -35,10 +35,35 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "hint": "Strictly positive \u2014 zero doesn't count."
 },
   "quant-06-variance-from-scratch": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nrng = np.random.default_rng(0)\nx = rng.normal(loc=0.0, scale=0.02, size=10_000)\nmu = x.mean()\ndeviations = x - mu\nvar_manual = (deviations ___ 2).mean()\nprint(round(var_manual, 6), round(x.var(), 6))\nprint(np.isclose(var_manual, x.var()))",
-  "expected_stdout": "0.000398 0.000398\nTrue",
-  "hint": "Two asterisks."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_matches_numpy_ddof_1_on_small_array",
+      "description": "sample_variance on [1..5] matches numpy's ddof=1 result."
+    },
+    {
+      "id": "tests/test_solution.py::test_matches_numpy_ddof_1_on_returns_like_array",
+      "description": "Matches numpy on a 1000-element return-like series."
+    },
+    {
+      "id": "tests/test_solution.py::test_two_element_sample_variance_is_half_squared_diff",
+      "description": "For [10, 12], sample variance is 2.0 (=(12-10)^2 / 2)."
+    },
+    {
+      "id": "tests/test_solution.py::test_constant_array_has_zero_variance",
+      "description": "Constant array has zero variance \u2014 must hold even with the fix."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Compute sample variance from first principles.\n\nThis is the function we ship to production. It's been reviewed by\ntwo engineers and passes a smoke test against a small array. But\nthe head of risk has just emailed: 'your vol numbers are\nsystematically smaller than mine.' Find why.\n\"\"\"\nimport numpy as np\n\n\ndef sample_variance(x: np.ndarray) -> float:\n    \"\"\"Sample variance: sum of squared deviations from the mean,\n    divided by the appropriate denominator for an unbiased estimator.\n    \"\"\"\n    mu = x.mean()\n    deviations = x - mu\n    squared = deviations ** 2\n    # Bug lives on the next line. Read the docstring above.\n    return float(squared.sum() / len(x))\n",
+    "tests/test_solution.py": "\"\"\"Sample-variance correctness against numpy's ddof=1 reference.\"\"\"\nimport numpy as np\nimport pytest\n\nfrom solution import sample_variance\n\n\ndef test_matches_numpy_ddof_1_on_small_array():\n    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n    assert abs(sample_variance(x) - x.var(ddof=1)) < 1e-12\n\n\ndef test_matches_numpy_ddof_1_on_returns_like_array():\n    rng = np.random.default_rng(0)\n    x = rng.normal(0.0, 0.02, 1000)\n    assert abs(sample_variance(x) - x.var(ddof=1)) < 1e-12\n\n\ndef test_two_element_sample_variance_is_half_squared_diff():\n    # For a 2-element sample, var = (x1 - x2)^2 / 2.\n    assert abs(sample_variance(np.array([10.0, 12.0])) - 2.0) < 1e-12\n\n\ndef test_constant_array_has_zero_variance():\n    x = np.full(50, 3.14)\n    # `mean()` of a constant array can leave a tiny float residual,\n    # so allow numerical-precision slack rather than == 0.\n    assert sample_variance(x) < 1e-20\n"
+  }
 },
   "quant-07-covariance-via-matrix-algebra": {
   "mode": "fillblank",
@@ -71,10 +96,39 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "prompt": "Type the list as Python prints it."
 },
   "quant-12-vectorising-with-cumsum": {
-  "mode": "fillblank",
-  "template": "import numpy as np\nx = np.array([1, 2, 3, 4, 5, 6], dtype=float)\nw = 3\nc = np.concatenate(([0], np.___(x)))\nrolling = (c[w:] - c[:-w]) / w\nprint(rolling)",
-  "expected_stdout": "[2. 3. 4. 5.]",
-  "hint": "Three letters then `sum`."
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_simple_input_matches_hand_calc",
+      "description": "rolling_mean([1..6], 3) is [2, 3, 4, 5]."
+    },
+    {
+      "id": "tests/test_solution.py::test_window_one_returns_input",
+      "description": "Window of 1 returns the input unchanged."
+    },
+    {
+      "id": "tests/test_solution.py::test_window_equals_length_returns_single_mean",
+      "description": "Window equal to len(x) returns a single mean."
+    },
+    {
+      "id": "tests/test_solution.py::test_shape_is_n_minus_w_plus_1",
+      "description": "Output shape is (len(x) - w + 1,)."
+    },
+    {
+      "id": "tests/test_solution.py::test_matches_naive_loop_on_random_input",
+      "description": "Matches a Python double-loop reference on a 200-element random series."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Vectorised rolling mean via the cumulative-sum identity.\"\"\"\nimport numpy as np\n\n\ndef rolling_mean(x: np.ndarray, w: int) -> np.ndarray:\n    \"\"\"Mean of every contiguous window of width `w` in `x`.\n\n    Use the cumsum trick: prepend a zero to cumsum(x), then\n    each window sum is one subtraction of two prefix sums.\n    Divide by `w` to get the mean.\n\n    Parameters\n    ----------\n    x : 1-D float ndarray\n    w : window width (1 <= w <= len(x))\n\n    Returns\n    -------\n    ndarray of shape (len(x) - w + 1,) with the rolling means.\n    \"\"\"\n    raise NotImplementedError(\"Implement rolling_mean\")\n",
+    "tests/test_solution.py": "\"\"\"Tests for the vectorised rolling mean.\"\"\"\nimport numpy as np\nimport pytest\n\nfrom solution import rolling_mean\n\n\ndef test_simple_input_matches_hand_calc():\n    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])\n    out = rolling_mean(x, 3)\n    assert np.allclose(out, [2.0, 3.0, 4.0, 5.0])\n\n\ndef test_window_one_returns_input():\n    x = np.array([10.0, 20.0, 30.0])\n    assert np.allclose(rolling_mean(x, 1), x)\n\n\ndef test_window_equals_length_returns_single_mean():\n    x = np.array([1.0, 2.0, 3.0, 4.0])\n    out = rolling_mean(x, 4)\n    assert out.shape == (1,)\n    assert abs(out[0] - 2.5) < 1e-12\n\n\ndef test_shape_is_n_minus_w_plus_1():\n    rng = np.random.default_rng(0)\n    x = rng.normal(size=100)\n    out = rolling_mean(x, 7)\n    assert out.shape == (100 - 7 + 1,)\n\n\ndef test_matches_naive_loop_on_random_input():\n    rng = np.random.default_rng(42)\n    x = rng.normal(size=200)\n    w = 12\n    naive = np.array([x[i : i + w].mean() for i in range(len(x) - w + 1)])\n    assert np.allclose(rolling_mean(x, w), naive)\n"
+  }
 },
   "quant-13-plot-a-price-path": {
   "mode": "matplot",

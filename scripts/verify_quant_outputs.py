@@ -1,8 +1,17 @@
-"""Sanity-check the quant lessons by running each Python example and
-comparing stdout to the lesson's `expected_stdout` / `expected_stdout_contains`.
+"""Sanity-check the quant lessons before they ship to learners.
 
-Catches typos before they ship to learners. Skips cscript / cwasm lessons
-(those have their own runtimes).
+Two distinct check modes, applied per lesson:
+
+- predict / fillblank / matplot: run the example_code (or `code` for
+  predict) and compare stdout to `expected_stdout` / `_contains`.
+- debug / skeleton: write a tiny pytest project (solution.py +
+  tests/test_solution.py) and run pytest twice — first against the
+  shipped editable_template (expect failure: bug trips for debug, or
+  NotImplementedError trips for skeleton), then against the reference
+  solution (expect pass).
+
+cscript / cwasm lessons run in browser-only runtimes (picoc-js / WASM)
+and are skipped here.
 
     python scripts/verify_quant_outputs.py
 """
@@ -10,7 +19,10 @@ Catches typos before they ship to learners. Skips cscript / cwasm lessons
 from __future__ import annotations
 
 import io
+import shutil
+import subprocess
 import sys
+import tempfile
 import traceback
 from contextlib import redirect_stdout
 
@@ -46,12 +58,57 @@ def run_example(code: str) -> tuple[str, str | None]:
         return buf.getvalue(), traceback.format_exc(limit=2)
 
 
+def verify_pytest_lesson(lesson) -> tuple[bool, str]:
+    """For debug/skeleton lessons, write a temp pytest project and assert
+    that the editable_template fails AND the reference_solution passes."""
+    with tempfile.TemporaryDirectory(prefix=f"qverify_{lesson.slug}_") as raw:
+        d = Path(raw)
+        (d / "tests").mkdir(parents=True, exist_ok=True)
+        (d / "tests" / "__init__.py").write_text("", encoding="utf-8")
+        (d / "tests" / "test_solution.py").write_text(
+            lesson.tests_py, encoding="utf-8"
+        )
+
+        def run() -> int:
+            res = subprocess.run(
+                ["python", "-m", "pytest", "-q", str(d)],
+                capture_output=True,
+                text=True,
+                cwd=str(d),
+            )
+            return res.returncode
+
+        # Editable should NOT pass — proves the bug/skeleton genuinely trips.
+        (d / "solution.py").write_text(
+            lesson.editable_template, encoding="utf-8"
+        )
+        if run() == 0:
+            return False, "editable_template passed all tests — bug doesn't trip"
+
+        # Reference solution must pass — proves tests are correctly authored.
+        (d / "solution.py").write_text(
+            lesson.reference_solution, encoding="utf-8"
+        )
+        if run() != 0:
+            return False, "reference_solution did not pass all tests"
+
+    return True, "ok"
+
+
 def main() -> int:
     ok = 0
     failed = 0
     for lesson in LESSONS:
-        if lesson.mode not in ("predict", "fillblank", "matplot"):
-            # cscript / cwasm — different runtimes; skip here.
+        if lesson.mode in ("cscript", "cwasm"):
+            # Browser-only runtimes; skip here.
+            continue
+        if lesson.mode in ("debug", "skeleton"):
+            success, message = verify_pytest_lesson(lesson)
+            if success:
+                ok += 1
+            else:
+                print(f"  ✗ {lesson.slug}  ({lesson.mode}): {message}")
+                failed += 1
             continue
         # predict: the LEARNER sees `code` and predicts its output.
         # fillblank / matplot: `example_code` is the filled-in version.

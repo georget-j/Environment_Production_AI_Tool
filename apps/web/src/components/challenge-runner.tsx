@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
   detectUnsupportedFeatures,
+  ensureDataset,
   ensurePytest,
   getPyodide,
   resetPyodide,
@@ -209,11 +210,20 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
 
     // Pre-warm Pyodide on mount so the first Run feels instant. Pytest is
     // installed lazily in handleRun via ensurePytest() — we don't pay that
-    // cost on every page mount.
+    // cost on every page mount. Datasets declared on the lesson are
+    // mounted into the FS here too so `pd.read_csv("/data/quant/spy.csv")`
+    // works inside tests.
+    const datasets = config.datasets ?? [];
+    const datasetsKey = datasets.join(",");
     useEffect(() => {
       let cancelled = false;
       setPyodideState({ kind: "warming" });
-      getPyodide()
+      (async () => {
+        await getPyodide();
+        for (const slug of datasets) {
+          await ensureDataset(slug);
+        }
+      })()
         .then(() => {
           if (!cancelled) setPyodideState({ kind: "ready" });
         })
@@ -228,7 +238,8 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
       return () => {
         cancelled = true;
       };
-    }, []);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [datasetsKey]);
 
     useEffect(() => {
       if (inlineFiles) {

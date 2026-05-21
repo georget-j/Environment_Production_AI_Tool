@@ -130,6 +130,12 @@ export type ChallengeRunnerConfig =
        * here. Missing keys would surface to the learner as an empty file.
        */
       inline?: Record<string, string>;
+      /**
+       * Bundled-CSV slugs to mount into Pyodide's FS at /data/quant/<slug>.csv
+       * before tests run. Same mechanism the `fillblank`/`matplot` modes use
+       * for their `datasets:` field. Optional — empty/omitted = no datasets.
+       */
+      datasets?: string[];
     }
   | {
       mode: "reading";
