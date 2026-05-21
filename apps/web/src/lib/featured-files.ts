@@ -128,9 +128,11 @@ export type ChallengeRunnerConfig =
   | CWasmLessonConfig;
 
 import { PYTHON_BASICS_CONFIG } from "@/lib/python-basics-config.generated";
+import { QUANT_CONFIG } from "@/lib/quant-config.generated";
 
 export const CHALLENGE_CONFIG: Record<string, ChallengeRunnerConfig> = {
   ...PYTHON_BASICS_CONFIG,
+  ...QUANT_CONFIG,
 
   "fastapi-commerce-run-and-explore": {
     mode: "reading",
