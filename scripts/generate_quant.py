@@ -747,6 +747,302 @@ LESSONS: list[Lesson] = [
         skills=["quant", "pandas", "time-series", "statistics"],
         datasets=["spy"],
     ),
+
+    # ============ Stage 3 — Financial Foundations / Options (10 lessons) ============
+    Lesson(
+        n=21, stage=3, mode="fillblank",
+        title="Present value of a single cash flow",
+        scenario="A pound tomorrow is worth less than a pound today. Discounting is the simplest version of every pricing model in finance.",
+        learner_goal="Compute the present value of £1000 received in 5 years at a 4% discount rate.",
+        concept="`PV = CF / (1 + r)**t` for a single cash flow. With continuous compounding the formula is `PV = CF * exp(-r*t)`. Either is fine; pick the one the textbook is using.",
+        example_code=(
+            "cf, r, t = 1000, 0.04, 5\n"
+            "pv = cf / (1 + r)**t\n"
+            "print(round(pv, 2))"
+        ),
+        template=(
+            "cf, r, t = 1000, 0.04, 5\n"
+            "pv = cf / (1 + r)___t\n"
+            "print(round(pv, 2))"
+        ),
+        your_turn="Replace `___` with the Python exponentiation operator.",
+        expected_stdout="821.93",
+        hint="Two asterisks.",
+        skills=["quant", "options"],
+    ),
+    Lesson(
+        n=22, stage=3, mode="fillblank",
+        title="Bond yield to maturity",
+        scenario="The YTM of a bond is the rate `r` that makes the discounted cash flows equal the price. There's no closed-form solution — you solve it numerically.",
+        learner_goal="Find the YTM of a 5-year bond paying a 5% coupon, priced at par (face=100).",
+        concept="The price of an annual-coupon bond is `sum(c / (1+r)**t for t in 1..N) + face / (1+r)**N`. When the bond trades at par, YTM equals the coupon rate by definition. `scipy.optimize.brentq` finds the root.",
+        example_code=(
+            "from scipy.optimize import brentq\n"
+            "face, coupon, n, price = 100, 5, 5, 100\n"
+            "def npv(r):\n"
+            "    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\n"
+            "ytm = brentq(npv, 0.0001, 0.5)\n"
+            "print(round(ytm, 4))"
+        ),
+        template=(
+            "from scipy.optimize import brentq\n"
+            "face, coupon, n, price = 100, 5, 5, 100\n"
+            "def npv(r):\n"
+            "    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\n"
+            "ytm = ___(npv, 0.0001, 0.5)\n"
+            "print(round(ytm, 4))"
+        ),
+        your_turn="Replace `___` with the root-finder we imported.",
+        expected_stdout="0.05",
+        hint="Imported above. Six letters.",
+        skills=["quant", "options"],
+    ),
+    Lesson(
+        n=23, stage=3, mode="matplot",
+        title="Option payoff diagrams",
+        scenario="A call's payoff at expiry is `max(S - K, 0)`. A put's is `max(K - S, 0)`. Plot them and you've drawn every derivatives textbook's first figure.",
+        learner_goal="Plot the payoff of a long call with strike 100 over spot prices 60..140.",
+        concept="`np.maximum(S - K, 0)` is the vectorised call payoff. Subtract the premium to get profit. `plt.plot(S, payoff)` does the rest.",
+        example_code=(
+            "import numpy as np, matplotlib.pyplot as plt\n"
+            "S = np.linspace(60, 140, 81)\n"
+            "K, premium = 100, 5\n"
+            "payoff = np.maximum(S - K, 0) - premium\n"
+            "plt.plot(S, payoff)\n"
+            "plt.title('Long call (K=100)'); plt.xlabel('spot'); plt.ylabel('profit')\n"
+            "plt.axhline(0, color='gray', lw=0.5)\n"
+            "print(round(payoff[-1], 1))"
+        ),
+        template=(
+            "import numpy as np, matplotlib.pyplot as plt\n"
+            "S = np.linspace(60, 140, 81)\n"
+            "K, premium = 100, 5\n"
+            "payoff = np.___(S - K, 0) - premium\n"
+            "plt.plot(S, payoff)\n"
+            "plt.title('Long call (K=100)'); plt.xlabel('spot'); plt.ylabel('profit')\n"
+            "plt.axhline(0, color='gray', lw=0.5)\n"
+            "print(round(payoff[-1], 1))"
+        ),
+        your_turn="Replace `___` with the elementwise max function.",
+        expected_stdout="35.0",
+        hint="It's `maximum`, not `max`.",
+        skills=["quant", "options", "matplotlib"],
+    ),
+    Lesson(
+        n=24, stage=3, mode="fillblank",
+        title="Put-call parity",
+        scenario="Put-call parity says `C - P = S - K * exp(-r*T)`. It's a no-arbitrage identity — if it breaks, someone is leaving money on the table.",
+        learner_goal="Verify put-call parity numerically using the Black-Scholes prices.",
+        concept="From parity, given a call price, the matching put is `P = C - S + K * exp(-r*T)`. Compute both sides and they should match to machine precision.",
+        example_code=(
+            "import numpy as np\n"
+            "S, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\n"
+            "P_from_parity = C - S + K * np.exp(-r * T)\n"
+            "print(round(P_from_parity, 2))"
+        ),
+        template=(
+            "import numpy as np\n"
+            "S, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\n"
+            "P_from_parity = C - S + K * np.exp(___ * T)\n"
+            "print(round(P_from_parity, 2))"
+        ),
+        your_turn="Replace `___` so the discount factor is correct (negative rate times time).",
+        expected_stdout="5.68",
+        hint="The exponent should be negative.",
+        skills=["quant", "options"],
+    ),
+    Lesson(
+        n=25, stage=3, mode="fillblank",
+        title="Black-Scholes from scratch",
+        scenario="The Black-Scholes call price is `S*N(d1) - K*exp(-r*T)*N(d2)` where `d1 = (ln(S/K) + (r + σ²/2)*T) / (σ*sqrt(T))` and `d2 = d1 - σ*sqrt(T)`.",
+        learner_goal="Implement the Black-Scholes call price and verify against a textbook example.",
+        concept="`scipy.stats.norm.cdf` is N(). Hull's example: S=100, K=100, r=5%, σ=20%, T=1 gives C ≈ 10.45. Match it.",
+        example_code=(
+            "import numpy as np\n"
+            "from scipy.stats import norm\n"
+            "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
+            "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
+            "d2 = d1 - sigma*np.sqrt(T)\n"
+            "C = S*norm.cdf(d1) - K*np.exp(-r*T)*norm.cdf(d2)\n"
+            "print(round(C, 4))"
+        ),
+        template=(
+            "import numpy as np\n"
+            "from scipy.stats import norm\n"
+            "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
+            "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
+            "d2 = d1 - sigma*np.sqrt(T)\n"
+            "C = S*norm.___(d1) - K*np.exp(-r*T)*norm.___(d2)\n"
+            "print(round(C, 4))"
+        ),
+        your_turn="Fill the two blanks with the normal CDF function.",
+        expected_stdout="10.4506",
+        hint="Three letters — cumulative distribution function.",
+        skills=["quant", "options", "black-scholes"],
+    ),
+    Lesson(
+        n=26, stage=3, mode="fillblank",
+        title="Greeks: delta of a call",
+        scenario="Delta is `dC/dS` — how much the option price moves when the underlying moves £1. For a Black-Scholes call, delta is just `N(d1)`.",
+        learner_goal="Compute the delta of an at-the-money call.",
+        concept="From the BS derivation, `Δ_call = N(d1)`. For an at-the-money option (S=K), d1 ≈ 0.35 at typical parameters, so delta ≈ 0.64.",
+        example_code=(
+            "import numpy as np\n"
+            "from scipy.stats import norm\n"
+            "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
+            "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
+            "delta = norm.cdf(d1)\n"
+            "print(round(delta, 4))"
+        ),
+        template=(
+            "import numpy as np\n"
+            "from scipy.stats import norm\n"
+            "S, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\n"
+            "d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\n"
+            "delta = ___.cdf(d1)\n"
+            "print(round(delta, 4))"
+        ),
+        your_turn="Replace `___` with the scipy.stats object we imported.",
+        expected_stdout="0.6368",
+        hint="Four letters.",
+        skills=["quant", "options", "greeks"],
+    ),
+    Lesson(
+        n=27, stage=3, mode="fillblank",
+        title="Binomial tree pricer",
+        scenario="The CRR (Cox-Ross-Rubinstein) tree builds N steps of up/down moves and prices the option by backward induction. With enough steps it converges to Black-Scholes.",
+        learner_goal="Price a European call with a 50-step binomial tree.",
+        concept="Set `u = exp(σ * sqrt(dt))`, `d = 1/u`, risk-neutral probability `p = (exp(r*dt) - d)/(u - d)`. Build terminal payoffs, then walk back to t=0 discounting at each step.",
+        example_code=(
+            "import numpy as np\n"
+            "S, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\n"
+            "dt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\n"
+            "p = (np.exp(r*dt) - d)/(u - d)\n"
+            "ST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\n"
+            "vals = np.maximum(ST - K, 0)\n"
+            "for _ in range(N):\n"
+            "    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[:-1])\n"
+            "print(round(vals[0], 4))"
+        ),
+        template=(
+            "import numpy as np\n"
+            "S, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\n"
+            "dt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\n"
+            "p = (np.exp(r*dt) - d)/(u - d)\n"
+            "ST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\n"
+            "vals = np.maximum(ST - K, 0)\n"
+            "for _ in range(N):\n"
+            "    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[___])\n"
+            "print(round(vals[0], 4))"
+        ),
+        your_turn="Replace `___` with the slice that gives 'all but the last' (the down-branch values).",
+        expected_stdout="10.4107",
+        hint="Two-character slice.",
+        skills=["quant", "options", "black-scholes"],
+    ),
+    Lesson(
+        n=28, stage=3, mode="matplot",
+        title="Monte Carlo option pricing",
+        scenario="Simulate many terminal stock prices under risk-neutral dynamics; average the discounted payoffs. The estimate converges as `1 / sqrt(N)` — plot to see it.",
+        learner_goal="Price a European call by Monte Carlo and plot the running estimate's convergence.",
+        concept="Under risk-neutral GBM, `S_T = S0 * exp((r - σ²/2)*T + σ*sqrt(T)*Z)` with `Z ~ N(0,1)`. Average `exp(-r*T) * max(S_T - K, 0)`. As N grows, the running mean settles on the BS price.",
+        example_code=(
+            "import numpy as np, matplotlib.pyplot as plt\n"
+            "S0, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50_000\n"
+            "rng = np.random.default_rng(0)\n"
+            "Z = rng.standard_normal(N)\n"
+            "ST = S0 * np.exp((r - sigma**2/2)*T + sigma*np.sqrt(T)*Z)\n"
+            "payoffs = np.exp(-r*T) * np.maximum(ST - K, 0)\n"
+            "running = np.cumsum(payoffs) / np.arange(1, N+1)\n"
+            "plt.plot(running)\n"
+            "plt.axhline(10.4506, color='red', lw=0.5, label='Black-Scholes')\n"
+            "plt.legend(); plt.title('MC call price convergence')\n"
+            "print(round(running[-1], 3))"
+        ),
+        template=(
+            "import numpy as np, matplotlib.pyplot as plt\n"
+            "S0, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50_000\n"
+            "rng = np.random.default_rng(0)\n"
+            "Z = rng.standard_normal(N)\n"
+            "ST = S0 * np.exp((r - sigma**2/2)*T + sigma*np.sqrt(T)*Z)\n"
+            "payoffs = np.exp(-r*T) * np.maximum(ST - K, 0)\n"
+            "running = np.___(payoffs) / np.arange(1, N+1)\n"
+            "plt.plot(running)\n"
+            "plt.axhline(10.4506, color='red', lw=0.5, label='Black-Scholes')\n"
+            "plt.legend(); plt.title('MC call price convergence')\n"
+            "print(round(running[-1], 3))"
+        ),
+        your_turn="Replace `___` so the running mean accumulates correctly.",
+        expected_stdout="10.48",
+        hint="Cumulative sum.",
+        skills=["quant", "options", "monte-carlo"],
+    ),
+    Lesson(
+        n=29, stage=3, mode="matplot",
+        title="Mean-variance frontier",
+        scenario="Markowitz's efficient frontier is the locus of minimum-variance portfolios for each target return. Plot it for SPY + AAPL + TLT and you've recreated the most-cited chart in finance.",
+        learner_goal="Sweep target returns and plot the resulting min-variance volatilities.",
+        concept="With covariance `Σ` and means `μ`, the closed-form min-variance frontier uses constants `a = 1ᵀΣ⁻¹1`, `b = μᵀΣ⁻¹1`, `c = μᵀΣ⁻¹μ`. Variance at target `t` is `(a·t² − 2bt + c) / (ac − b²)`. No optimisation loop — one pass.",
+        example_code=(
+            "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+            "def ret(t): return pd.read_csv(f'/data/quant/{t}.csv')['adj_close'].pct_change().dropna().values[-1000:]\n"
+            "R = np.column_stack([ret('spy'), ret('aapl'), ret('tlt')])\n"
+            "mu, S = R.mean(axis=0), np.cov(R, rowvar=False)\n"
+            "Sinv = np.linalg.inv(S); ones = np.ones(3)\n"
+            "a = ones @ Sinv @ ones; b = mu @ Sinv @ ones; c = mu @ Sinv @ mu\n"
+            "targets = np.linspace(mu.min(), mu.max(), 50)\n"
+            "vars_ = (a*targets**2 - 2*b*targets + c) / (a*c - b**2)\n"
+            "plt.plot(np.sqrt(vars_), targets); plt.xlabel('vol'); plt.ylabel('return')\n"
+            "print(round(float(np.sqrt(vars_).min()), 4))"
+        ),
+        template=(
+            "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+            "def ret(t): return pd.read_csv(f'/data/quant/{t}.csv')['adj_close'].pct_change().dropna().values[-1000:]\n"
+            "R = np.column_stack([ret('spy'), ret('aapl'), ret('tlt')])\n"
+            "mu, S = R.mean(axis=0), np.cov(R, ___=False)\n"
+            "Sinv = np.linalg.inv(S); ones = np.ones(3)\n"
+            "a = ones @ Sinv @ ones; b = mu @ Sinv @ ones; c = mu @ Sinv @ mu\n"
+            "targets = np.linspace(mu.min(), mu.max(), 50)\n"
+            "vars_ = (a*targets**2 - 2*b*targets + c) / (a*c - b**2)\n"
+            "plt.plot(np.sqrt(vars_), targets); plt.xlabel('vol'); plt.ylabel('return')\n"
+            "print(round(float(np.sqrt(vars_).min()), 4))"
+        ),
+        your_turn="Replace `___` with the np.cov keyword that treats each column as one variable.",
+        expected_stdout="0.0079",
+        hint="It's the opposite of 'rows are variables'.",
+        skills=["quant", "portfolio", "linear-algebra"],
+        datasets=["spy", "aapl", "tlt"],
+    ),
+    Lesson(
+        n=30, stage=3, mode="fillblank",
+        title="Sharpe, max drawdown",
+        scenario="The Sharpe ratio is mean return divided by standard deviation, annualised. Max drawdown is the worst peak-to-trough on the equity curve.",
+        learner_goal="Compute SPY's annualised Sharpe ratio and max drawdown.",
+        concept="Annualised Sharpe = `(r.mean() * 252) / (r.std() * sqrt(252))` for daily data. Max drawdown is `(equity / equity.cummax() - 1).min()`. Both are scalar — print them rounded.",
+        example_code=(
+            "import pandas as pd, numpy as np\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "r = df['adj_close'].pct_change().dropna()\n"
+            "sharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\n"
+            "eq = (1 + r).cumprod()\n"
+            "dd = (eq / eq.cummax() - 1).min()\n"
+            "print(round(sharpe, 2), round(dd, 3))"
+        ),
+        template=(
+            "import pandas as pd, numpy as np\n"
+            "df = pd.read_csv('/data/quant/spy.csv')\n"
+            "r = df['adj_close'].pct_change().dropna()\n"
+            "sharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\n"
+            "eq = (1 + r).cumprod()\n"
+            "dd = (eq / eq.___() - 1).min()\n"
+            "print(round(sharpe, 2), round(dd, 3))"
+        ),
+        your_turn="Replace `___` with the running-max method.",
+        expected_stdout="0.8 -0.337",
+        hint="`cum...` something — running maximum.",
+        skills=["quant", "pandas", "risk-metrics"],
+        datasets=["spy"],
+    ),
 ]
 # fmt: on
 

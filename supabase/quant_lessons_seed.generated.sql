@@ -682,16 +682,361 @@ on conflict (slug) do update set
   is_free = excluded.is_free,
   order_index = excluded.order_index;
 
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000314',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-21-present-value-of-a-single-cash-flow',
+  E'Present value of a single cash flow',
+  E'A pound tomorrow is worth less than a pound today. Discounting is the simplest version of every pricing model in finance.',
+  E'Compute the present value of £1000 received in 5 years at a 4% discount rate.',
+  E'**Concept.** `PV = CF / (1 + r)**t` for a single cash flow. With continuous compounding the formula is `PV = CF * exp(-r*t)`. Either is fine; pick the one the textbook is using.\n\n**Example.**\n\n```python\ncf, r, t = 1000, 0.04, 5\npv = cf / (1 + r)**t\nprint(round(pv, 2))\n```\n\n**Your turn.** Replace `___` with the Python exponentiation operator.\n\n**Expected.** `821.93`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options'],
+  true,
+  21
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000315',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-22-bond-yield-to-maturity',
+  E'Bond yield to maturity',
+  E'The YTM of a bond is the rate `r` that makes the discounted cash flows equal the price. There''s no closed-form solution — you solve it numerically.',
+  E'Find the YTM of a 5-year bond paying a 5% coupon, priced at par (face=100).',
+  E'**Concept.** The price of an annual-coupon bond is `sum(c / (1+r)**t for t in 1..N) + face / (1+r)**N`. When the bond trades at par, YTM equals the coupon rate by definition. `scipy.optimize.brentq` finds the root.\n\n**Example.**\n\n```python\nfrom scipy.optimize import brentq\nface, coupon, n, price = 100, 5, 5, 100\ndef npv(r):\n    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\nytm = brentq(npv, 0.0001, 0.5)\nprint(round(ytm, 4))\n```\n\n**Your turn.** Replace `___` with the root-finder we imported.\n\n**Expected.** `0.05`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options'],
+  true,
+  22
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000316',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-23-option-payoff-diagrams',
+  E'Option payoff diagrams',
+  E'A call''s payoff at expiry is `max(S - K, 0)`. A put''s is `max(K - S, 0)`. Plot them and you''ve drawn every derivatives textbook''s first figure.',
+  E'Plot the payoff of a long call with strike 100 over spot prices 60..140.',
+  E'**Concept.** `np.maximum(S - K, 0)` is the vectorised call payoff. Subtract the premium to get profit. `plt.plot(S, payoff)` does the rest.\n\n**Example.**\n\n```python\nimport numpy as np, matplotlib.pyplot as plt\nS = np.linspace(60, 140, 81)\nK, premium = 100, 5\npayoff = np.maximum(S - K, 0) - premium\nplt.plot(S, payoff)\nplt.title(''Long call (K=100)''); plt.xlabel(''spot''); plt.ylabel(''profit'')\nplt.axhline(0, color=''gray'', lw=0.5)\nprint(round(payoff[-1], 1))\n```\n\n**Your turn.** Replace `___` with the elementwise max function.\n\n**Expected.** `35.0`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'matplotlib'],
+  true,
+  23
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000317',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-24-put-call-parity',
+  E'Put-call parity',
+  E'Put-call parity says `C - P = S - K * exp(-r*T)`. It''s a no-arbitrage identity — if it breaks, someone is leaving money on the table.',
+  E'Verify put-call parity numerically using the Black-Scholes prices.',
+  E'**Concept.** From parity, given a call price, the matching put is `P = C - S + K * exp(-r*T)`. Compute both sides and they should match to machine precision.\n\n**Example.**\n\n```python\nimport numpy as np\nS, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\nP_from_parity = C - S + K * np.exp(-r * T)\nprint(round(P_from_parity, 2))\n```\n\n**Your turn.** Replace `___` so the discount factor is correct (negative rate times time).\n\n**Expected.** `5.68`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options'],
+  true,
+  24
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000318',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-25-black-scholes-from-scratch',
+  E'Black-Scholes from scratch',
+  E'The Black-Scholes call price is `S*N(d1) - K*exp(-r*T)*N(d2)` where `d1 = (ln(S/K) + (r + σ²/2)*T) / (σ*sqrt(T))` and `d2 = d1 - σ*sqrt(T)`.',
+  E'Implement the Black-Scholes call price and verify against a textbook example.',
+  E'**Concept.** `scipy.stats.norm.cdf` is N(). Hull''s example: S=100, K=100, r=5%, σ=20%, T=1 gives C ≈ 10.45. Match it.\n\n**Example.**\n\n```python\nimport numpy as np\nfrom scipy.stats import norm\nS, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\nd1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\nd2 = d1 - sigma*np.sqrt(T)\nC = S*norm.cdf(d1) - K*np.exp(-r*T)*norm.cdf(d2)\nprint(round(C, 4))\n```\n\n**Your turn.** Fill the two blanks with the normal CDF function.\n\n**Expected.** `10.4506`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'black-scholes'],
+  true,
+  25
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000319',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-26-greeks-delta-of-a-call',
+  E'Greeks: delta of a call',
+  E'Delta is `dC/dS` — how much the option price moves when the underlying moves £1. For a Black-Scholes call, delta is just `N(d1)`.',
+  E'Compute the delta of an at-the-money call.',
+  E'**Concept.** From the BS derivation, `Δ_call = N(d1)`. For an at-the-money option (S=K), d1 ≈ 0.35 at typical parameters, so delta ≈ 0.64.\n\n**Example.**\n\n```python\nimport numpy as np\nfrom scipy.stats import norm\nS, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\nd1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\ndelta = norm.cdf(d1)\nprint(round(delta, 4))\n```\n\n**Your turn.** Replace `___` with the scipy.stats object we imported.\n\n**Expected.** `0.6368`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'greeks'],
+  true,
+  26
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000031a',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-27-binomial-tree-pricer',
+  E'Binomial tree pricer',
+  E'The CRR (Cox-Ross-Rubinstein) tree builds N steps of up/down moves and prices the option by backward induction. With enough steps it converges to Black-Scholes.',
+  E'Price a European call with a 50-step binomial tree.',
+  E'**Concept.** Set `u = exp(σ * sqrt(dt))`, `d = 1/u`, risk-neutral probability `p = (exp(r*dt) - d)/(u - d)`. Build terminal payoffs, then walk back to t=0 discounting at each step.\n\n**Example.**\n\n```python\nimport numpy as np\nS, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\ndt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\np = (np.exp(r*dt) - d)/(u - d)\nST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\nvals = np.maximum(ST - K, 0)\nfor _ in range(N):\n    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[:-1])\nprint(round(vals[0], 4))\n```\n\n**Your turn.** Replace `___` with the slice that gives ''all but the last'' (the down-branch values).\n\n**Expected.** `10.4107`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'black-scholes'],
+  true,
+  27
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000031b',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-28-monte-carlo-option-pricing',
+  E'Monte Carlo option pricing',
+  E'Simulate many terminal stock prices under risk-neutral dynamics; average the discounted payoffs. The estimate converges as `1 / sqrt(N)` — plot to see it.',
+  E'Price a European call by Monte Carlo and plot the running estimate''s convergence.',
+  E'**Concept.** Under risk-neutral GBM, `S_T = S0 * exp((r - σ²/2)*T + σ*sqrt(T)*Z)` with `Z ~ N(0,1)`. Average `exp(-r*T) * max(S_T - K, 0)`. As N grows, the running mean settles on the BS price.\n\n**Example.**\n\n```python\nimport numpy as np, matplotlib.pyplot as plt\nS0, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50_000\nrng = np.random.default_rng(0)\nZ = rng.standard_normal(N)\nST = S0 * np.exp((r - sigma**2/2)*T + sigma*np.sqrt(T)*Z)\npayoffs = np.exp(-r*T) * np.maximum(ST - K, 0)\nrunning = np.cumsum(payoffs) / np.arange(1, N+1)\nplt.plot(running)\nplt.axhline(10.4506, color=''red'', lw=0.5, label=''Black-Scholes'')\nplt.legend(); plt.title(''MC call price convergence'')\nprint(round(running[-1], 3))\n```\n\n**Your turn.** Replace `___` so the running mean accumulates correctly.\n\n**Expected.** `10.48`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'monte-carlo'],
+  true,
+  28
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000031c',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-29-mean-variance-frontier',
+  E'Mean-variance frontier',
+  E'Markowitz''s efficient frontier is the locus of minimum-variance portfolios for each target return. Plot it for SPY + AAPL + TLT and you''ve recreated the most-cited chart in finance.',
+  E'Sweep target returns and plot the resulting min-variance volatilities.',
+  E'**Concept.** With covariance `Σ` and means `μ`, the closed-form min-variance frontier uses constants `a = 1ᵀΣ⁻¹1`, `b = μᵀΣ⁻¹1`, `c = μᵀΣ⁻¹μ`. Variance at target `t` is `(a·t² − 2bt + c) / (ac − b²)`. No optimisation loop — one pass.\n\n**Example.**\n\n```python\nimport pandas as pd, numpy as np, matplotlib.pyplot as plt\ndef ret(t): return pd.read_csv(f''/data/quant/{t}.csv'')[''adj_close''].pct_change().dropna().values[-1000:]\nR = np.column_stack([ret(''spy''), ret(''aapl''), ret(''tlt'')])\nmu, S = R.mean(axis=0), np.cov(R, rowvar=False)\nSinv = np.linalg.inv(S); ones = np.ones(3)\na = ones @ Sinv @ ones; b = mu @ Sinv @ ones; c = mu @ Sinv @ mu\ntargets = np.linspace(mu.min(), mu.max(), 50)\nvars_ = (a*targets**2 - 2*b*targets + c) / (a*c - b**2)\nplt.plot(np.sqrt(vars_), targets); plt.xlabel(''vol''); plt.ylabel(''return'')\nprint(round(float(np.sqrt(vars_).min()), 4))\n```\n\n**Your turn.** Replace `___` with the np.cov keyword that treats each column as one variable.\n\n**Expected.** `0.0079`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'portfolio', 'linear-algebra'],
+  true,
+  29
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000031d',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-30-sharpe-max-drawdown',
+  E'Sharpe, max drawdown',
+  E'The Sharpe ratio is mean return divided by standard deviation, annualised. Max drawdown is the worst peak-to-trough on the equity curve.',
+  E'Compute SPY''s annualised Sharpe ratio and max drawdown.',
+  E'**Concept.** Annualised Sharpe = `(r.mean() * 252) / (r.std() * sqrt(252))` for daily data. Max drawdown is `(equity / equity.cummax() - 1).min()`. Both are scalar — print them rounded.\n\n**Example.**\n\n```python\nimport pandas as pd, numpy as np\ndf = pd.read_csv(''/data/quant/spy.csv'')\nr = df[''adj_close''].pct_change().dropna()\nsharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\neq = (1 + r).cumprod()\ndd = (eq / eq.cummax() - 1).min()\nprint(round(sharpe, 2), round(dd, 3))\n```\n\n**Your turn.** Replace `___` with the running-max method.\n\n**Expected.** `0.8 -0.337`',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'risk-metrics'],
+  true,
+  30
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
 insert into public.skills (slug, name) values
+  ('black-scholes', 'Black-Scholes'),
+  ('greeks', 'Greeks'),
   ('linear-algebra', 'Linear algebra'),
   ('matplotlib', 'Matplotlib'),
   ('monte-carlo', 'Monte Carlo'),
   ('numpy', 'NumPy'),
+  ('options', 'Options'),
   ('pandas', 'pandas'),
   ('performance', 'Performance engineering'),
+  ('portfolio', 'Portfolio theory'),
   ('quant', 'Quantitative finance'),
   ('random-numbers', 'Random number generation'),
   ('regression', 'Regression'),
+  ('risk-metrics', 'Risk metrics'),
   ('statistics', 'Statistics'),
   ('time-series', 'Time series'),
   ('vectorisation', 'Vectorisation')

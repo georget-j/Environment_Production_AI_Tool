@@ -150,4 +150,72 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "expected_stdout": "True True",
   "prompt": "Two booleans."
 },
+  "quant-21-present-value-of-a-single-cash-flow": {
+  "mode": "fillblank",
+  "template": "cf, r, t = 1000, 0.04, 5\npv = cf / (1 + r)___t\nprint(round(pv, 2))",
+  "expected_stdout": "821.93",
+  "hint": "Two asterisks."
+},
+  "quant-22-bond-yield-to-maturity": {
+  "mode": "fillblank",
+  "template": "from scipy.optimize import brentq\nface, coupon, n, price = 100, 5, 5, 100\ndef npv(r):\n    return sum(coupon / (1+r)**t for t in range(1, n+1)) + face / (1+r)**n - price\nytm = ___(npv, 0.0001, 0.5)\nprint(round(ytm, 4))",
+  "expected_stdout": "0.05",
+  "hint": "Imported above. Six letters."
+},
+  "quant-23-option-payoff-diagrams": {
+  "mode": "matplot",
+  "template": "import numpy as np, matplotlib.pyplot as plt\nS = np.linspace(60, 140, 81)\nK, premium = 100, 5\npayoff = np.___(S - K, 0) - premium\nplt.plot(S, payoff)\nplt.title('Long call (K=100)'); plt.xlabel('spot'); plt.ylabel('profit')\nplt.axhline(0, color='gray', lw=0.5)\nprint(round(payoff[-1], 1))",
+  "expected_stdout": "35.0",
+  "hint": "It's `maximum`, not `max`."
+},
+  "quant-24-put-call-parity": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nS, K, r, T, C = 100, 100, 0.04, 1.0, 9.6\nP_from_parity = C - S + K * np.exp(___ * T)\nprint(round(P_from_parity, 2))",
+  "expected_stdout": "5.68",
+  "hint": "The exponent should be negative."
+},
+  "quant-25-black-scholes-from-scratch": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nfrom scipy.stats import norm\nS, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\nd1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\nd2 = d1 - sigma*np.sqrt(T)\nC = S*norm.___(d1) - K*np.exp(-r*T)*norm.___(d2)\nprint(round(C, 4))",
+  "expected_stdout": "10.4506",
+  "hint": "Three letters \u2014 cumulative distribution function."
+},
+  "quant-26-greeks-delta-of-a-call": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nfrom scipy.stats import norm\nS, K, r, sigma, T = 100, 100, 0.05, 0.20, 1.0\nd1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))\ndelta = ___.cdf(d1)\nprint(round(delta, 4))",
+  "expected_stdout": "0.6368",
+  "hint": "Four letters."
+},
+  "quant-27-binomial-tree-pricer": {
+  "mode": "fillblank",
+  "template": "import numpy as np\nS, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50\ndt = T/N; u = np.exp(sigma*np.sqrt(dt)); d = 1/u\np = (np.exp(r*dt) - d)/(u - d)\nST = S * u**np.arange(N+1) * d**(N - np.arange(N+1))\nvals = np.maximum(ST - K, 0)\nfor _ in range(N):\n    vals = np.exp(-r*dt) * (p*vals[1:] + (1-p)*vals[___])\nprint(round(vals[0], 4))",
+  "expected_stdout": "10.4107",
+  "hint": "Two-character slice."
+},
+  "quant-28-monte-carlo-option-pricing": {
+  "mode": "matplot",
+  "template": "import numpy as np, matplotlib.pyplot as plt\nS0, K, r, sigma, T, N = 100, 100, 0.05, 0.20, 1.0, 50_000\nrng = np.random.default_rng(0)\nZ = rng.standard_normal(N)\nST = S0 * np.exp((r - sigma**2/2)*T + sigma*np.sqrt(T)*Z)\npayoffs = np.exp(-r*T) * np.maximum(ST - K, 0)\nrunning = np.___(payoffs) / np.arange(1, N+1)\nplt.plot(running)\nplt.axhline(10.4506, color='red', lw=0.5, label='Black-Scholes')\nplt.legend(); plt.title('MC call price convergence')\nprint(round(running[-1], 3))",
+  "expected_stdout": "10.48",
+  "hint": "Cumulative sum."
+},
+  "quant-29-mean-variance-frontier": {
+  "mode": "matplot",
+  "template": "import pandas as pd, numpy as np, matplotlib.pyplot as plt\ndef ret(t): return pd.read_csv(f'/data/quant/{t}.csv')['adj_close'].pct_change().dropna().values[-1000:]\nR = np.column_stack([ret('spy'), ret('aapl'), ret('tlt')])\nmu, S = R.mean(axis=0), np.cov(R, ___=False)\nSinv = np.linalg.inv(S); ones = np.ones(3)\na = ones @ Sinv @ ones; b = mu @ Sinv @ ones; c = mu @ Sinv @ mu\ntargets = np.linspace(mu.min(), mu.max(), 50)\nvars_ = (a*targets**2 - 2*b*targets + c) / (a*c - b**2)\nplt.plot(np.sqrt(vars_), targets); plt.xlabel('vol'); plt.ylabel('return')\nprint(round(float(np.sqrt(vars_).min()), 4))",
+  "expected_stdout": "0.0079",
+  "hint": "It's the opposite of 'rows are variables'.",
+  "datasets": [
+    "spy",
+    "aapl",
+    "tlt"
+  ]
+},
+  "quant-30-sharpe-max-drawdown": {
+  "mode": "fillblank",
+  "template": "import pandas as pd, numpy as np\ndf = pd.read_csv('/data/quant/spy.csv')\nr = df['adj_close'].pct_change().dropna()\nsharpe = (r.mean()*252) / (r.std()*np.sqrt(252))\neq = (1 + r).cumprod()\ndd = (eq / eq.___() - 1).min()\nprint(round(sharpe, 2), round(dd, 3))",
+  "expected_stdout": "0.8 -0.337",
+  "hint": "`cum...` something \u2014 running maximum.",
+  "datasets": [
+    "spy"
+  ]
+},
 };
