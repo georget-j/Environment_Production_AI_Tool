@@ -7,6 +7,7 @@ import {
 } from "@/components/challenge-runner";
 import { CodePreview } from "@/components/code-preview";
 import { LessonFillBlank } from "@/components/lesson-fill-blank";
+import { LessonMatplot } from "@/components/lesson-matplot";
 import { LessonPredict } from "@/components/lesson-predict";
 import { MentorChat, type MentorChatHandle } from "@/components/mentor-chat";
 import { OnboardingTour } from "@/components/onboarding-tour";
@@ -199,6 +200,17 @@ export function ChallengeView({
           onCodeChange={(code) => {
             // Mirror the single editable into filesRef so MentorChat picks
             // it up via getFilesSnapshot.
+            filesRef.current = { "solution.py": code };
+          }}
+        />
+      );
+      break;
+    case "matplot":
+      runner = (
+        <LessonMatplot
+          config={config}
+          nextSlug={nextSlug}
+          onCodeChange={(code) => {
             filesRef.current = { "solution.py": code };
           }}
         />

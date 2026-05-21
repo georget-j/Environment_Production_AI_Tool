@@ -37,7 +37,7 @@ export default async function TrackDetailPage({ params }: { params: Params }) {
 
   return (
     <div className="space-y-10 py-8">
-      <PyodidePrewarm />
+      <PyodidePrewarm trackSlug={slug} />
       <header className="space-y-3">
         <h1 className="text-3xl font-semibold">{track.title}</h1>
         {track.description && (

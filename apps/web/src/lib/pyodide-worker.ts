@@ -6,11 +6,13 @@
  * Communicates via a simple `{ id, fn, args }` → `{ id, result, error }` RPC.
  *
  * Supported `fn` values:
- *   init                  — load Pyodide. Resolves when ready.
- *   ensurePytest          — install pytest via micropip. Idempotent.
- *   runPythonStdout       — run user code with the step watchdog.
- *   runPytest             — write a file tree + run pytest.
- *   reset                 — discard the current Pyodide instance.
+ *   init                       — load Pyodide. Resolves when ready.
+ *   ensurePytest               — install pytest via micropip. Idempotent.
+ *   ensureMatplotlib           — install matplotlib (Agg backend). Idempotent.
+ *   runPythonStdout            — run user code with the step watchdog.
+ *   runPythonAndCaptureFigure  — run user code + grab the active figure as SVG.
+ *   runPytest                  — write a file tree + run pytest.
+ *   reset                      — discard the current Pyodide instance.
  *
  * The watchdog (sys.settrace) catches infinite loops. The trace function
  * lives at module level in Python and is reused across runs.
@@ -83,6 +85,7 @@ def _pyodide_run_user(code: str) -> None:
 let pyodide: PyodideAPI | null = null;
 let initPromise: Promise<void> | null = null;
 let pytestPromise: Promise<void> | null = null;
+let matplotlibPromise: Promise<void> | null = null;
 
 // Track the last-written tree signature so duplicate runs skip the FS write.
 let lastTreeSignature: string | null = null;
@@ -113,6 +116,25 @@ async function ensurePytest(): Promise<void> {
     throw exc;
   });
   return pytestPromise;
+}
+
+async function ensureMatplotlib(): Promise<void> {
+  if (matplotlibPromise) return matplotlibPromise;
+  if (!pyodide) throw new Error("Pyodide not ready");
+  const py = pyodide;
+  matplotlibPromise = (async () => {
+    // Pyodide ships a pre-built matplotlib package; loadPackage is faster
+    // than micropip for it because there's no resolution step.
+    await py.loadPackage(["matplotlib"]);
+    // Force the Agg backend so plt.show() never tries to open a window.
+    await py.runPythonAsync(
+      "import matplotlib\nmatplotlib.use('Agg', force=True)\n",
+    );
+  })().catch((exc) => {
+    matplotlibPromise = null;
+    throw exc;
+  });
+  return matplotlibPromise;
 }
 
 function writeTree(files: Record<string, string>): void {
@@ -154,6 +176,67 @@ async function runPythonStdout(
   } catch (exc) {
     return {
       stdout: outLines.join("\n"),
+      error: exc instanceof Error ? exc.message : String(exc),
+    };
+  } finally {
+    try {
+      py.globals.delete("_pyodide_user_code_in");
+    } catch {
+      // ignore
+    }
+  }
+}
+
+type FigureRun = {
+  stdout: string;
+  svg: string | null;
+  error: string | null;
+};
+
+async function runPythonAndCaptureFigure(code: string): Promise<FigureRun> {
+  if (!pyodide) throw new Error("Pyodide not ready");
+  const py = pyodide;
+  const outLines: string[] = [];
+  const errLines: string[] = [];
+  try {
+    py.setStdout({ batched: (s) => outLines.push(s) });
+    py.setStderr({ batched: (s) => errLines.push(s) });
+  } catch (exc) {
+    return {
+      stdout: "",
+      svg: null,
+      error: `Couldn't attach stdout: ${exc instanceof Error ? exc.message : String(exc)}. Try the Reset Python button.`,
+    };
+  }
+  try {
+    // Reset any prior figures so we capture only this run's plot.
+    await py.runPythonAsync(
+      "import matplotlib.pyplot as plt\nplt.close('all')",
+    );
+    py.globals.set("_pyodide_user_code_in", code);
+    await py.runPythonAsync("_pyodide_run_user(_pyodide_user_code_in)");
+    // Grab the active figure (whatever the learner drew last) as SVG.
+    const svg = (await py.runPythonAsync(`
+import io as _io
+import matplotlib.pyplot as plt
+_fig = plt.gcf()
+if not _fig.get_axes():
+    _svg_out = ""
+else:
+    _buf = _io.StringIO()
+    _fig.savefig(_buf, format='svg', bbox_inches='tight')
+    _svg_out = _buf.getvalue()
+_svg_out
+`)) as string;
+    return {
+      stdout: outLines.join("\n"),
+      svg: svg || null,
+      error: errLines.join("\n") || null,
+    };
+  } catch (exc) {
+    return {
+      stdout: outLines.join("\n"),
+      svg: null,
       error: exc instanceof Error ? exc.message : String(exc),
     };
   } finally {
@@ -324,9 +407,23 @@ workerSelf.addEventListener(
           await ensurePytest();
           reply({ id, result: null });
           return;
+        case "ensureMatplotlib":
+          await ensureInit();
+          await ensureMatplotlib();
+          reply({ id, result: null });
+          return;
         case "runPythonStdout": {
           await ensureInit();
           const result = await runPythonStdout((args as { code: string }).code);
+          reply({ id, result });
+          return;
+        }
+        case "runPythonAndCaptureFigure": {
+          await ensureInit();
+          await ensureMatplotlib();
+          const result = await runPythonAndCaptureFigure(
+            (args as { code: string }).code,
+          );
           reply({ id, result });
           return;
         }
@@ -348,6 +445,7 @@ workerSelf.addEventListener(
           pyodide = null;
           initPromise = null;
           pytestPromise = null;
+          matplotlibPromise = null;
           lastTreeSignature = null;
           reply({ id, result: null });
           return;

@@ -55,6 +55,21 @@ export type FillBlankLessonConfig = {
   hint?: string;
 };
 
+/**
+ * Quant track 'matplot' lesson: Monaco + Pyodide + inline matplotlib SVG.
+ * Pass criterion is "code runs cleanly AND a non-empty figure was drawn AND
+ * (if expected_stdout is set) stdout matches". No pixel-diff: too brittle.
+ */
+export type MatplotLessonConfig = {
+  mode: "matplot";
+  /** Initial editor content. Use `___` for blanks if you want a fill-in shape. */
+  template: string;
+  /** Optional exact stdout (e.g. a printed Sharpe ratio). */
+  expected_stdout?: string;
+  /** One-line hint shown under the editor. */
+  hint?: string;
+};
+
 export type ChallengeRunnerConfig =
   | {
       mode: "pyodide";
@@ -67,7 +82,8 @@ export type ChallengeRunnerConfig =
       readonly: string[];
     }
   | PredictLessonConfig
-  | FillBlankLessonConfig;
+  | FillBlankLessonConfig
+  | MatplotLessonConfig;
 
 import { PYTHON_BASICS_CONFIG } from "@/lib/python-basics-config.generated";
 
@@ -93,11 +109,13 @@ export const CHALLENGE_CONFIG: Record<string, ChallengeRunnerConfig> = {
     tests: [
       {
         id: "tests/test_orders.py::test_compute_total_without_coupon",
-        description: "1 × £12 notebook + 2 × £9.50 coffee mugs should total £33.50.",
+        description:
+          "1 × £12 notebook + 2 × £9.50 coffee mugs should total £33.50.",
       },
       {
         id: "tests/test_orders.py::test_compute_total_with_valid_coupon",
-        description: "A valid WELCOME10 coupon should knock 10% off the subtotal.",
+        description:
+          "A valid WELCOME10 coupon should knock 10% off the subtotal.",
       },
       {
         id: "tests/test_orders.py::test_compute_total_create_order_persists_total",

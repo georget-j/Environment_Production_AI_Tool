@@ -9,7 +9,9 @@
  * so the lesson runners didn't need much refactoring:
  *   - getPyodide(): resolves when the worker has booted Pyodide
  *   - ensurePytest(): installs pytest inside the worker (idempotent)
+ *   - ensureMatplotlib(): installs matplotlib (idempotent)
  *   - runPythonStdout(code): one-shot run + stdout capture
+ *   - runPythonAndCaptureFigure(code): run + grab the active figure as SVG
  *   - runPytest(files, pytestArgs): writes files, runs pytest, returns result
  *   - resetPyodide(): terminate the worker; next call boots a fresh one
  *   - detectUnsupportedFeatures(code): pure pre-flight check
@@ -86,6 +88,10 @@ export async function ensurePytest(): Promise<void> {
   await call<null>("ensurePytest");
 }
 
+export async function ensureMatplotlib(): Promise<void> {
+  await call<null>("ensureMatplotlib");
+}
+
 export async function runPythonStdout(
   code: string,
 ): Promise<{ stdout: string; error: string | null }> {
@@ -94,6 +100,17 @@ export async function runPythonStdout(
   return call<{ stdout: string; error: string | null }>("runPythonStdout", {
     code,
   });
+}
+
+export async function runPythonAndCaptureFigure(
+  code: string,
+): Promise<{ stdout: string; svg: string | null; error: string | null }> {
+  const unsupported = detectUnsupportedFeatures(code);
+  if (unsupported) return { stdout: "", svg: null, error: unsupported };
+  return call<{ stdout: string; svg: string | null; error: string | null }>(
+    "runPythonAndCaptureFigure",
+    { code },
+  );
 }
 
 export async function runPytest(
