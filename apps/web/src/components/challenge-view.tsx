@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChallengeRunner,
@@ -183,9 +184,9 @@ export function ChallengeView({
           The slug <code>{challengeSlug}</code> doesn&apos;t have a runner
           config in this build. The lesson may have been renamed — go back to
           the{" "}
-          <a href="/tracks/quant-programmer" className="underline">
+          <Link href="/tracks/quant-programmer" className="underline">
             track page
-          </a>{" "}
+          </Link>{" "}
           and click the lesson from there.
         </p>
       </div>
