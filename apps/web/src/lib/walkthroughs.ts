@@ -1,11 +1,17 @@
 /**
  * Per-lesson walkthroughs. A walkthrough is a sequence of (caption, lines[])
- * pairs that annotate the lesson's worked Example code. Rendered as the
- * "Example" stage of the lesson wizard. Authored by hand — only added for
- * lessons where the worked Example is genuinely different from the
- * problem the learner solves (fillblank + matplot modes). Predict mode's
- * `code` IS the problem; debug / skeleton / apifetch have no separable
- * Example block — those modes skip the Example stage entirely.
+ * pairs that annotate code shown to the learner before they attempt the
+ * task. Rendered as the "Example" stage of the lesson wizard.
+ *
+ * Mode coverage:
+ *  - fillblank / matplot: walk the worked Example (worked version is
+ *    different from the editor's template-with-blanks).
+ *  - predict: walk the code's *mechanics* — what each line does — without
+ *    revealing the literal output. The learner traces through and
+ *    predicts the answer themselves.
+ *  - debug / skeleton / apifetch / cscript / cwasm: not yet covered.
+ *    These modes have no separable Example block and need a different
+ *    walkthrough shape (the spec/contract/API rather than the code).
  */
 
 import type { WalkthroughStep } from "@/components/lesson-walkthrough";
@@ -566,6 +572,318 @@ export const WALKTHROUGHS: Record<string, WalkthroughEntry> = {
         caption:
           "Drain the buffer with a walrus-assignment while-loop. `out` ends up as `[10, 20, 30, 40]` — the 50 was rejected on overflow.",
         lines: [15, 16, 17, 18],
+      },
+    ],
+  },
+
+  // ─── predict mode (11) ────────────────────────────────────────────
+  // Captions walk what each line DOES mechanically. They stop short of
+  // doing the final arithmetic so the learner has to trace through and
+  // predict the answer themselves.
+
+  "quant-01-why-numpy": {
+    code: [
+      "import numpy as np",
+      "n = 1_000_000",
+      "xs = list(range(n))",
+      "arr = np.arange(n)",
+      "print(sum(xs) == int(arr.sum()))",
+    ].join("\n"),
+    steps: [
+      { caption: "Import numpy.", lines: [1] },
+      {
+        caption:
+          "`xs` is a Python list of integers 0..999,999. A million Python objects in a list — every element is a full PyObject, with all the per-element overhead that implies.",
+        lines: [2, 3],
+      },
+      {
+        caption:
+          "`arr` is a numpy array of the same integers — but stored as a contiguous C buffer of int64 values. No PyObject per element, no interpreter dispatch in the hot loop.",
+        lines: [4],
+      },
+      {
+        caption:
+          "Both `sum(xs)` (a Python `for` loop with a million dispatches) and `arr.sum()` (one C loop) compute the same arithmetic sum 0+1+...+999999. The question is whether the two answers agree.",
+        lines: [5],
+      },
+    ],
+  },
+
+  "quant-03-broadcasting-basics": {
+    code: [
+      "import numpy as np",
+      "raw = np.full((4, 3), 0.012)",
+      "rf = np.array([0.0001, 0.0001, 0.0002])",
+      "excess = raw - rf",
+      "print(excess[0])",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`raw` is a (4, 3) matrix — every cell is 0.012. Think of it as 4 positions × 3 days of raw returns, all the same number.",
+        lines: [2],
+      },
+      {
+        caption:
+          "`rf` is a (3,) vector — the risk-free rate per day. Three days, three numbers. Note the third day's rate differs from the first two.",
+        lines: [3],
+      },
+      {
+        caption:
+          "Broadcasting: the (3,) vector is implicitly stretched DOWN all 4 rows of `raw`, then subtraction is elementwise. Result has shape (4, 3) — same as `raw`.",
+        lines: [4],
+      },
+      {
+        caption:
+          "`excess[0]` is the FIRST ROW of the result — a (3,) vector. Each element is `0.012 - rf[j]` for j in 0,1,2. Do the arithmetic for the three positions.",
+        lines: [5],
+      },
+    ],
+  },
+
+  "quant-04-broadcasting-gotchas": {
+    code: [
+      "import numpy as np",
+      "raw = np.full((4, 3), 0.01)",
+      "weights = np.array([1.0, 0.5, 2.0, 1.5])",
+      "scaled = raw * weights.reshape(4, 1)",
+      "print(scaled[:, 0])",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`raw` is a (4, 3) matrix of 0.01s — 4 positions × 3 days, all the same.",
+        lines: [2],
+      },
+      {
+        caption:
+          "`weights` is a (4,) vector — one weight per position. Plain `raw * weights` would NOT align: trailing dimensions are 4 vs. 3.",
+        lines: [3],
+      },
+      {
+        caption:
+          "`weights.reshape(4, 1)` makes it a (4, 1) column vector. Now trailing dims are 1 and 3 — broadcastable, because size-1 axes stretch. Each row of `raw` gets multiplied by its own weight.",
+        lines: [4],
+      },
+      {
+        caption:
+          "`scaled[:, 0]` is the FIRST COLUMN of the result — a (4,) vector. Each element is `0.01 × weights[i]` for i in 0..3. Do the four multiplications.",
+        lines: [5],
+      },
+    ],
+  },
+
+  "quant-10-why-numpy-is-fast": {
+    code: [
+      "import numpy as np",
+      "x = np.arange(1_000_000)",
+      "print(int(x.sum()))",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`x` is a numpy array containing the integers 0, 1, 2, ..., 999,999. A million int64s in a contiguous C buffer.",
+        lines: [2],
+      },
+      {
+        caption:
+          "`x.sum()` computes 0+1+2+...+999999 in one tight C loop. The closed-form for the sum 0+1+...+(n-1) is `n(n-1)/2`. With n = 1,000,000, that's 1,000,000 × 999,999 / 2. Compute it.",
+        lines: [3],
+      },
+    ],
+  },
+
+  "quant-11-the-slow-python-rolling-mean": {
+    code: [
+      "x = [1, 2, 3, 4, 5, 6]",
+      "w = 3",
+      "rolling = []",
+      "for i in range(w - 1, len(x)):",
+      "    s = 0",
+      "    for j in range(i - w + 1, i + 1):",
+      "        s += x[j]",
+      "    rolling.append(s / w)",
+      "print(rolling)",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Inputs: array `x = [1..6]`, window size `w = 3`. The naive rolling mean has an outer loop and an inner loop.",
+        lines: [1, 2, 3],
+      },
+      {
+        caption:
+          "Outer loop: `i` runs from `w-1` (= 2) to `len(x)-1` (= 5), inclusive. That's 4 iterations — one per output row. `i` is the index of the LAST element in each window.",
+        lines: [4],
+      },
+      {
+        caption:
+          "Inner loop: sum the three values from `x[i-2]` to `x[i]` inclusive. Then append `s / 3` to the output.",
+        lines: [5, 6, 7, 8],
+      },
+      {
+        caption:
+          "Final list has 4 means: mean(1,2,3), mean(2,3,4), mean(3,4,5), mean(4,5,6). Compute the four values.",
+        lines: [9],
+      },
+    ],
+  },
+
+  "quant-15-loc-versus-iloc": {
+    code: [
+      "import pandas as pd",
+      "df = pd.DataFrame({'price': [100, 101, 99]}, index=['a', 'b', 'c'])",
+      "print(df.iloc[0]['price'], df.loc['b', 'price'])",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Build a 3-row DataFrame with a `price` column. The labels are `a`, `b`, `c` — NOT the default 0, 1, 2. That's what makes `.iloc` and `.loc` diverge here.",
+        lines: [2],
+      },
+      {
+        caption:
+          "`df.iloc[0]` is POSITION — the first physical row, regardless of label. Its `price` is the first value in `[100, 101, 99]`.",
+        lines: [3],
+      },
+      {
+        caption:
+          "`df.loc['b', 'price']` is LABEL — look up the row labelled `'b'` (the second one). Its `price` is the second value in `[100, 101, 99]`.",
+        lines: [3],
+      },
+      {
+        caption:
+          "Print is `<iloc_value> <loc_value>` — two integers space-separated.",
+        lines: [3],
+      },
+    ],
+  },
+
+  "quant-23-stationarity-preview": {
+    code: [
+      "import pandas as pd",
+      "from statsmodels.tsa.stattools import adfuller",
+      "df = pd.read_csv('/data/quant/spy.csv')",
+      "p_price = adfuller(df['adj_close'])[1]",
+      "p_ret = adfuller(df['adj_close'].pct_change().dropna())[1]",
+      "print(p_price > 0.05, p_ret < 0.05)",
+    ].join("\n"),
+    steps: [
+      {
+        caption: "Load the SPY tape (2015–2025 daily bars).",
+        lines: [1, 2, 3],
+      },
+      {
+        caption:
+          "Run ADF on the raw PRICE series. ADF's null hypothesis is 'this has a unit root' (random-walk-like). Element [1] of the result is the p-value. Prices wander, so the test fails to reject — p comes out close to 1 (large).",
+        lines: [4],
+      },
+      {
+        caption:
+          "Run ADF on daily RETURNS. Returns oscillate around zero, so the test rejects the null overwhelmingly — p comes out tiny, way below 0.05.",
+        lines: [5],
+      },
+      {
+        caption:
+          "Two booleans: 'was prices' p > 0.05?' (i.e., non-stationary) and 'was returns' p < 0.05?' (i.e., stationary). For SPY both should be True. Now confirm by predicting each.",
+        lines: [6],
+      },
+    ],
+  },
+
+  "quant-35-lookahead-bias": {
+    code: [
+      "from sklearn.model_selection import train_test_split",
+      "import numpy as np",
+      "X = np.arange(10).reshape(-1, 1); y = np.arange(10)",
+      "_, X_test, _, _ = train_test_split(X, y, test_size=0.2, shuffle=False)",
+      "print(X_test.ravel().tolist())",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`X` and `y` are both ordered ranges 0..9 — pretend each integer is a date.",
+        lines: [3],
+      },
+      {
+        caption:
+          "`train_test_split` with `test_size=0.2` reserves 20% of the data for the test set. CRITICAL: `shuffle=False` preserves the original order — last 20% becomes test, no random reshuffle. This is the right setting for time-series.",
+        lines: [4],
+      },
+      {
+        caption:
+          "The test set is the LAST 20% of 10 elements. How many elements is that? Which integers? Print as a Python list.",
+        lines: [5],
+      },
+    ],
+  },
+
+  "quant-39-the-p-hacked-sharpe-trap": {
+    code: [
+      "import numpy as np",
+      "rng = np.random.default_rng(42)",
+      "R = rng.normal(0, 0.01, size=(1000, 1000))",
+      "sharpe = R.mean(axis=1) / R.std(axis=1) * np.sqrt(252)",
+      "print(round(sharpe.max(), 2) > 1.5)",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Seed a Generator, then draw a 1000×1000 matrix of normal noise with std 0.01. Each ROW is one fake 'strategy' — 1000 daily returns of pure noise, mean ZERO by construction. Zero edge.",
+        lines: [2, 3],
+      },
+      {
+        caption:
+          "Compute annualised Sharpe per row: `mean(row) / std(row) × √252`. With true mean 0 and 1000 sample points, each Sharpe is a noisy near-zero. Across 1000 rows, you get 1000 such Sharpes.",
+        lines: [4],
+      },
+      {
+        caption:
+          "Take the MAX across the 1000 strategies. Even with true mean zero, the extremum of 1000 draws drifts several standard errors above zero. Will it crack 1.5? That's the question.",
+        lines: [5],
+      },
+    ],
+  },
+
+  "quant-50-cython-preview": {
+    code: [
+      "def cy_sum(arr):",
+      "    total = 0",
+      "    for i in range(len(arr)):",
+      "        total += arr[i]",
+      "    return total",
+      "print(cy_sum(list(range(100))))",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "A simple Python sum loop. In a real .pyx file you'd add `cdef int i, n = len(arr); cdef long total = 0` and Cython would compile this to a tight C loop. Here it's plain Python so you can read the shape.",
+        lines: [1, 2, 3, 4, 5],
+      },
+      {
+        caption:
+          "Call it on `list(range(100))` — that's 0, 1, 2, ..., 99. The formula for `0+1+...+(n-1)` is `n(n-1)/2`. With n=100, that's 100 × 99 / 2.",
+        lines: [6],
+      },
+    ],
+  },
+
+  "quant-51-cffi-preview": {
+    code: [
+      "def c_sum_simulated(arr, n):",
+      "    return sum(arr[:n])",
+      "print(c_sum_simulated(list(range(50)), 50))",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "The function takes an array and an integer `n`. In real cffi this would be declared `long c_sum(long *arr, int n);` and the call would cross the FFI boundary into a compiled `.so`. Here it's a Python simulator so you can see the call shape.",
+        lines: [1, 2],
+      },
+      {
+        caption:
+          "Call it on `list(range(50))` with `n=50` — sums all 50 elements, 0+1+...+49. The closed-form `n(n-1)/2` with n=50 is 50 × 49 / 2.",
+        lines: [3],
       },
     ],
   },
