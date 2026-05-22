@@ -219,6 +219,10 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     const editorRef = useRef<MonacoEditorRef | null>(null);
     // Decoration ids returned by Monaco; we keep them to clear on next change.
     const decorationIdsRef = useRef<string[]>([]);
+    // Result banner — scrolled into view after each test run so the
+    // learner sees the outcome (especially failures) without having
+    // to scroll past the editor on mobile.
+    const resultBannerRef = useRef<HTMLElement | null>(null);
 
     // Pre-warm Pyodide on mount so the first Run feels instant. Pytest is
     // installed lazily in handleRun via ensurePytest() — we don't pay that
@@ -641,6 +645,22 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [runState]);
 
+    // After each completed run, scroll the result banner into view so
+    // the learner immediately sees pass/fail (especially important on
+    // mobile, where the editor takes most of the viewport and the
+    // banner appears below the fold).
+    useEffect(() => {
+      if (runState.kind !== "done") return;
+      // requestAnimationFrame so the banner has rendered before scroll.
+      const raf = requestAnimationFrame(() => {
+        resultBannerRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+      return () => cancelAnimationFrame(raf);
+    }, [runState]);
+
     const toggleTestExpand = (id: string) =>
       setExpandedTestIds((prev) => {
         const next = new Set(prev);
@@ -761,7 +781,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
             })}
           </div>
 
-          <div className="h-[65vh] min-h-[400px] overflow-hidden rounded-md border border-border lg:h-[55vh] lg:min-h-[300px]">
+          <div className="h-[70vh] min-h-[440px] overflow-hidden rounded-md border border-border lg:h-[55vh] lg:min-h-[300px]">
             <MonacoEditor
               key={activeTab}
               height="100%"
@@ -807,8 +827,9 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
 
         {runState.kind === "done" && (
           <section
+            ref={resultBannerRef}
             className={cn(
-              "flex-none space-y-2 rounded-md border p-3",
+              "flex-none scroll-mt-2 space-y-2 rounded-md border p-3",
               passed
                 ? "border-green-300 bg-green-50"
                 : "border-red-300 bg-red-50",

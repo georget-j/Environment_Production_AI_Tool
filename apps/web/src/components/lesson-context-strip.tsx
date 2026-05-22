@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { ChallengeNavRef } from "@/lib/api";
 
 type Props = {
@@ -44,6 +45,11 @@ export function LessonContextStrip({
   const showNav = total > 1;
   const pct =
     total > 1 ? Math.max(0, Math.min(100, (position / total) * 100)) : 0;
+  // Mobile: scenario collapsed by default to free vertical space for
+  // the wizard. Default state = false matches SSR — toggle button is
+  // `lg:hidden` so it never appears on desktop, where the scenario is
+  // force-visible via `lg:block`.
+  const [scenarioExpanded, setScenarioExpanded] = useState(false);
 
   return (
     <section className="flex-none border-b border-border bg-background">
@@ -99,9 +105,24 @@ export function LessonContextStrip({
         <h1 className="text-base font-semibold leading-tight sm:text-lg lg:text-xl">
           {challengeTitle}
         </h1>
+        <button
+          type="button"
+          onClick={() => setScenarioExpanded((x) => !x)}
+          className="ml-auto rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted lg:hidden"
+          aria-expanded={scenarioExpanded}
+          aria-label={scenarioExpanded ? "Hide scenario" : "Show scenario"}
+        >
+          {scenarioExpanded ? "Hide ▴" : "Why? ▾"}
+        </button>
       </div>
 
-      <div className="px-1 pb-2">
+      <div
+        className={
+          scenarioExpanded
+            ? "block px-1 pb-2 lg:block"
+            : "hidden px-1 pb-2 lg:block"
+        }
+      >
         <p className="text-[12px] leading-snug text-foreground sm:text-[13px] lg:text-sm lg:leading-relaxed">
           {scenario}
         </p>
