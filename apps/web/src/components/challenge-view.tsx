@@ -11,6 +11,8 @@ import {
   LessonApproach,
   type ApproachMode,
 } from "@/components/lesson-approach";
+import { LessonWalkthrough } from "@/components/lesson-walkthrough";
+import { WALKTHROUGHS } from "@/lib/walkthroughs";
 import { LessonCFillBlank } from "@/components/lesson-c-fill-blank";
 import { LessonCWasm } from "@/components/lesson-c-wasm";
 import { LessonFillBlank } from "@/components/lesson-fill-blank";
@@ -354,12 +356,21 @@ export function ChallengeView({
   return (
     <div className={gridClass}>
       <section className="min-w-0 space-y-3">
-        {approachMode && (
-          <LessonApproach
-            mode={approachMode}
-            challengeSlug={challengeSlug}
-            learnerGoal={learnerGoal}
+        {WALKTHROUGHS[challengeSlug] && (
+          <LessonWalkthrough
+            code={WALKTHROUGHS[challengeSlug].code}
+            steps={WALKTHROUGHS[challengeSlug].steps}
+            scrollTargetId="lesson-now-you-try"
           />
+        )}
+        {approachMode && (
+          <div id="lesson-now-you-try" className="scroll-mt-4">
+            <LessonApproach
+              mode={approachMode}
+              challengeSlug={challengeSlug}
+              learnerGoal={learnerGoal}
+            />
+          </div>
         )}
         {runner}
       </section>
