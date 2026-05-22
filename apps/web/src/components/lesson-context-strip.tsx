@@ -19,8 +19,8 @@ type Props = {
 
 /**
  * Compact strip at the top of a lesson page. Collapsed by default so the
- * workspace below fills the viewport. The "More" disclosure reveals the
- * full goal callout + the markdown instructions inline.
+ * editor fills the viewport. The "More" disclosure reveals the full goal
+ * callout + the markdown instructions inline.
  */
 export function LessonContextStrip({
   moduleTitle,

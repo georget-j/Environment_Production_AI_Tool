@@ -24,8 +24,19 @@ Lesson modes supported (extending Python Basics' 'predict' + 'fillblank'):
 Same 4-part instruction template as Python Basics (60–80 words):
     **Concept.** ...
     **Example.** ```python (or c) ...```
-    **Your turn.** ... (predict-mode uses "Predict.")
+    **<verb>.** ...
     **Expected.** `...`
+
+The action verb in the third slot is unified across modes — one imperative
+per mode, same grammar:
+    predict   → Predict the output.
+    fillblank → Fill in the gap.
+    matplot   → Make the plot.
+    debug     → Find the bug.        (no Example block; editor IS the code)
+    skeleton  → Implement the function.
+    apifetch  → Build the client.
+    cscript   → Fill in the gap.
+    cwasm     → (no third slot; read-only demo)
 """
 
 from __future__ import annotations
@@ -197,10 +208,15 @@ class Lesson:
             "```",
             "",
         ]
+        # Action verb is unified across modes: imperative-active, ends with
+        # a period. {predict / fillblank / matplot / debug / skeleton /
+        # apifetch} — five shapes, five verbs, same grammar slot.
         if self.mode == "predict":
-            lines.append(f"**Predict.** {self.your_turn.strip()}")
+            lines.append(f"**Predict the output.** {self.your_turn.strip()}")
+        elif self.mode == "matplot":
+            lines.append(f"**Make the plot.** {self.your_turn.strip()}")
         else:
-            lines.append(f"**Your turn.** {self.your_turn.strip()}")
+            lines.append(f"**Fill in the gap.** {self.your_turn.strip()}")
         lines.append("")
         expected = self.expected_stdout or self.expected_stdout_contains
         expected_one_line = expected.replace("\n", " · ")
