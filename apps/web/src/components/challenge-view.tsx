@@ -7,6 +7,10 @@ import {
   type ChallengeRunnerHandle,
 } from "@/components/challenge-runner";
 import { CodePreview } from "@/components/code-preview";
+import {
+  LessonApproach,
+  type ApproachMode,
+} from "@/components/lesson-approach";
 import { LessonCFillBlank } from "@/components/lesson-c-fill-blank";
 import { LessonCWasm } from "@/components/lesson-c-wasm";
 import { LessonFillBlank } from "@/components/lesson-fill-blank";
@@ -34,6 +38,8 @@ type Props = {
   config: ChallengeRunnerConfig | undefined;
   /** Slug of the next lesson in the same track, for auto-advance on success. */
   nextSlug: string | null;
+  /** One-line learner-facing goal, rendered in the approach card. */
+  learnerGoal: string;
 };
 
 /**
@@ -51,6 +57,7 @@ export function ChallengeView({
   repoBranch,
   config,
   nextSlug,
+  learnerGoal,
 }: Props) {
   const mentorRef = useRef<MentorChatHandle | null>(null);
   const runnerRef = useRef<ChallengeRunnerHandle | null>(null);
@@ -207,6 +214,29 @@ export function ChallengeView({
     }
   }, [challengeId, config]);
 
+  // Derive the approach-card mode from the runner config. For pyodide we
+  // inspect the inline file map to distinguish debug / skeleton /
+  // apifetch — the three shapes have very different attack strategies.
+  // Fall back to "pyodide-other" for fetched-from-GitHub challenges (no
+  // inline map) where we can't introspect content. `reading` lessons
+  // get no approach card — they're display-only.
+  const approachMode: ApproachMode | null = (() => {
+    if (!config || config.mode === "reading") return null;
+    if (config.mode === "pyodide") {
+      const inline = config.inline ?? {};
+      if ("mock_api.py" in inline) return "pyodide-apifetch";
+      if (
+        typeof inline["solution.py"] === "string" &&
+        inline["solution.py"].includes("NotImplementedError")
+      ) {
+        return "pyodide-skeleton";
+      }
+      if (Object.keys(inline).length > 0) return "pyodide-debug";
+      return "pyodide-other";
+    }
+    return config.mode;
+  })();
+
   let runner: React.ReactNode;
   // No config for this slug = lesson was renamed/removed since the last
   // build. Surface a clear error rather than the misleading "no template"
@@ -313,13 +343,26 @@ export function ChallengeView({
   // On lg+, the grid's right column is either the full mentor sidebar
   // (~400px) or a thin 40px rail that the learner clicks to expand.
   // The mobile overlay flow doesn't depend on this column.
+  // No h-full / min-h-0 here — we want the workspace to grow with its
+  // content and the document to scroll, instead of clipping the bottom
+  // action area on long lessons. The mentor column is `lg:sticky` so it
+  // stays in view while the workspace scrolls.
   const gridClass = mentorCollapsed
-    ? "grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_40px]"
-    : "grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]";
+    ? "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_40px]"
+    : "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]";
 
   return (
     <div className={gridClass}>
-      <section className="min-h-0 min-w-0 overflow-hidden">{runner}</section>
+      <section className="min-w-0 space-y-3">
+        {approachMode && (
+          <LessonApproach
+            mode={approachMode}
+            challengeSlug={challengeSlug}
+            learnerGoal={learnerGoal}
+          />
+        )}
+        {runner}
+      </section>
 
       {/* Mentor: lives in the grid's right column on lg+. On smaller
        * screens the grid is single-column (workspace only) and the
@@ -331,8 +374,8 @@ export function ChallengeView({
       <aside
         className={
           mentorOverlayOpen
-            ? "fixed inset-0 z-50 flex min-h-0 min-w-0 flex-col bg-background lg:relative lg:inset-auto lg:z-auto lg:bg-transparent"
-            : "hidden min-h-0 min-w-0 lg:flex lg:flex-col"
+            ? "fixed inset-0 z-50 flex min-h-0 min-w-0 flex-col bg-background lg:relative lg:inset-auto lg:z-auto lg:bg-transparent lg:sticky lg:top-2 lg:self-start lg:max-h-[calc(100dvh-5rem)]"
+            : "hidden min-w-0 lg:flex lg:flex-col lg:sticky lg:top-2 lg:self-start lg:max-h-[calc(100dvh-5rem)]"
         }
       >
         {mentorOverlayOpen && (

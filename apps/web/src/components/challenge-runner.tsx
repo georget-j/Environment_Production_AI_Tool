@@ -206,6 +206,12 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     const [explainState, setExplainState] = useState<ExplainState>({
       kind: "idle",
     });
+    // Which failing-test rows are currently expanded. After each run we
+    // auto-expand the first failure (so the learner sees one explanation
+    // up-front instead of a wall of red); they can toggle others.
+    const [expandedTestIds, setExpandedTestIds] = useState<Set<string>>(
+      () => new Set(),
+    );
     const [failureLocations, setFailureLocations] = useState<
       Record<string, number[]>
     >({});
@@ -622,8 +628,29 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
           ).length
         : 0;
 
+    // Auto-expand the first failing test on each new run so the learner
+    // immediately sees one explanation instead of a list of red rows.
+    // Other failures stay collapsed until clicked.
+    useEffect(() => {
+      if (runState.kind !== "done") return;
+      const firstFailed = testRows.find(
+        (r) => r.status === "failed" || r.status === "error",
+      );
+      setExpandedTestIds(firstFailed ? new Set([firstFailed.id]) : new Set());
+      // testRows depends on runState; depending on runState here is enough.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [runState]);
+
+    const toggleTestExpand = (id: string) =>
+      setExpandedTestIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+
     return (
-      <section className="flex h-full min-h-0 flex-col gap-3">
+      <section className="flex flex-col gap-3">
         {pyodideState.kind === "warming" && (
           <div className="flex-none rounded-md border border-border bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground">
             Loading the Python runtime (~10 MB, one-time). You can start editing
@@ -636,10 +663,9 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
           </div>
         )}
 
-        <section className="flex min-h-0 flex-[3] flex-col gap-2">
+        <section className="flex flex-col gap-2">
           <header className="flex flex-none flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold">Workspace</h2>
               <p className="text-xs text-muted-foreground">
                 {config.editable.length} editable file
                 {config.editable.length === 1 ? "" : "s"} ·{" "}
@@ -721,9 +747,9 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
                   type="button"
                   onClick={() => setActiveTab(p)}
                   className={cn(
-                    "flex items-center gap-1 rounded-t-md border-b-2 px-3 py-1.5 font-mono text-xs",
+                    "flex items-center gap-1.5 rounded-t-md border-b-2 px-3.5 py-2 font-mono text-xs",
                     p === activeTab
-                      ? "border-primary bg-muted text-foreground"
+                      ? "border-primary bg-muted font-semibold text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                   title={isEditable ? "Editable" : "Read-only"}
@@ -735,7 +761,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
             })}
           </div>
 
-          <div className="min-h-[180px] flex-1 overflow-hidden rounded-md border border-border">
+          <div className="h-[60vh] min-h-[320px] overflow-hidden rounded-md border border-border">
             <MonacoEditor
               key={activeTab}
               height="100%"
@@ -745,7 +771,9 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
               options={{
                 readOnly: !editable,
                 minimap: { enabled: false },
-                fontSize: 13,
+                fontSize: 14,
+                lineHeight: 22,
+                padding: { top: 10, bottom: 10 },
                 scrollBeyondLastLine: false,
                 tabSize: 4,
               }}
@@ -896,20 +924,14 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
           </section>
         )}
 
-        <section className="flex min-h-0 flex-[2] flex-col overflow-hidden rounded-md border border-border">
+        <section className="flex flex-col rounded-md border border-border">
           <header className="flex flex-none items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-sm font-semibold">
             <span>
-              Tests ({config.tests.length})
-              {runState.kind === "done" && (
-                <span className="ml-2 font-normal text-muted-foreground">
-                  {
-                    runState.result.tests.filter((t) => t.status === "passed")
-                      .length
-                  }{" "}
-                  passed
-                  {failureCount > 0 && ` · ${failureCount} failed`}
-                </span>
-              )}
+              {runState.kind === "done"
+                ? failureCount > 0
+                  ? `${failureCount} test${failureCount === 1 ? "" : "s"} failing — fix the top one first`
+                  : "All tests passed"
+                : `Tests (${config.tests.length})`}
             </span>
             {explainState.kind === "loading" && (
               <span className="text-xs font-normal text-muted-foreground">
@@ -917,11 +939,12 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
               </span>
             )}
           </header>
-          <ul className="flex-1 divide-y divide-border overflow-y-auto">
+          <ul className="divide-y divide-border">
             {testRows.map((t) => {
               const ex = findExplanation(t);
               const showFailureBox =
                 t.status === "failed" || t.status === "error";
+              const isExpanded = expandedTestIds.has(t.id);
               return (
                 <li key={t.id} className="px-3 py-2.5">
                   <div className="flex items-start gap-3 text-sm">
@@ -940,9 +963,18 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
                       <p className="mt-0.5 text-muted-foreground">
                         {t.description}
                       </p>
+                      {showFailureBox && !isExpanded && (
+                        <button
+                          type="button"
+                          onClick={() => toggleTestExpand(t.id)}
+                          className="mt-1 text-xs text-red-700 underline-offset-2 hover:underline"
+                        >
+                          Show details ↓
+                        </button>
+                      )}
                     </div>
                   </div>
-                  {showFailureBox && (
+                  {showFailureBox && isExpanded && (
                     <div className="mt-2 ml-7 space-y-2 rounded-md border border-red-200 bg-red-50/60 p-4 text-sm leading-relaxed">
                       {ex ? (
                         <>
@@ -994,6 +1026,13 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
                           {explainState.message}). Check the raw output below.
                         </p>
                       ) : null}
+                      <button
+                        type="button"
+                        onClick={() => toggleTestExpand(t.id)}
+                        className="mt-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                      >
+                        Hide details
+                      </button>
                     </div>
                   )}
                 </li>

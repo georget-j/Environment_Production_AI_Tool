@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import type { ChallengeNavRef } from "@/lib/api";
 
 type Props = {
+  challengeSlug: string;
   moduleTitle: string;
   challengeTitle: string;
   scenario: string;
@@ -18,11 +19,13 @@ type Props = {
 };
 
 /**
- * Compact strip at the top of a lesson page. Collapsed by default so the
- * editor fills the viewport. The "More" disclosure reveals the full goal
- * callout + the markdown instructions inline.
+ * Compact strip at the top of a lesson page. Expanded by default so the
+ * Concept / Example / action verb are visible on first visit; collapsed
+ * state persists per challenge slug in localStorage so a learner who
+ * already knows the lesson shape can hide it.
  */
 export function LessonContextStrip({
+  challengeSlug,
   moduleTitle,
   challengeTitle,
   scenario,
@@ -33,7 +36,28 @@ export function LessonContextStrip({
   position,
   total,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  // SSR/CSR consistency: initial render uses the default-expanded state.
+  // The effect below restores a previously-collapsed choice once mounted.
+  const [expanded, setExpanded] = useState(true);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(
+      `prodready:strip-collapsed:${challengeSlug}`,
+    );
+    if (stored === "true") setExpanded(false);
+  }, [challengeSlug]);
+  const toggleExpanded = () => {
+    setExpanded((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          `prodready:strip-collapsed:${challengeSlug}`,
+          next ? "false" : "true",
+        );
+      }
+      return next;
+    });
+  };
   const showNav = total > 1;
   const pct =
     total > 1 ? Math.max(0, Math.min(100, (position / total) * 100)) : 0;
@@ -109,7 +133,7 @@ export function LessonContextStrip({
         </p>
         <button
           type="button"
-          onClick={() => setExpanded((x) => !x)}
+          onClick={toggleExpanded}
           className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted"
           aria-expanded={expanded}
         >

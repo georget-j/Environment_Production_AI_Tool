@@ -22,10 +22,13 @@ export default async function ChallengeDetailPage({
   const config = CHALLENGE_CONFIG[challenge.slug];
 
   return (
-    // 4rem = SiteNav (h-16). Use dvh so iOS Safari's dynamic chrome doesn't
-    // hide the bottom of the workspace.
-    <div className="flex h-[calc(100dvh-4rem)] flex-col gap-3 py-2">
+    // Use min-h so the page can grow with content (long failure lists,
+    // expanded instructions, etc.) and the natural document scroll takes
+    // over. Previously this was h-[calc(100dvh-4rem)] which clipped the
+    // bottom action area on long lessons.
+    <div className="flex min-h-[calc(100dvh-4rem)] flex-col gap-3 py-2">
       <LessonContextStrip
+        challengeSlug={challenge.slug}
         moduleTitle={challenge.module.title}
         challengeTitle={challenge.title}
         scenario={challenge.scenario}
@@ -37,7 +40,7 @@ export default async function ChallengeDetailPage({
         total={challenge.total_in_track}
       />
 
-      <div className="min-h-0 flex-1">
+      <div className="flex-1">
         <ChallengeView
           challengeId={challenge.id}
           challengeSlug={challenge.slug}
@@ -45,6 +48,7 @@ export default async function ChallengeDetailPage({
           repoBranch={challenge.repo_branch}
           config={config}
           nextSlug={challenge.next?.slug ?? null}
+          learnerGoal={challenge.learner_goal}
         />
       </div>
     </div>
