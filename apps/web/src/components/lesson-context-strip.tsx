@@ -96,13 +96,15 @@ export function LessonContextStrip({
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {moduleTitle}
         </p>
-        <h1 className="text-lg font-semibold leading-tight lg:text-xl">
+        <h1 className="text-base font-semibold leading-tight sm:text-lg lg:text-xl">
           {challengeTitle}
         </h1>
       </div>
 
       <div className="px-1 pb-2">
-        <p className="text-sm leading-relaxed text-foreground">{scenario}</p>
+        <p className="text-[12px] leading-snug text-foreground sm:text-[13px] lg:text-sm lg:leading-relaxed">
+          {scenario}
+        </p>
       </div>
     </section>
   );

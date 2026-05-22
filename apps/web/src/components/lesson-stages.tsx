@@ -74,20 +74,17 @@ export function LessonStages({ example, approach, solve }: Props) {
       </nav>
 
       {/* Active stage area. On lg+ the panes inside fit side-by-side
-       * and each has its own internal scroll; on narrow screens the
-       * panes stack vertically and may exceed the stage's bounded
-       * height — so we allow `overflow-y-auto` here as a safety net.
-       * Approach + Solve panes already have their own overflow-y-auto;
-       * this catches the Example stage's stacked-panes overflow on
-       * mobile without affecting their behaviour.
-       *
-       * `pb-20 lg:pb-0`: on mobile, leave room at the bottom so the
-       * floating "Ask the mentor" button (fixed bottom-4 right-4)
-       * doesn't cover the last lines of content. On lg+ the mentor
-       * lives in the grid's right column, no floating button. */}
+       * and each has their own internal scroll; on narrow screens
+       * the panes stack vertically and may exceed the stage's bounded
+       * height — `overflow-y-auto` here is the safety net so the bottom
+       * of any stage stays reachable.
+       * The FAB-overlap padding (pb-20 on mobile) lives on the Solve
+       * pane wrapper instead — Example/Approach have a wizard footer
+       * underneath the stage area that the FAB overlaps, not the pane
+       * itself, so they don't need bottom padding. */}
       <div
         key={active.id}
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-20 lg:pb-0"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
       >
         {active.content}
       </div>
@@ -95,10 +92,11 @@ export function LessonStages({ example, approach, solve }: Props) {
       {/* Next button at the bottom-right; absent on the terminal Solve stage.
        * On mobile the floating "Ask the mentor" FAB sits bottom-right at
        * z-40, so we reserve right-padding here to keep the Next button
-       * to the left of the FAB. */}
+       * to the left of the FAB. The explanatory copy is `hidden` on
+       * mobile — the button label alone is enough. */}
       {!isLast && nextStage && (
         <div className="flex flex-none items-center justify-between gap-2 border-t border-border bg-muted/10 px-3 py-2 pr-24 lg:pr-3">
-          <p className="text-xs text-muted-foreground">
+          <p className="hidden text-xs text-muted-foreground sm:block">
             When you&apos;ve digested this, advance to{" "}
             <span className="font-medium text-foreground">
               {nextStage.label}
@@ -108,7 +106,7 @@ export function LessonStages({ example, approach, solve }: Props) {
           <button
             type="button"
             onClick={() => setActiveIdx(activeIdx + 1)}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="ml-auto rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 sm:px-4 sm:text-sm"
           >
             Next: {nextStage.label} →
           </button>

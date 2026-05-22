@@ -400,7 +400,14 @@ export function ChallengeView({
   // grows (or a post-submit success card with auto-advance appears),
   // the bottom content must always be reachable via scroll instead of
   // being clipped by a rigid flex layout.
-  const solvePane = <div className="h-full overflow-y-auto">{runner}</div>;
+  // `pb-20 lg:pb-0`: on mobile the floating "Ask the mentor" FAB sits
+  // bottom-right at z-40 — reserve space below the runner so the FAB
+  // never overlaps the Submit button / auto-advance / failure cards.
+  // (Example and Approach stages have a wizard footer below them; the
+  // FAB overlaps that footer instead, handled via pr-24 there.)
+  const solvePane = (
+    <div className="h-full overflow-y-auto pb-20 lg:pb-0">{runner}</div>
+  );
 
   return (
     <div className={gridClass}>

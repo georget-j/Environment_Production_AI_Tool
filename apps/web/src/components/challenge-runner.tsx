@@ -761,7 +761,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
             })}
           </div>
 
-          <div className="h-[55vh] min-h-[300px] overflow-hidden rounded-md border border-border">
+          <div className="h-[65vh] min-h-[400px] overflow-hidden rounded-md border border-border lg:h-[55vh] lg:min-h-[300px]">
             <MonacoEditor
               key={activeTab}
               height="100%"
