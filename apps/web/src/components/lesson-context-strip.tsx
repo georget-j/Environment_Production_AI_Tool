@@ -120,15 +120,9 @@ export function LessonContextStrip({
         </h1>
       </div>
 
-      {/* Row 3: scenario + More toggle */}
+      {/* Row 3: scenario (always full text) + toggle for reference material */}
       <div className="flex items-start gap-2 px-1 pb-2">
-        <p
-          className={
-            expanded
-              ? "flex-1 text-sm leading-relaxed text-foreground"
-              : "flex-1 truncate text-sm leading-relaxed text-muted-foreground"
-          }
-        >
+        <p className="flex-1 text-sm leading-relaxed text-foreground">
           {scenario}
         </p>
         <button
@@ -137,11 +131,11 @@ export function LessonContextStrip({
           className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted"
           aria-expanded={expanded}
         >
-          {expanded ? "Less ↑" : "More ↓"}
+          {expanded ? "Hide reference ↑" : "Show reference ↓"}
         </button>
       </div>
 
-      {/* Expanded body: goal callout + full instructions */}
+      {/* Expanded body: goal callout + full instructions reference */}
       {expanded && (
         <div className="space-y-3 border-t border-border bg-muted/10 px-3 py-3">
           <div className="rounded-md border-l-4 border-primary bg-muted/40 px-3 py-2 text-sm leading-relaxed">
