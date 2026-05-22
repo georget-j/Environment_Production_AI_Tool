@@ -887,4 +887,190 @@ export const WALKTHROUGHS: Record<string, WalkthroughEntry> = {
       },
     ],
   },
+
+  // ─── debug / skeleton / apifetch pilots ───────────────────────────
+  // These modes don't have a separable Example block — the editor's
+  // content IS the problem (broken code / skeleton / API consumer).
+  // The walkthrough shows the *same* code with annotations that explain
+  // mechanics, contract, or API shape — orienting the learner before
+  // they read it again in the Solve stage. For debug, the annotations
+  // walk what the function is *supposed* to do without pointing at the
+  // bug. For skeleton, they walk the test contract. For apifetch, the
+  // API surface.
+
+  "quant-06-variance-from-scratch": {
+    code: [
+      '"""Compute sample variance from first principles.',
+      "",
+      "This is the function we ship to production. It's been reviewed by",
+      "two engineers and passes a smoke test against a small array. But",
+      "the head of risk has just emailed: 'your vol numbers are",
+      "systematically smaller than mine.' Find why.",
+      '"""',
+      "import numpy as np",
+      "",
+      "",
+      "def sample_variance(x: np.ndarray) -> float:",
+      '    """Sample variance: sum of squared deviations from the mean,',
+      "    divided by the appropriate denominator for an unbiased estimator.",
+      '    """',
+      "    mu = x.mean()",
+      "    deviations = x - mu",
+      "    squared = deviations ** 2",
+      "    # Bug lives on the next line. Read the docstring above.",
+      "    return float(squared.sum() / len(x))",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "The scenario: a junior shipped this; risk lead says vol numbers are *systematically* too small. The word 'systematically' matters — a sign flip would be 50/50; a constant scaling factor like `n / (n-1)` is always too small.",
+        lines: [1, 2, 3, 4, 5, 6, 7],
+      },
+      {
+        caption:
+          "The function returns variance from an array. The docstring promises an **unbiased estimator** — the key word. There are two conventions for 'variance', and they differ only in the denominator.",
+        lines: [11, 12, 13, 14],
+      },
+      {
+        caption:
+          "The numerator: compute the mean, subtract it elementwise, square. Standard formula `Σ(xᵢ − μ)²`. Verify each line; no bug here.",
+        lines: [15, 16, 17],
+      },
+      {
+        caption:
+          "The final line divides the numerator by some denominator. Two candidates: `n` → POPULATION variance (use when your data IS the whole population), or `n − 1` → SAMPLE variance, the unbiased estimator (use when your data is a sample of something larger). Which matches the docstring? Read line 19 in Stage 3.",
+        lines: [18, 19],
+      },
+    ],
+  },
+
+  "quant-12-vectorising-with-cumsum": {
+    code: [
+      '"""Tests for the vectorised rolling mean."""',
+      "import numpy as np",
+      "import pytest",
+      "",
+      "from solution import rolling_mean",
+      "",
+      "",
+      "def test_simple_input_matches_hand_calc():",
+      "    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])",
+      "    out = rolling_mean(x, 3)",
+      "    assert np.allclose(out, [2.0, 3.0, 4.0, 5.0])",
+      "",
+      "",
+      "def test_window_one_returns_input():",
+      "    x = np.array([10.0, 20.0, 30.0])",
+      "    assert np.allclose(rolling_mean(x, 1), x)",
+      "",
+      "",
+      "def test_window_equals_length_returns_single_mean():",
+      "    x = np.array([1.0, 2.0, 3.0, 4.0])",
+      "    out = rolling_mean(x, 4)",
+      "    assert out.shape == (1,)",
+      "    assert abs(out[0] - 2.5) < 1e-12",
+      "",
+      "",
+      "def test_shape_is_n_minus_w_plus_1():",
+      "    rng = np.random.default_rng(0)",
+      "    x = rng.normal(size=100)",
+      "    out = rolling_mean(x, 7)",
+      "    assert out.shape == (100 - 7 + 1,)",
+      "",
+      "",
+      "def test_matches_naive_loop_on_random_input():",
+      "    rng = np.random.default_rng(42)",
+      "    x = rng.normal(size=200)",
+      "    w = 12",
+      "    naive = np.array([x[i : i + w].mean() for i in range(len(x) - w + 1)])",
+      "    assert np.allclose(rolling_mean(x, w), naive)",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Your job: implement `rolling_mean` in `solution.py`. The five tests below define the contract. Reading the tests first is the right strategy — they tell you exactly what your function must return on what inputs.",
+        lines: [1, 2, 3, 4, 5],
+      },
+      {
+        caption:
+          "The behavioural test: `rolling_mean([1..6], 3)` must return `[2.0, 3.0, 4.0, 5.0]` — the mean of each consecutive 3-element window. Four windows for 6 inputs at w=3.",
+        lines: [8, 9, 10, 11],
+      },
+      {
+        caption:
+          "Edge case w=1: a window of size 1 means every 'window' is a single element. The output equals the input, unchanged.",
+        lines: [14, 15, 16],
+      },
+      {
+        caption:
+          "Edge case w=len(x): a single window covers the whole array. Output is shape `(1,)` containing the overall mean.",
+        lines: [19, 20, 21, 22, 23],
+      },
+      {
+        caption:
+          "The shape contract: output is `(len(x) - w + 1,)`. Always. The first `w-1` positions of `x` don't have a full window behind them so they're not in the output.",
+        lines: [26, 27, 28, 29, 30],
+      },
+      {
+        caption:
+          "The semantic guarantee: your fast vectorised implementation must match a Python double-loop bit-for-bit on random data. The Approach tab points at the cumsum trick: prepend a zero to `cumsum(x)` and `c[w:] − c[:-w]` is the numerator of every window in one shot.",
+        lines: [33, 34, 35, 36, 37, 38],
+      },
+    ],
+  },
+
+  "quant-22-ols-beta-of-aapl-on-spy": {
+    code: [
+      '"""In-process mock of a /returns/<ticker> HTTP API."""',
+      "from dataclasses import dataclass",
+      "from typing import Any",
+      "import numpy as np",
+      "",
+      "",
+      "@dataclass",
+      "class Response:",
+      "    status_code: int",
+      "    _payload: dict",
+      "",
+      "    @property",
+      "    def ok(self) -> bool:",
+      "        return 200 <= self.status_code < 300",
+      "",
+      "    def json(self) -> Any:",
+      "        return self._payload",
+      "",
+      "",
+      "def get(path: str) -> Response:",
+      '    """Mock HTTP GET. Supports /returns/<ticker> only.',
+      "",
+      "    200 + payload {ticker, returns: [...]}  for known tickers.",
+      "    404 + payload {error: 'unknown ticker'} otherwise.",
+      '    """',
+      "    # Known tickers: SPY (market), AAPL, QQQ.",
+      "    # Anything else returns 404.",
+      "    ...",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`Response` is the return shape — same as `requests.Response`. Two things matter on it: `.ok` (True for status 200–299) and `.json()` (returns the parsed JSON payload as a dict).",
+        lines: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+      },
+      {
+        caption:
+          "`mock_api.get(path)` is the only entry point — there's no POST, no auth, no headers. You'll call it twice from `solution.py`: once for the market series, once for the ticker.",
+        lines: [20],
+      },
+      {
+        caption:
+          "Supported route: `/returns/<TICKER>` only. On 200, payload is `{ticker, returns}` — `returns` is a list of floats (daily returns). On 404, payload is `{error}` — your code should raise ValueError with that error message.",
+        lines: [21, 22, 23, 24, 25],
+      },
+      {
+        caption:
+          "Known tickers: SPY, AAPL, QQQ. Anything else 404s. In Stage 3, you'll write `compute_beta(ticker, market)` that calls `mock_api.get('/returns/SPY')` and `mock_api.get(f'/returns/{ticker}')`, checks `.ok` on each, parses the lists, then runs `sm.OLS(y, sm.add_constant(x)).fit()` and returns the slope.",
+        lines: [26, 27, 28],
+      },
+    ],
+  },
 };
