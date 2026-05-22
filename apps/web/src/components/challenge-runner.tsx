@@ -676,9 +676,12 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     return (
       <section className="flex flex-col gap-3 p-3">
         {pyodideState.kind === "warming" && (
-          <div className="flex-none rounded-md border border-border bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground">
-            Loading the Python runtime (~10 MB, one-time). You can start editing
-            — Run will be ready shortly.
+          <div className="flex-none rounded-md border-2 border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+            <span aria-hidden="true" className="mr-1.5">
+              ⏳
+            </span>
+            Loading the Python runtime (~10 MB, one-time download). Run tests
+            will activate when this banner clears — usually 5–15 seconds.
           </div>
         )}
         {pyodideState.kind === "error" && (
@@ -746,12 +749,13 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
                 disabled={
                   runState.kind === "running" || pyodideState.kind === "warming"
                 }
+                className="h-10 px-4 text-sm sm:h-9 sm:px-3 sm:text-xs"
               >
                 {runState.kind === "running"
-                  ? "Running tests…"
+                  ? "⏳ Running tests…"
                   : pyodideState.kind === "warming"
-                    ? "Loading Python…"
-                    : "Run tests"}
+                    ? "⏳ Loading Python…"
+                    : "▶ Run tests"}
               </Button>
             </div>
           </header>

@@ -166,6 +166,18 @@ export function LessonMatplot({ config, nextSlug, onCodeChange }: Props) {
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
+      {(runtime.kind === "warming-pyodide" ||
+        runtime.kind === "warming-matplotlib") && (
+        <div className="flex-none rounded-md border-2 border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+          <span aria-hidden="true" className="mr-1.5">
+            ⏳
+          </span>
+          {runtime.kind === "warming-pyodide"
+            ? "Loading the Python runtime (~10 MB, one-time download)."
+            : "Loading matplotlib — almost ready."}{" "}
+          Run will activate when this banner clears.
+        </div>
+      )}
       <header className="flex flex-none items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Plot it</h3>
         <div className="flex items-center gap-2">
@@ -180,8 +192,14 @@ export function LessonMatplot({ config, nextSlug, onCodeChange }: Props) {
           <Button type="button" variant="outline" size="sm" onClick={reset}>
             Reset code
           </Button>
-          <Button type="button" size="sm" onClick={run} disabled={runDisabled}>
-            {runLabel}
+          <Button
+            type="button"
+            size="sm"
+            onClick={run}
+            disabled={runDisabled}
+            className="h-10 px-4 text-sm sm:h-9 sm:px-3 sm:text-xs"
+          >
+            {runLabel === "Run" ? "▶ Run" : `⏳ ${runLabel}`}
           </Button>
         </div>
       </header>

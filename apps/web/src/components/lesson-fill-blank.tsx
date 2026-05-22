@@ -150,6 +150,15 @@ export function LessonFillBlank({ config, nextSlug, onCodeChange }: Props) {
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
+      {pyodideState.kind === "warming" && (
+        <div className="flex-none rounded-md border-2 border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+          <span aria-hidden="true" className="mr-1.5">
+            ⏳
+          </span>
+          Loading the Python runtime (~10 MB, one-time download). Run will
+          activate when this banner clears — usually 5–15 seconds.
+        </div>
+      )}
       <header className="flex flex-none items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Replace the blanks</h3>
         <div className="flex items-center gap-2">
@@ -164,12 +173,18 @@ export function LessonFillBlank({ config, nextSlug, onCodeChange }: Props) {
           <Button type="button" variant="outline" size="sm" onClick={reset}>
             Reset code
           </Button>
-          <Button type="button" size="sm" onClick={run} disabled={runDisabled}>
+          <Button
+            type="button"
+            size="sm"
+            onClick={run}
+            disabled={runDisabled}
+            className="h-10 px-4 text-sm sm:h-9 sm:px-3 sm:text-xs"
+          >
             {runState.kind === "running"
-              ? "Running…"
+              ? "⏳ Running…"
               : pyodideState.kind === "warming"
-                ? "Loading Python…"
-                : "Run"}
+                ? "⏳ Loading Python…"
+                : "▶ Run"}
           </Button>
         </div>
       </header>

@@ -29,13 +29,17 @@
     @apply bg-background text-foreground;
   }
 
-  /* iOS Safari shows a grey overlay on tappable elements by default —
-   * disable it for buttons + links to stop the "grey bar" flash the
-   * user sees when advancing through walkthrough steps. */
+  /* iOS Safari's default tap-highlight is a 40%-black overlay — too
+   * heavy. Override to a faint grey that still gives the learner
+   * confirmation their tap registered without the "grey bar" flash. */
   button,
   a,
   [role="button"] {
-    -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.06);
+  }
+  /* Subtle pressed state on touch — works on both mobile and desktop. */
+  button:active:not(:disabled) {
+    opacity: 0.85;
   }
 }
 
