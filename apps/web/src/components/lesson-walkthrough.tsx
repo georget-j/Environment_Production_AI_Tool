@@ -88,10 +88,50 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
           })}
         </div>
 
-        {/* Right: numbered clickable steps. Natural height — the
-         * stage container (or this pane via lg:max-h) handles the
-         * scroll. */}
-        <div className="flex flex-col gap-2 pr-1">
+        {/* Right pane has two layouts. On lg+, every step is shown
+         * as a clickable card so the learner can scan and skip. On
+         * mobile, only the ACTIVE step is shown with prev/next
+         * controls — less scrolling, less scanning, one focused
+         * caption at a time. */}
+
+        {/* Mobile: single-step view */}
+        <div className="flex flex-col gap-3 lg:hidden">
+          <p className="text-[11px] font-medium text-muted-foreground">
+            Step {active + 1} of {steps.length}
+          </p>
+          <div className="rounded-md border border-primary bg-primary/5 p-3">
+            <div className="flex items-start gap-3 text-sm leading-relaxed">
+              <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                {active + 1}
+              </span>
+              <span>{steps[active]?.caption}</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setActive((a) => Math.max(0, a - 1));
+                setCompleted(false);
+              }}
+              disabled={active === 0}
+              className="rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40"
+            >
+              ← Back
+            </button>
+            <button
+              type="button"
+              onClick={onContinue}
+              disabled={isLast}
+              className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+            >
+              {isLast ? "All steps read ✓" : "Next step →"}
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop: list of clickable steps. */}
+        <div className="hidden flex-col gap-2 pr-1 lg:flex">
           <ol className="space-y-2">
             {steps.map((s, i) => {
               const isCurrent = i === active;
@@ -135,9 +175,6 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
               );
             })}
           </ol>
-          {/* Hide the terminal CTA when there's no scroll target (the wizard
-           * owns the stage transition). On non-terminal steps, always show
-           * "Next step →" so the learner can advance one annotation at a time. */}
           {(!isLast || scrollTargetId) && (
             <button
               type="button"
