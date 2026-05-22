@@ -361,11 +361,11 @@ export function ChallengeView({
 
   const walkthrough = WALKTHROUGHS[challengeSlug];
   const examplePane = walkthrough ? (
-    <div className="h-full overflow-y-auto p-3">
+    <div className="h-full min-h-0 p-3">
       <LessonWalkthrough
         code={walkthrough.code}
         steps={walkthrough.steps}
-        scrollTargetId="__noop__"
+        scrollTargetId=""
       />
     </div>
   ) : undefined;

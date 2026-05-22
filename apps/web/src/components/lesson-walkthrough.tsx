@@ -48,8 +48,8 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
   const isLast = active === steps.length - 1;
 
   return (
-    <section className="rounded-lg border border-primary/30 bg-background">
-      <header className="flex items-center justify-between border-b border-primary/20 px-4 py-2">
+    <section className="flex h-full min-h-0 flex-col rounded-lg border border-primary/30 bg-background">
+      <header className="flex flex-none items-center justify-between border-b border-primary/20 px-4 py-2">
         <p className="text-sm font-semibold">
           Walk the example first
           <span className="ml-2 text-xs font-normal text-muted-foreground">
@@ -60,9 +60,12 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
           Click a step to highlight its lines.
         </p>
       </header>
-      <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,_1.1fr)_minmax(0,_0.9fr)]">
-        {/* Left: read-only annotated code. */}
-        <div className="overflow-x-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[13px] leading-[1.7]">
+      <div className="grid min-h-0 flex-1 gap-3 p-3 lg:grid-cols-[minmax(0,_1.1fr)_minmax(0,_0.9fr)]">
+        {/* Left: read-only annotated code. Code rarely needs to scroll
+         * (worked examples are short), but if it does, it scrolls inside
+         * this column — independent of the steps column, so the learner
+         * never loses sight of the code while clicking through steps. */}
+        <div className="overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[13px] leading-[1.7] lg:sticky lg:top-0">
           {codeLines.map((line, i) => {
             const lineNum = i + 1;
             const isActive = activeLines.has(lineNum);
@@ -83,8 +86,9 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
           })}
         </div>
 
-        {/* Right: numbered clickable steps. */}
-        <div className="flex flex-col gap-2">
+        {/* Right: numbered clickable steps. Scrolls independently so the
+         * code on the left stays anchored. */}
+        <div className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-1">
           <ol className="space-y-2">
             {steps.map((s, i) => {
               const isCurrent = i === active;
