@@ -69,3 +69,46 @@ class ProgressOut(_Base):
     started_at: datetime | None
     completed_at: datetime | None
     attempts_count: int
+
+
+class TrackProgressOut(_Base):
+    """Per-track aggregate for the authenticated user. Used by the dashboard
+    to render progress bars + a 'Continue track' CTA per track card."""
+
+    slug: str
+    title: str
+    description: str | None = None
+    difficulty: str | None = None
+    completed: int
+    total: int
+    latest_in_progress_slug: str | None = None
+
+
+class ContinueRef(_Base):
+    """Pointer to the lesson the dashboard's 'Resume' card should link to —
+    the most-recently-started in-progress lesson across all tracks."""
+
+    track_slug: str
+    track_title: str
+    module_title: str
+    challenge_slug: str
+    challenge_title: str
+    position: int
+    total: int
+
+
+class MeProgressOut(_Base):
+    tracks: list[TrackProgressOut]
+    continue_lesson: ContinueRef | None = None
+
+
+class TrackProgressDetail(_Base):
+    """Per-challenge progress for a single track, used to decorate the
+    track-detail page with done/current/not-yet state per lesson."""
+
+    completed_slugs: list[str]
+    in_progress_slugs: list[str]
+    next_unsolved_slug: str | None = None
+    completed: int
+    total: int
+    module_progress: dict[str, dict[str, int]]  # module_id (str) → {completed, total}

@@ -112,3 +112,37 @@ export type ProgressOut = {
   completed_at: string | null;
   attempts_count: number;
 };
+
+export type TrackProgressOut = {
+  slug: string;
+  title: string;
+  description: string | null;
+  difficulty: string | null;
+  completed: number;
+  total: number;
+  latest_in_progress_slug: string | null;
+};
+
+export type ContinueRef = {
+  track_slug: string;
+  track_title: string;
+  module_title: string;
+  challenge_slug: string;
+  challenge_title: string;
+  position: number;
+  total: number;
+};
+
+export type MeProgressOut = {
+  tracks: TrackProgressOut[];
+  continue_lesson: ContinueRef | null;
+};
+
+export type TrackProgressDetail = {
+  completed_slugs: string[];
+  in_progress_slugs: string[];
+  next_unsolved_slug: string | null;
+  completed: number;
+  total: number;
+  module_progress: Record<string, { completed: number; total: number }>;
+};
