@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Markdown } from "@/components/markdown";
 import type { ChallengeNavRef } from "@/lib/api";
 
 type Props = {
@@ -18,34 +17,36 @@ type Props = {
 };
 
 /**
- * Strip at the top of a lesson page. Everything is always visible —
- * scenario, goal, and the Concept / Example / action verb reference.
- * Page-level scroll handles taller content. No collapse toggle: the
- * scenario carries the firm-scene framing that anchors why the lesson
- * matters, and the reference block carries the technical setup the
- * learner needs to attack the task. Both are worth keeping in view.
+ * Compact strip at the top of a lesson page. Title + module + scenario,
+ * nothing else. The Concept / Example / action verb that used to live
+ * here have moved into the LessonStages wizard (Example stage for
+ * lessons with a walkthrough; Approach stage otherwise), so the page
+ * frame is now a thin band and the wizard owns the screen.
+ *
+ * `learnerGoal` and `instructions` are still received for prop-shape
+ * compatibility but no longer rendered here — the wizard reads them.
  */
 export function LessonContextStrip({
-  // challengeSlug retained for future per-slug behaviour; intentionally unused.
   challengeSlug: _challengeSlug,
   moduleTitle,
   challengeTitle,
   scenario,
-  learnerGoal,
-  instructions,
+  learnerGoal: _learnerGoal,
+  instructions: _instructions,
   previous,
   next,
   position,
   total,
 }: Props) {
   void _challengeSlug;
+  void _learnerGoal;
+  void _instructions;
   const showNav = total > 1;
   const pct =
     total > 1 ? Math.max(0, Math.min(100, (position / total) * 100)) : 0;
 
   return (
     <section className="flex-none border-b border-border bg-background">
-      {/* Row 1: nav + position + progress bar (only when track has >1 lesson) */}
       {showNav && (
         <div className="flex items-center gap-3 px-1 py-1.5 text-[11px] text-muted-foreground">
           {previous ? (
@@ -91,7 +92,6 @@ export function LessonContextStrip({
         </div>
       )}
 
-      {/* Row 2: module + title */}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1 pb-1 pt-0.5">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {moduleTitle}
@@ -101,22 +101,8 @@ export function LessonContextStrip({
         </h1>
       </div>
 
-      {/* Row 3: scenario — always full text. */}
       <div className="px-1 pb-2">
         <p className="text-sm leading-relaxed text-foreground">{scenario}</p>
-      </div>
-
-      {/* Reference body: goal callout + full instructions. Always shown. */}
-      <div className="space-y-3 border-t border-border bg-muted/10 px-3 py-3">
-        <div className="rounded-md border-l-4 border-primary bg-muted/40 px-3 py-2 text-sm leading-relaxed">
-          <span className="font-semibold">Your goal: </span>
-          {learnerGoal}
-        </div>
-        {instructions?.trim() && (
-          <div className="rounded-md border border-border bg-background px-3 py-2">
-            <Markdown>{instructions}</Markdown>
-          </div>
-        )}
       </div>
     </section>
   );

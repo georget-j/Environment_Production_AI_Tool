@@ -650,7 +650,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
       });
 
     return (
-      <section className="flex flex-col gap-3">
+      <section className="flex h-full min-h-0 flex-col gap-3 p-3">
         {pyodideState.kind === "warming" && (
           <div className="flex-none rounded-md border border-border bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground">
             Loading the Python runtime (~10 MB, one-time). You can start editing
@@ -663,7 +663,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
           </div>
         )}
 
-        <section className="flex flex-col gap-2">
+        <section className="flex min-h-0 flex-[3] flex-col gap-2">
           <header className="flex flex-none flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">
@@ -761,7 +761,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
             })}
           </div>
 
-          <div className="h-[60vh] min-h-[320px] overflow-hidden rounded-md border border-border">
+          <div className="min-h-[200px] flex-1 overflow-hidden rounded-md border border-border">
             <MonacoEditor
               key={activeTab}
               height="100%"
@@ -924,7 +924,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
           </section>
         )}
 
-        <section className="flex flex-col rounded-md border border-border">
+        <section className="flex min-h-0 flex-[2] flex-col overflow-hidden rounded-md border border-border">
           <header className="flex flex-none items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-sm font-semibold">
             <span>
               {runState.kind === "done"
@@ -939,7 +939,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
               </span>
             )}
           </header>
-          <ul className="divide-y divide-border">
+          <ul className="flex-1 divide-y divide-border overflow-y-auto">
             {testRows.map((t) => {
               const ex = findExplanation(t);
               const showFailureBox =

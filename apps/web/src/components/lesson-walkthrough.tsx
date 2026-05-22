@@ -13,7 +13,10 @@ export type WalkthroughStep = {
 type Props = {
   code: string;
   steps: WalkthroughStep[];
-  /** DOM id of the element to scroll to when "Now you try" is clicked. */
+  /** DOM id of the element to scroll to when "Now you try" is clicked.
+   *  Pass an empty string when used inside a stage wizard — the wizard's
+   *  own "Next →" handles the transition and the walkthrough should not
+   *  render its own terminal CTA. */
   scrollTargetId: string;
 };
 
@@ -125,13 +128,18 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
               );
             })}
           </ol>
-          <button
-            type="button"
-            onClick={onContinue}
-            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            {isLast ? "Now you try ↓" : "Next step →"}
-          </button>
+          {/* Hide the terminal CTA when there's no scroll target (the wizard
+           * owns the stage transition). On non-terminal steps, always show
+           * "Next step →" so the learner can advance one annotation at a time. */}
+          {(!isLast || scrollTargetId) && (
+            <button
+              type="button"
+              onClick={onContinue}
+              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              {isLast ? "Now you try ↓" : "Next step →"}
+            </button>
+          )}
         </div>
       </div>
     </section>

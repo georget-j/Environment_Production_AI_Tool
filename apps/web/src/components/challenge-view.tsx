@@ -11,7 +11,9 @@ import {
   LessonApproach,
   type ApproachMode,
 } from "@/components/lesson-approach";
+import { LessonStages } from "@/components/lesson-stages";
 import { LessonWalkthrough } from "@/components/lesson-walkthrough";
+import { Markdown } from "@/components/markdown";
 import { WALKTHROUGHS } from "@/lib/walkthroughs";
 import { LessonCFillBlank } from "@/components/lesson-c-fill-blank";
 import { LessonCWasm } from "@/components/lesson-c-wasm";
@@ -42,6 +44,9 @@ type Props = {
   nextSlug: string | null;
   /** One-line learner-facing goal, rendered in the approach card. */
   learnerGoal: string;
+  /** Full instructions markdown (Concept + Example + verb + Expected) —
+   *  surfaced inside the Approach stage as reference. */
+  instructions: string;
 };
 
 /**
@@ -60,6 +65,7 @@ export function ChallengeView({
   config,
   nextSlug,
   learnerGoal,
+  instructions,
 }: Props) {
   const mentorRef = useRef<MentorChatHandle | null>(null);
   const runnerRef = useRef<ChallengeRunnerHandle | null>(null);
@@ -350,29 +356,54 @@ export function ChallengeView({
   // action area on long lessons. The mentor column is `lg:sticky` so it
   // stays in view while the workspace scrolls.
   const gridClass = mentorCollapsed
-    ? "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_40px]"
-    : "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]";
+    ? "grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_40px]"
+    : "grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(360px,_400px)]";
+
+  const walkthrough = WALKTHROUGHS[challengeSlug];
+  const examplePane = walkthrough ? (
+    <div className="h-full overflow-y-auto p-3">
+      <LessonWalkthrough
+        code={walkthrough.code}
+        steps={walkthrough.steps}
+        scrollTargetId="__noop__"
+      />
+    </div>
+  ) : undefined;
+
+  const approachPane = approachMode ? (
+    <div className="h-full space-y-3 overflow-y-auto p-3">
+      <LessonApproach
+        mode={approachMode}
+        challengeSlug={challengeSlug}
+        learnerGoal={learnerGoal}
+      />
+      {instructions?.trim() && (
+        <details className="rounded-md border border-border bg-muted/10 px-3 py-2 text-sm">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+            Show concept reference (instructions, expected output)
+          </summary>
+          <div className="mt-2">
+            <Markdown>{instructions}</Markdown>
+          </div>
+        </details>
+      )}
+    </div>
+  ) : (
+    <div className="h-full p-3 text-sm text-muted-foreground">
+      No approach card for this lesson mode.
+    </div>
+  );
+
+  const solvePane = <div className="h-full overflow-hidden">{runner}</div>;
 
   return (
     <div className={gridClass}>
-      <section className="min-w-0 space-y-3">
-        {WALKTHROUGHS[challengeSlug] && (
-          <LessonWalkthrough
-            code={WALKTHROUGHS[challengeSlug].code}
-            steps={WALKTHROUGHS[challengeSlug].steps}
-            scrollTargetId="lesson-now-you-try"
-          />
-        )}
-        {approachMode && (
-          <div id="lesson-now-you-try" className="scroll-mt-4">
-            <LessonApproach
-              mode={approachMode}
-              challengeSlug={challengeSlug}
-              learnerGoal={learnerGoal}
-            />
-          </div>
-        )}
-        {runner}
+      <section className="min-h-0 min-w-0 overflow-hidden rounded-lg border border-border bg-background">
+        <LessonStages
+          example={examplePane}
+          approach={approachPane}
+          solve={solvePane}
+        />
       </section>
 
       {/* Mentor: lives in the grid's right column on lg+. On smaller

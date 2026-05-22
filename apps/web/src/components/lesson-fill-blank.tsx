@@ -149,7 +149,7 @@ export function LessonFillBlank({ config, nextSlug, onCodeChange }: Props) {
     pyodideState.kind !== "ready" || runState.kind === "running";
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
+    <section className="flex h-full min-h-0 flex-col gap-3 overflow-hidden rounded-lg border border-border bg-background p-4">
       <header className="flex flex-none items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Replace the blanks</h3>
         <div className="flex items-center gap-2">
@@ -174,7 +174,7 @@ export function LessonFillBlank({ config, nextSlug, onCodeChange }: Props) {
         </div>
       </header>
 
-      <div className="h-[55vh] min-h-[280px] overflow-hidden rounded-md border border-border">
+      <div className="min-h-[180px] flex-1 overflow-hidden rounded-md border border-border">
         <MonacoEditor
           height="100%"
           defaultLanguage="python"

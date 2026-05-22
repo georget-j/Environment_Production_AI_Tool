@@ -17,6 +17,45 @@ type WalkthroughEntry = {
 };
 
 export const WALKTHROUGHS: Record<string, WalkthroughEntry> = {
+  "quant-02-creating-arrays": {
+    code: [
+      "import numpy as np",
+      "# A literal list — known coupon rates on three bonds.",
+      "coupons = np.array([0.025, 0.032, 0.041])",
+      "# Pre-allocated buffer for tomorrow's signals.",
+      "signals = np.zeros(252)",
+      "# Evenly-spaced strikes for an IV surface — 80% to 120% of spot.",
+      "strikes = np.linspace(80, 120, 5)",
+      "print(coupons, signals[:3], strikes, sep=' | ')",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Import numpy as `np` — the only sensible alias; every quant codebase uses it.",
+        lines: [1],
+      },
+      {
+        caption:
+          "`np.array([...])` lifts a Python list into a fixed-size, contiguous numeric array. Use this when you already have the values in hand — here, three known coupon rates.",
+        lines: [2, 3],
+      },
+      {
+        caption:
+          "`np.zeros(n)` pre-allocates a vector of `n` zeros. Use this as a *buffer* — somewhere to drop values you'll fill in later (e.g., tomorrow's daily signals across 252 trading days).",
+        lines: [4, 5],
+      },
+      {
+        caption:
+          "`np.linspace(start, stop, n)` returns `n` evenly-spaced points *including both endpoints*. Use this for grids: strikes for an IV surface, parameter sweeps, plot x-axes.",
+        lines: [6, 7],
+      },
+      {
+        caption:
+          "Print all three so you can see their shapes side-by-side. The `sep=' | '` separator just keeps the output readable. In the next stage you'll write two of these constructors yourself from scratch.",
+        lines: [8],
+      },
+    ],
+  },
   "quant-03-broadcasting-basics": {
     code: [
       "import numpy as np",
