@@ -79,17 +79,25 @@ export function LessonStages({ example, approach, solve }: Props) {
        * height — so we allow `overflow-y-auto` here as a safety net.
        * Approach + Solve panes already have their own overflow-y-auto;
        * this catches the Example stage's stacked-panes overflow on
-       * mobile without affecting their behaviour. */}
+       * mobile without affecting their behaviour.
+       *
+       * `pb-20 lg:pb-0`: on mobile, leave room at the bottom so the
+       * floating "Ask the mentor" button (fixed bottom-4 right-4)
+       * doesn't cover the last lines of content. On lg+ the mentor
+       * lives in the grid's right column, no floating button. */}
       <div
         key={active.id}
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-20 lg:pb-0"
       >
         {active.content}
       </div>
 
-      {/* Next button at the bottom-right; absent on the terminal Solve stage. */}
+      {/* Next button at the bottom-right; absent on the terminal Solve stage.
+       * On mobile the floating "Ask the mentor" FAB sits bottom-right at
+       * z-40, so we reserve right-padding here to keep the Next button
+       * to the left of the FAB. */}
       {!isLast && nextStage && (
-        <div className="flex flex-none items-center justify-between border-t border-border bg-muted/10 px-3 py-2">
+        <div className="flex flex-none items-center justify-between gap-2 border-t border-border bg-muted/10 px-3 py-2 pr-24 lg:pr-3">
           <p className="text-xs text-muted-foreground">
             When you&apos;ve digested this, advance to{" "}
             <span className="font-medium text-foreground">

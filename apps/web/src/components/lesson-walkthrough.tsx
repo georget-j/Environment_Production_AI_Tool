@@ -67,7 +67,7 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
         {/* Left: read-only annotated code. Sticks to the top of the
          * scrollable stage on lg+ so the learner never loses sight
          * of the snippet as they read through the steps. */}
-        <div className="overflow-x-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[13px] leading-[1.7] lg:sticky lg:top-0 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto">
+        <div className="overflow-x-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] leading-[1.6] sm:text-[12px] lg:sticky lg:top-0 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:text-[13px] lg:leading-[1.7]">
           {codeLines.map((line, i) => {
             const lineNum = i + 1;
             const isActive = activeLines.has(lineNum);

@@ -529,9 +529,11 @@ export function ChallengeView({
         <button
           type="button"
           onClick={() => setMentorOverlayOpen(true)}
-          className="fixed bottom-4 right-4 z-40 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg hover:bg-primary/90 lg:hidden"
+          className="fixed bottom-3 right-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-lg hover:bg-primary/90 lg:hidden"
+          aria-label="Ask the mentor"
         >
-          Ask the mentor
+          <span aria-hidden="true">💬</span>
+          <span>Mentor</span>
         </button>
       )}
 
