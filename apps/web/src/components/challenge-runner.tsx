@@ -212,6 +212,11 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
     const [expandedTestIds, setExpandedTestIds] = useState<Set<string>>(
       () => new Set(),
     );
+    // Mobile-only slide-up sheet for the result banner + tests panel.
+    // Auto-opens after each Run; user can dismiss with ✕ and reopen via
+    // the bottom-left pill. On lg+ the wrapper dissolves (lg:contents)
+    // and the results render inline in the runner's flex flow.
+    const [sheetOpen, setSheetOpen] = useState(false);
     const [failureLocations, setFailureLocations] = useState<
       Record<string, number[]>
     >({});
@@ -645,13 +650,12 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [runState]);
 
-    // After each completed run, scroll the result banner into view —
-    // but with `block: 'end'` so the banner appears at the BOTTOM of
-    // the visible area, keeping the editor visible above. The learner
-    // can see their code and the result side-by-side without losing
-    // either when iterating.
+    // After each completed run: on mobile, slide the results sheet up;
+    // on desktop, scroll the result banner into view at the bottom of
+    // the visible area so the editor stays visible above.
     useEffect(() => {
       if (runState.kind !== "done") return;
+      setSheetOpen(true);
       const raf = requestAnimationFrame(() => {
         resultBannerRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -830,242 +834,291 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
           </div>
         </section>
 
-        {runState.kind === "done" && (
-          <section
-            ref={resultBannerRef}
-            className={cn(
-              "flex-none scroll-mt-2 space-y-2 rounded-md border p-3",
-              passed
-                ? "border-green-300 bg-green-50"
-                : "border-red-300 bg-red-50",
-            )}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold">
-                {passed
-                  ? `✓ ${runState.result.summary || "All tests passed"}`
-                  : runState.result.exitCode === -1
-                    ? "Runner error"
-                    : `✗ ${runState.result.summary || `pytest exited ${runState.result.exitCode}`}`}
-              </p>
-              <div className="flex items-center gap-2">
-                {!passed && onStuck && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const failed = runState.result.tests
-                        .filter(
-                          (t) => t.status === "failed" || t.status === "error",
-                        )
-                        .map((t) => t.name);
-                      const list =
-                        failed.length > 0
-                          ? failed.join(", ")
-                          : "the failing test";
-                      onStuck(
-                        `I ran the tests and ${failed.length || "some"} failed (${list}). I'm not sure where to start — can you walk me through what to look at?`,
-                      );
-                    }}
-                  >
-                    I&apos;m stuck — help
-                  </Button>
+        {/* Results sheet — slides up from bottom on mobile, renders
+         * inline on lg+ (the `lg:contents` dissolves the wrapper at
+         * desktop sizes so children flow in the runner's flex column
+         * as before). Auto-opens after each Run; ✕ closes; the
+         * bottom-left pill below reopens. */}
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col overflow-hidden rounded-t-2xl border-t-2 border-primary/40 bg-background shadow-2xl transition-transform duration-300",
+            sheetOpen ? "translate-y-0" : "translate-y-full",
+            "lg:contents",
+          )}
+        >
+          <div className="flex flex-none items-center justify-between border-b border-border bg-background/95 px-3 py-2 backdrop-blur lg:hidden">
+            <span className="text-sm font-semibold">Test results</span>
+            <button
+              type="button"
+              onClick={() => setSheetOpen(false)}
+              className="rounded-md px-2 py-1 text-muted-foreground hover:bg-muted"
+              aria-label="Close test results"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="space-y-3 overflow-y-auto p-3 pb-6 lg:contents lg:overflow-visible">
+            {runState.kind === "done" && (
+              <section
+                ref={resultBannerRef}
+                className={cn(
+                  "flex-none scroll-mt-2 space-y-2 rounded-md border p-3",
+                  passed
+                    ? "border-green-300 bg-green-50"
+                    : "border-red-300 bg-red-50",
                 )}
-                {passed && submitState.kind !== "passed" && (
-                  <Button
-                    size="lg"
-                    onClick={handleSubmit}
-                    disabled={submitState.kind === "submitting"}
-                    className="w-full sm:w-auto"
-                  >
-                    {submitState.kind === "submitting"
-                      ? "Submitting…"
-                      : "Submit solution →"}
-                  </Button>
-                )}
-              </div>
-            </div>
-            {submitState.kind === "passed" && (
-              <div
-                onPointerEnter={() => setAutoCancelled(true)}
-                onFocusCapture={() => setAutoCancelled(true)}
-                className="space-y-2 rounded-md border border-green-300 bg-white px-3 py-3"
               >
-                <p className="text-sm font-semibold text-green-900">
-                  ✓ Solution submitted — nice work.
-                </p>
-                {nextSlug ? (
-                  <>
-                    <Button
-                      type="button"
-                      className="w-full"
-                      onClick={() => router.push(`/challenges/${nextSlug}`)}
-                    >
-                      Next lesson →
-                    </Button>
-                    {!autoCancelled ? (
-                      <p className="text-center text-[11px] text-green-900/70">
-                        Auto-advancing in {Math.round(AUTO_ADVANCE_MS / 1000)}s
-                        …{" "}
-                        <button
-                          type="button"
-                          onClick={() => setAutoCancelled(true)}
-                          className="underline hover:no-underline"
-                        >
-                          Stay on this lesson
-                        </button>
-                      </p>
-                    ) : (
-                      <p className="text-center text-[11px] text-green-900/70">
-                        Take your time — click Next when you&apos;re ready.
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-green-900">
-                    You&apos;ve finished the last lesson of this track 🎉
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">
+                    {passed
+                      ? `✓ ${runState.result.summary || "All tests passed"}`
+                      : runState.result.exitCode === -1
+                        ? "Runner error"
+                        : `✗ ${runState.result.summary || `pytest exited ${runState.result.exitCode}`}`}
                   </p>
-                )}
-                <p className="text-center text-[11px] text-muted-foreground">
-                  <a
-                    href={`/submissions/${submitState.submissionId}${nextSlug ? `?next=${nextSlug}` : ""}`}
-                    className="underline hover:no-underline"
-                  >
-                    View submission details
-                  </a>
-                </p>
-              </div>
-            )}
-            {submitState.kind === "error" && (
-              <p className="text-xs text-red-700">{submitState.message}</p>
-            )}
-            <details className="text-xs">
-              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                Raw pytest output
-              </summary>
-              <pre className="mt-2 max-h-80 overflow-auto rounded bg-white p-3 font-mono text-[11px] leading-relaxed">
-                {runState.result.output || "(no output)"}
-              </pre>
-            </details>
-          </section>
-        )}
-
-        <section className="flex flex-col rounded-md border border-border">
-          <header className="flex flex-none items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-sm font-semibold">
-            <span>
-              {runState.kind === "done"
-                ? failureCount > 0
-                  ? `${failureCount} test${failureCount === 1 ? "" : "s"} failing — fix the top one first`
-                  : "All tests passed"
-                : `Tests (${config.tests.length})`}
-            </span>
-            {explainState.kind === "loading" && (
-              <span className="text-xs font-normal text-muted-foreground">
-                Mentor is explaining failures…
-              </span>
-            )}
-          </header>
-          <ul className="divide-y divide-border">
-            {testRows.map((t) => {
-              const ex = findExplanation(t);
-              const showFailureBox =
-                t.status === "failed" || t.status === "error";
-              const isExpanded = expandedTestIds.has(t.id);
-              return (
-                <li key={t.id} className="px-3 py-2.5">
-                  <div className="flex items-start gap-3 text-sm">
-                    <span
-                      className={cn(
-                        "w-4 shrink-0 font-mono",
-                        statusClass(t.status),
-                      )}
-                    >
-                      {t.status === "pending" ? "·" : statusEmoji(t.status)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-xs">
-                        {shortName(t)}
-                      </p>
-                      <p className="mt-0.5 text-muted-foreground">
-                        {t.description}
-                      </p>
-                      {showFailureBox && !isExpanded && (
-                        <button
-                          type="button"
-                          onClick={() => toggleTestExpand(t.id)}
-                          className="mt-1 text-xs text-red-700 underline-offset-2 hover:underline"
-                        >
-                          Show details ↓
-                        </button>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    {!passed && onStuck && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const failed = runState.result.tests
+                            .filter(
+                              (t) =>
+                                t.status === "failed" || t.status === "error",
+                            )
+                            .map((t) => t.name);
+                          const list =
+                            failed.length > 0
+                              ? failed.join(", ")
+                              : "the failing test";
+                          onStuck(
+                            `I ran the tests and ${failed.length || "some"} failed (${list}). I'm not sure where to start — can you walk me through what to look at?`,
+                          );
+                        }}
+                      >
+                        I&apos;m stuck — help
+                      </Button>
+                    )}
+                    {passed && submitState.kind !== "passed" && (
+                      <Button
+                        size="lg"
+                        onClick={handleSubmit}
+                        disabled={submitState.kind === "submitting"}
+                        className="w-full sm:w-auto"
+                      >
+                        {submitState.kind === "submitting"
+                          ? "Submitting…"
+                          : "Submit solution →"}
+                      </Button>
+                    )}
                   </div>
-                  {showFailureBox && isExpanded && (
-                    <div className="mt-2 ml-7 space-y-2 rounded-md border border-red-200 bg-red-50/60 p-4 text-sm leading-relaxed">
-                      {ex ? (
-                        <>
-                          <p>
-                            <span className="font-semibold">
-                              What this test checked:{" "}
-                            </span>
-                            {ex.what_was_checked}
-                          </p>
-                          <p>
-                            <span className="font-semibold">
-                              What happened:{" "}
-                            </span>
-                            {ex.what_happened}
-                          </p>
-                          <p>
-                            <span className="font-semibold">
-                              Where to look next:{" "}
-                            </span>
-                            {ex.where_to_look}
-                          </p>
-                          {ex.file && ex.file in files && (
+                </div>
+                {submitState.kind === "passed" && (
+                  <div
+                    onPointerEnter={() => setAutoCancelled(true)}
+                    onFocusCapture={() => setAutoCancelled(true)}
+                    className="space-y-2 rounded-md border border-green-300 bg-white px-3 py-3"
+                  >
+                    <p className="text-sm font-semibold text-green-900">
+                      ✓ Solution submitted — nice work.
+                    </p>
+                    {nextSlug ? (
+                      <>
+                        <Button
+                          type="button"
+                          className="w-full"
+                          onClick={() => router.push(`/challenges/${nextSlug}`)}
+                        >
+                          Next lesson →
+                        </Button>
+                        {!autoCancelled ? (
+                          <p className="text-center text-[11px] text-green-900/70">
+                            Auto-advancing in{" "}
+                            {Math.round(AUTO_ADVANCE_MS / 1000)}s …{" "}
                             <button
                               type="button"
-                              onClick={() => jumpTo(ex.file!, ex.line ?? null)}
-                              className="mt-1 inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                              onClick={() => setAutoCancelled(true)}
+                              className="underline hover:no-underline"
                             >
-                              Jump to{" "}
-                              <code className="font-mono">
-                                {ex.file}
-                                {ex.line ? `:${ex.line}` : ""}
-                              </code>{" "}
-                              →
+                              Stay on this lesson
+                            </button>
+                          </p>
+                        ) : (
+                          <p className="text-center text-[11px] text-green-900/70">
+                            Take your time — click Next when you&apos;re ready.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-green-900">
+                        You&apos;ve finished the last lesson of this track 🎉
+                      </p>
+                    )}
+                    <p className="text-center text-[11px] text-muted-foreground">
+                      <a
+                        href={`/submissions/${submitState.submissionId}${nextSlug ? `?next=${nextSlug}` : ""}`}
+                        className="underline hover:no-underline"
+                      >
+                        View submission details
+                      </a>
+                    </p>
+                  </div>
+                )}
+                {submitState.kind === "error" && (
+                  <p className="text-xs text-red-700">{submitState.message}</p>
+                )}
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                    Raw pytest output
+                  </summary>
+                  <pre className="mt-2 max-h-80 overflow-auto rounded bg-white p-3 font-mono text-[11px] leading-relaxed">
+                    {runState.result.output || "(no output)"}
+                  </pre>
+                </details>
+              </section>
+            )}
+
+            <section className="flex flex-col rounded-md border border-border">
+              <header className="flex flex-none items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-sm font-semibold">
+                <span>
+                  {runState.kind === "done"
+                    ? failureCount > 0
+                      ? `${failureCount} test${failureCount === 1 ? "" : "s"} failing — fix the top one first`
+                      : "All tests passed"
+                    : `Tests (${config.tests.length})`}
+                </span>
+                {explainState.kind === "loading" && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Mentor is explaining failures…
+                  </span>
+                )}
+              </header>
+              <ul className="divide-y divide-border">
+                {testRows.map((t) => {
+                  const ex = findExplanation(t);
+                  const showFailureBox =
+                    t.status === "failed" || t.status === "error";
+                  const isExpanded = expandedTestIds.has(t.id);
+                  return (
+                    <li key={t.id} className="px-3 py-2.5">
+                      <div className="flex items-start gap-3 text-sm">
+                        <span
+                          className={cn(
+                            "w-4 shrink-0 font-mono",
+                            statusClass(t.status),
+                          )}
+                        >
+                          {t.status === "pending" ? "·" : statusEmoji(t.status)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-mono text-xs">
+                            {shortName(t)}
+                          </p>
+                          <p className="mt-0.5 text-muted-foreground">
+                            {t.description}
+                          </p>
+                          {showFailureBox && !isExpanded && (
+                            <button
+                              type="button"
+                              onClick={() => toggleTestExpand(t.id)}
+                              className="mt-1 text-xs text-red-700 underline-offset-2 hover:underline"
+                            >
+                              Show details ↓
                             </button>
                           )}
-                        </>
-                      ) : explainState.kind === "loading" ? (
-                        <p className="text-muted-foreground">
-                          Generating explanation…
-                        </p>
-                      ) : explainState.kind === "ready" ? (
-                        <p className="text-muted-foreground">
-                          Mentor returned an explanation but couldn&apos;t match
-                          it to this test. Check the raw pytest output below.
-                        </p>
-                      ) : explainState.kind === "error" ? (
-                        <p className="text-muted-foreground">
-                          Mentor couldn&apos;t reach the AI (
-                          {explainState.message}). Check the raw output below.
-                        </p>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => toggleTestExpand(t.id)}
-                        className="mt-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                      >
-                        Hide details
-                      </button>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+                        </div>
+                      </div>
+                      {showFailureBox && isExpanded && (
+                        <div className="mt-2 ml-7 space-y-2 rounded-md border border-red-200 bg-red-50/60 p-4 text-sm leading-relaxed">
+                          {ex ? (
+                            <>
+                              <p>
+                                <span className="font-semibold">
+                                  What this test checked:{" "}
+                                </span>
+                                {ex.what_was_checked}
+                              </p>
+                              <p>
+                                <span className="font-semibold">
+                                  What happened:{" "}
+                                </span>
+                                {ex.what_happened}
+                              </p>
+                              <p>
+                                <span className="font-semibold">
+                                  Where to look next:{" "}
+                                </span>
+                                {ex.where_to_look}
+                              </p>
+                              {ex.file && ex.file in files && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    jumpTo(ex.file!, ex.line ?? null)
+                                  }
+                                  className="mt-1 inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                                >
+                                  Jump to{" "}
+                                  <code className="font-mono">
+                                    {ex.file}
+                                    {ex.line ? `:${ex.line}` : ""}
+                                  </code>{" "}
+                                  →
+                                </button>
+                              )}
+                            </>
+                          ) : explainState.kind === "loading" ? (
+                            <p className="text-muted-foreground">
+                              Generating explanation…
+                            </p>
+                          ) : explainState.kind === "ready" ? (
+                            <p className="text-muted-foreground">
+                              Mentor returned an explanation but couldn&apos;t
+                              match it to this test. Check the raw pytest output
+                              below.
+                            </p>
+                          ) : explainState.kind === "error" ? (
+                            <p className="text-muted-foreground">
+                              Mentor couldn&apos;t reach the AI (
+                              {explainState.message}). Check the raw output
+                              below.
+                            </p>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => toggleTestExpand(t.id)}
+                            className="mt-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                          >
+                            Hide details
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          </div>
+        </div>
+
+        {/* Reopen-sheet pill — mobile only, shown when results exist
+         * but the sheet has been dismissed. Positioned bottom-LEFT so
+         * it doesn't conflict with the mentor FAB (bottom-right). */}
+        {runState.kind === "done" && !sheetOpen && (
+          <button
+            type="button"
+            onClick={() => setSheetOpen(true)}
+            className={cn(
+              "fixed bottom-3 left-3 z-40 rounded-full px-4 py-2 text-xs font-medium text-primary-foreground shadow-lg lg:hidden",
+              passed ? "bg-green-600" : "bg-red-600",
+            )}
+          >
+            {passed
+              ? "✓ Tests passed — view"
+              : `✗ ${failureCount} failing — view`}
+          </button>
+        )}
       </section>
     );
   },
