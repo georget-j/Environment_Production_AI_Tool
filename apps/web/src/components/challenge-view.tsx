@@ -65,10 +65,22 @@ export function ChallengeView({
   // initial render uses the default so SSR/CSR match; the effect below
   // syncs to the stored value once the client is mounted.
   const [mentorCollapsed, setMentorCollapsed] = useState(true);
+  // First-visit tooltip on the collapsed mentor rail — shown once per
+  // browser, dismissed automatically the first time the learner expands
+  // the mentor (or clicks the tooltip's close button).
+  const [showRailTip, setShowRailTip] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem("prodready:mentor-collapsed");
     if (stored === "false") setMentorCollapsed(false);
+    const seen = window.localStorage.getItem("prodready:mentor-rail-tip-seen");
+    if (stored !== "false" && seen !== "true") setShowRailTip(true);
+  }, []);
+  const dismissRailTip = useCallback(() => {
+    setShowRailTip(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("prodready:mentor-rail-tip-seen", "true");
+    }
   }, []);
   const handleToggleMentor = useCallback(() => {
     setMentorCollapsed((prev) => {
@@ -81,7 +93,8 @@ export function ChallengeView({
       }
       return next;
     });
-  }, []);
+    dismissRailTip();
+  }, [dismissRailTip]);
 
   // Lock body scroll + Escape-to-close while the mobile mentor overlay
   // is open. No-ops on lg+ because the overlay is hidden by CSS there.
@@ -229,6 +242,7 @@ export function ChallengeView({
               repoTemplateUrl={repoTemplateUrl}
               branch={repoBranch ?? "main"}
               config={config}
+              nextSlug={nextSlug}
               onStuck={handleStuck}
               onFilesChange={handleFilesChange}
             />
@@ -338,24 +352,49 @@ export function ChallengeView({
          * collapsed. Clicking it expands the sidebar. The overlay
          * (mobile) path always shows the full chat, never the rail. */}
         {mentorCollapsed && !mentorOverlayOpen && (
-          <button
-            type="button"
-            onClick={handleToggleMentor}
-            className="hidden lg:flex h-full w-full flex-col items-center justify-start gap-3 rounded-md border border-border bg-muted/30 py-3 text-xs font-medium text-muted-foreground hover:bg-muted/60"
-            aria-label="Expand the AI mentor"
-            title="Expand the AI mentor"
-          >
-            <span aria-hidden="true">›</span>
-            <span
-              className="select-none"
-              style={{
-                writingMode: "vertical-rl",
-                transform: "rotate(180deg)",
-              }}
+          <div className="relative hidden h-full w-full lg:block">
+            <button
+              type="button"
+              onClick={handleToggleMentor}
+              className="flex h-full w-full flex-col items-center justify-start gap-3 rounded-md border border-border bg-muted/30 py-3 text-xs font-medium text-muted-foreground hover:bg-muted/60"
+              aria-label="Expand the AI mentor"
+              title="Expand the AI mentor"
             >
-              Ask the mentor
-            </span>
-          </button>
+              <span aria-hidden="true">›</span>
+              <span
+                className="select-none"
+                style={{
+                  writingMode: "vertical-rl",
+                  transform: "rotate(180deg)",
+                }}
+              >
+                Ask the mentor
+              </span>
+            </button>
+            {showRailTip && (
+              <div
+                role="tooltip"
+                className="absolute right-12 top-3 z-20 w-56 rounded-md border border-primary/40 bg-background p-3 text-xs shadow-lg"
+              >
+                <p className="font-semibold">Stuck? Ask the mentor.</p>
+                <p className="mt-1 text-muted-foreground">
+                  Click the rail to expand the AI mentor and get a hint, or ask
+                  any question about the lesson.
+                </p>
+                <button
+                  type="button"
+                  onClick={dismissRailTip}
+                  className="mt-2 text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  Got it
+                </button>
+                <span
+                  aria-hidden="true"
+                  className="absolute right-[-6px] top-4 h-3 w-3 rotate-45 border-r border-t border-primary/40 bg-background"
+                />
+              </div>
+            )}
+          </div>
         )}
         <div
           className={

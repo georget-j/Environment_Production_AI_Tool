@@ -67,6 +67,7 @@ const RAW_BASE = "https://raw.githubusercontent.com";
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const SUBMIT_REPO_URL = "https://prodready-ai.vercel.app/in-browser";
+const AUTO_ADVANCE_MS = 6000;
 
 type Props = {
   challengeSlug: string;
@@ -79,6 +80,9 @@ type Props = {
   repoTemplateUrl: string | null;
   branch: string;
   config: Extract<ChallengeRunnerConfig, { mode: "pyodide" }>;
+  /** Slug of the next lesson in the same track, for auto-advance on
+   * successful submission. Null when this is the last lesson. */
+  nextSlug: string | null;
   /** Called when the learner clicks 'Stuck?'. Receives a pre-baked
    * message the parent can forward to the mentor chat. */
   onStuck?: (message: string) => void;
@@ -107,6 +111,7 @@ type RunState =
 type SubmitState =
   | { kind: "idle" }
   | { kind: "submitting" }
+  | { kind: "passed"; submissionId: string }
   | { kind: "error"; message: string };
 
 function parseOwnerRepo(
@@ -172,6 +177,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
       repoTemplateUrl,
       branch,
       config,
+      nextSlug,
       onStuck,
       onFilesChange,
     },
@@ -562,8 +568,22 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
         return;
       }
       const data = await response.json();
-      router.push(`/submissions/${data.id}`);
-    }, [runState, challengeSlug, router]);
+      setSubmitState({ kind: "passed", submissionId: data.id });
+    }, [runState, challengeSlug]);
+
+    // Auto-advance to the next lesson once the submission has been
+    // accepted. Mirrors the predict/fillblank/matplot pass UX so pyodide
+    // lessons don't dead-end at a submission detail page. The countdown
+    // can be cancelled by hovering the success card (sets autoCancelled).
+    const [autoCancelled, setAutoCancelled] = useState(false);
+    useEffect(() => {
+      if (submitState.kind !== "passed") return;
+      if (!nextSlug || autoCancelled) return;
+      const t = setTimeout(() => {
+        router.push(`/challenges/${nextSlug}`);
+      }, AUTO_ADVANCE_MS);
+      return () => clearTimeout(t);
+    }, [submitState, nextSlug, autoCancelled, router]);
 
     // Build a per-test view by joining config.tests with the parsed pytest output
     // and the AI explanation, if any.
@@ -627,34 +647,49 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  resetPyodide();
-                  setPyodideState({ kind: "warming" });
-                  void getPyodide()
-                    .then(() => setPyodideState({ kind: "ready" }))
-                    .catch((exc) =>
-                      setPyodideState({
-                        kind: "error",
-                        message:
-                          exc instanceof Error ? exc.message : String(exc),
-                      }),
-                    );
-                }}
-                className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
-                title="Wipe the Python sandbox if it gets stuck"
-              >
-                Reset Python
-              </button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleReset}
-                disabled={Object.keys(files).length === 0}
-              >
-                Reset code
-              </Button>
+              <details className="relative">
+                <summary className="flex h-8 cursor-pointer list-none items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent">
+                  Reset{" "}
+                  <span aria-hidden="true" className="ml-1">
+                    ▾
+                  </span>
+                </summary>
+                <div className="absolute right-0 z-10 mt-1 w-64 rounded-md border border-border bg-background shadow-lg">
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    disabled={Object.keys(files).length === 0}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-50"
+                  >
+                    <p className="font-medium">Reset code</p>
+                    <p className="text-xs text-muted-foreground">
+                      Revert your edits to the starting scaffold.
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetPyodide();
+                      setPyodideState({ kind: "warming" });
+                      void getPyodide()
+                        .then(() => setPyodideState({ kind: "ready" }))
+                        .catch((exc) =>
+                          setPyodideState({
+                            kind: "error",
+                            message:
+                              exc instanceof Error ? exc.message : String(exc),
+                          }),
+                        );
+                    }}
+                    className="block w-full border-t border-border px-3 py-2 text-left text-sm hover:bg-muted"
+                  >
+                    <p className="font-medium">Reset Python</p>
+                    <p className="text-xs text-muted-foreground">
+                      Wipe the sandbox if the runtime gets stuck.
+                    </p>
+                  </button>
+                </div>
+              </details>
               <Button
                 size="sm"
                 onClick={handleRun}
@@ -782,7 +817,7 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
                     I&apos;m stuck — help
                   </Button>
                 )}
-                {passed && (
+                {passed && submitState.kind !== "passed" && (
                   <Button
                     size="lg"
                     onClick={handleSubmit}
@@ -796,6 +831,57 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
                 )}
               </div>
             </div>
+            {submitState.kind === "passed" && (
+              <div
+                onPointerEnter={() => setAutoCancelled(true)}
+                onFocusCapture={() => setAutoCancelled(true)}
+                className="space-y-2 rounded-md border border-green-300 bg-white px-3 py-3"
+              >
+                <p className="text-sm font-semibold text-green-900">
+                  ✓ Solution submitted — nice work.
+                </p>
+                {nextSlug ? (
+                  <>
+                    <Button
+                      type="button"
+                      className="w-full"
+                      onClick={() => router.push(`/challenges/${nextSlug}`)}
+                    >
+                      Next lesson →
+                    </Button>
+                    {!autoCancelled ? (
+                      <p className="text-center text-[11px] text-green-900/70">
+                        Auto-advancing in {Math.round(AUTO_ADVANCE_MS / 1000)}s
+                        …{" "}
+                        <button
+                          type="button"
+                          onClick={() => setAutoCancelled(true)}
+                          className="underline hover:no-underline"
+                        >
+                          Stay on this lesson
+                        </button>
+                      </p>
+                    ) : (
+                      <p className="text-center text-[11px] text-green-900/70">
+                        Take your time — click Next when you&apos;re ready.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-green-900">
+                    You&apos;ve finished the last lesson of this track 🎉
+                  </p>
+                )}
+                <p className="text-center text-[11px] text-muted-foreground">
+                  <a
+                    href={`/submissions/${submitState.submissionId}${nextSlug ? `?next=${nextSlug}` : ""}`}
+                    className="underline hover:no-underline"
+                  >
+                    View submission details
+                  </a>
+                </p>
+              </div>
+            )}
             {submitState.kind === "error" && (
               <p className="text-xs text-red-700">{submitState.message}</p>
             )}

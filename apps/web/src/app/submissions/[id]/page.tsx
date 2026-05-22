@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AiReview } from "@/components/ai-review";
@@ -26,6 +27,8 @@ type Params = Promise<{ id: string }>;
 
 export default function SubmissionPage({ params }: { params: Params }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
+  const nextSlug = searchParams.get("next");
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [celebrated, setCelebrated] = useState(false);
@@ -96,9 +99,15 @@ export default function SubmissionPage({ params }: { params: Params }) {
               : "generating below — usually 5–10 seconds."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/tracks">
-              <Button>Pick the next challenge →</Button>
-            </Link>
+            {nextSlug ? (
+              <Link href={`/challenges/${nextSlug}`}>
+                <Button>Next lesson →</Button>
+              </Link>
+            ) : (
+              <Link href="/tracks">
+                <Button>Pick the next challenge →</Button>
+              </Link>
+            )}
             <Link href="/dashboard">
               <Button variant="outline">Dashboard</Button>
             </Link>
