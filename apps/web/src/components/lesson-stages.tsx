@@ -73,12 +73,16 @@ export function LessonStages({ example, approach, solve }: Props) {
         ))}
       </nav>
 
-      {/* Active stage area. Each rendered stage gets full height; inner
-       * scroll is the responsibility of the stage's own content (so the
-       * Solve stage's tests panel can scroll separately from the editor). */}
+      {/* Active stage area. On lg+ the panes inside fit side-by-side
+       * and each has its own internal scroll; on narrow screens the
+       * panes stack vertically and may exceed the stage's bounded
+       * height — so we allow `overflow-y-auto` here as a safety net.
+       * Approach + Solve panes already have their own overflow-y-auto;
+       * this catches the Example stage's stacked-panes overflow on
+       * mobile without affecting their behaviour. */}
       <div
         key={active.id}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
       >
         {active.content}
       </div>

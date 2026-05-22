@@ -1073,4 +1073,680 @@ export const WALKTHROUGHS: Record<string, WalkthroughEntry> = {
       },
     ],
   },
+
+  // ─── remaining debug / skeleton lessons ──────────────────────────
+
+  "quant-07-covariance-via-matrix-algebra": {
+    code: [
+      "def covariance_matrix(X: np.ndarray) -> np.ndarray:",
+      '    """Return the sample covariance matrix of X.',
+      "",
+      "    Steps the reviewer expects:",
+      "      1. Demean each column.",
+      "      2. Cross-product Xdᵀ Xd.",
+      "      3. Divide by (n − 1) for the unbiased estimator.",
+      '    """',
+      "    n = X.shape[0]",
+      "    # Bug: step 1 missing.",
+      "    return (X.T @ X) / (n - 1)",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Input X is (n_obs, n_assets). Output must be (n_assets, n_assets), compared in tests against `np.cov(X, rowvar=False)`.",
+        lines: [1],
+      },
+      {
+        caption:
+          "The docstring lists three required steps: demean, cross-product, divide by n−1. Read it. The current code is doing only two of them.",
+        lines: [4, 5, 6, 7],
+      },
+      {
+        caption:
+          "Compare lines 9–11 against the three docstring steps. Which step is silently skipped? The cross-product is `X.T @ X`, the division is `/ (n-1)` — both present.",
+        lines: [9, 10, 11],
+      },
+      {
+        caption:
+          "The killer test: `test_matches_numpy_cov_with_drift` adds drift `[10, -5, 2.5]` to the input. Without demeaning, you compute the *uncentered* second moment instead of covariance — silently wrong by `μᵀμ` per entry.",
+        lines: [10, 11],
+      },
+    ],
+  },
+
+  "quant-09-statistical-reductions": {
+    code: [
+      "def summary_stats(r: np.ndarray) -> dict:",
+      '    """Return mean, std, and 95th percentile of a return series."""',
+      "    return {",
+      '        "mean": float(r.mean()),',
+      '        "std": float(r.std(ddof=1)),',
+      "        # Bug lives on the next line.",
+      '        "p95": float(np.percentile(r, 0.95)),',
+      "    }",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Function returns three stats: mean, sample std (ddof=1, correct), and the 95th percentile of a return series.",
+        lines: [1, 2],
+      },
+      {
+        caption:
+          "Mean and std look fine. The bug is in the percentile call on line 7. Compare APIs: `np.percentile(arr, q)` takes q in **0–100**; `pd.Series.quantile(q)` takes q in **0–1**. Easy to mix up.",
+        lines: [3, 4, 5],
+      },
+      {
+        caption:
+          "`np.percentile(r, 0.95)` asks for the 0.95-th percentile — essentially the minimum of the distribution. You want the 95-th percentile. Fix the argument.",
+        lines: [6, 7],
+      },
+    ],
+  },
+
+  "quant-16-boolean-filtering-on-real-prices": {
+    code: [
+      "def count_gap_ups(df: pd.DataFrame) -> int:",
+      '    """Return the number of days where today\'s open is strictly',
+      "    above YESTERDAY's close.",
+      '    """',
+      "    # Bug: the right-hand side should be yesterday's close,",
+      "    # not today's close. The shift is missing.",
+      "    mask = df['open'] > df['close']",
+      "    return int(mask.sum())",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Function counts gap-up days: today's OPEN strictly above YESTERDAY's CLOSE.",
+        lines: [1, 2, 3, 4],
+      },
+      {
+        caption:
+          "Yesterday's close, for any row, is `df['close'].shift(1)`. The `.shift(1)` shifts every value down one row, so the row at index `t` carries the value from `t-1` in the close column.",
+        lines: [5, 6],
+      },
+      {
+        caption:
+          "Current line 7 compares today's open to TODAY's close — that's 'is today a green candle', not 'was there a gap'. The missing `.shift(1)` is the bug.",
+        lines: [7, 8],
+      },
+    ],
+  },
+
+  "quant-19-groupby-year": {
+    code: [
+      "def by_year_metrics(df: pd.DataFrame) -> pd.DataFrame:",
+      '    """Per-calendar-year mean, vol, and Sharpe of daily returns.',
+      "",
+      "    Input: df with `date` and `adj_close` columns.",
+      "    Output: DataFrame indexed by year with columns:",
+      "      - mean_daily, vol_daily, sharpe  (rf=0, not annualised)",
+      "",
+      "    Tips:",
+      "      - Drop the first NaN that pct_change introduces.",
+      "      - Group by `pd.to_datetime(df['date']).dt.year`.",
+      "      - .apply a function that returns a pd.Series of three",
+      "        stats; pandas pivots them into three columns.",
+      '    """',
+      '    raise NotImplementedError("Implement by_year_metrics")',
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Goal: per-year mean/vol/Sharpe of daily returns. Output is one row per year, three columns.",
+        lines: [1, 2, 3, 4, 5, 6],
+      },
+      {
+        caption:
+          "Step 1: compute daily returns with `pct_change()` on `adj_close`. Drop the first NaN it introduces.",
+        lines: [8, 9],
+      },
+      {
+        caption:
+          "Step 2: extract year as `pd.to_datetime(df['date']).dt.year`. Group your returns Series by that.",
+        lines: [10],
+      },
+      {
+        caption:
+          "Step 3: `.apply(fn)` where `fn(series)` returns `pd.Series({'mean_daily': ..., 'vol_daily': ..., 'sharpe': ...})`. Pandas pivots the three keys into three output columns. Sharpe = mean / vol (no risk-free, no annualisation).",
+        lines: [11, 12, 13],
+      },
+    ],
+  },
+
+  "quant-20-aligning-two-series": {
+    code: [
+      "def aligned_returns(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:",
+      '    """Merge two daily-bar frames on `date`, keeping only dates',
+      "    that appear in BOTH inputs. Wrong join type = NaNs leak.",
+      '    """',
+      "    # Bug lives in the how= argument.",
+      "    return a.merge(b, on='date', how='outer', suffixes=('_a', '_b'))",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Function merges two daily-bar frames on the 'date' column. The docstring is explicit: keep only dates in BOTH inputs.",
+        lines: [1, 2, 3, 4],
+      },
+      {
+        caption:
+          "pandas merge how= values: `inner` (intersection), `left` / `right` (keep one side), `outer` (union — fills missing with NaN). 'Both inputs' = intersection = inner.",
+        lines: [5],
+      },
+      {
+        caption:
+          "Current code uses `outer` — that's the union, which is the opposite of what's wanted. Imagine BTC (trades weekends) and SPY (doesn't): outer leaks NaNs into the backtest.",
+        lines: [6],
+      },
+    ],
+  },
+
+  "quant-25-bond-yield-to-maturity": {
+    code: [
+      "def ytm(face: float, coupon: float, n_years: int, price: float) -> float:",
+      '    """Return the annual-compounding YTM of a vanilla coupon bond.',
+      "",
+      "    Steps:",
+      "      - Define an `npv(r)` closure that returns",
+      "        PV_of_all_cashflows(r) - price.",
+      "      - Call brentq with bracket (0.0001, 0.5).",
+      "",
+      "    Sanity: at par (price == face), YTM == coupon rate.",
+      '    """',
+      '    raise NotImplementedError("Implement ytm")',
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Annual-coupon bond fair price: `Σ coupon/(1+r)**t for t=1..N` plus `face/(1+r)**N`. YTM is the `r` that balances this against the market price.",
+        lines: [1],
+      },
+      {
+        caption:
+          "No closed form for general bonds. Use scipy's `brentq` — robust bisection. It needs a function whose sign flips inside the bracket.",
+        lines: [4, 5, 6, 7],
+      },
+      {
+        caption:
+          "Define `npv(r)` returning `sum(coupon/(1+r)**t for t in range(1, n_years+1)) + face/(1+r)**n_years - price`. Then `return brentq(npv, 0.0001, 0.5)`.",
+        lines: [5, 6, 7],
+      },
+      {
+        caption:
+          "Cheapest sanity check: at par (price == face), YTM should equal the coupon rate. The tests verify this.",
+        lines: [9],
+      },
+    ],
+  },
+
+  "quant-27-put-call-parity": {
+    code: [
+      "def parity_put_from_call(",
+      "    call: float, S: float, K: float, r: float, T: float",
+      ") -> float:",
+      '    """Return the no-arb put price implied by C - P = S - K*exp(-r*T)."""',
+      "    # Discount factor sign is wrong.",
+      "    # Strike's PV must use exp(-r*T).",
+      "    return call - S + K * math.exp(r * T)",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Put-call parity: `C - P = S - K·exp(-rT)`. Solve for P: `P = C - S + K·exp(-rT)`.",
+        lines: [1, 2, 3, 4],
+      },
+      {
+        caption:
+          "The discount factor `exp(-rT)` is < 1 for positive r — today's worth of a strike paid at T years from now is LESS than face. That's the entire point of discounting.",
+        lines: [4],
+      },
+      {
+        caption:
+          "Current line 7 uses `exp(r * T)` — positive exponent, which INFLATES the strike (compounding it forward instead of discounting it back). Sign flip on the exponent.",
+        lines: [5, 6, 7],
+      },
+    ],
+  },
+
+  "quant-28-black-scholes-from-scratch": {
+    code: [
+      "def bs_call(S: float, K: float, r: float, sigma: float, T: float) -> float:",
+      '    """Return the Black-Scholes call price.',
+      "",
+      "    Steps:",
+      "      d1 = (ln(S/K) + (r + σ²/2)·T) / (σ·√T)",
+      "      d2 = d1 - σ·√T",
+      "      C  = S·N(d1) - K·exp(-rT)·N(d2)",
+      "",
+      "    Sanity: S=K=100, r=5%, σ=20%, T=1 → C ≈ 10.4506 (Hull canonical).",
+      '    """',
+      '    raise NotImplementedError("Implement bs_call")',
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Goal: Black-Scholes closed-form European call price. N is the standard normal CDF — import `scipy.stats.norm` and call `norm.cdf(...)`.",
+        lines: [1],
+      },
+      {
+        caption:
+          "Compute `d1` first. Note the SIGN on σ²/2: it's `+` in the d1 numerator (the convexity correction). Mixing it with `-σ²/2` is the most common BS bug.",
+        lines: [4, 5],
+      },
+      {
+        caption: "Then `d2 = d1 - σ·√T`. One subtraction.",
+        lines: [6],
+      },
+      {
+        caption:
+          "Assemble: `C = S * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2)`. The Hull canonical sanity check is in the docstring — if your S=K=100, r=5%, σ=20%, T=1 case gives 10.4506, you're good.",
+        lines: [7, 9],
+      },
+    ],
+  },
+
+  "quant-29-greeks-delta-of-a-call": {
+    code: [
+      "def compute_delta(S, K, r, sigma, T):",
+      '    """Black-Scholes delta of a European call: Δ = N(d1).',
+      "",
+      "    d1 = (ln(S/K) + (r + σ²/2)·T) / (σ·√T)",
+      '    """',
+      "    # Bug: the convexity term has the wrong sign.",
+      "    d1 = (math.log(S / K) + (r - sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))",
+      "    return float(norm.cdf(d1))",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Call delta is `N(d1)` — the standard normal CDF at d1. The full d1 formula is in the docstring.",
+        lines: [1, 2, 3, 4, 5],
+      },
+      {
+        caption:
+          "Compare line 7 to line 4 (the docstring's formula). The σ² term in the d1 numerator should be `+ σ²/2`, not `- σ²/2`. The two terms (`r + σ²/2` in d1, `r - σ²/2` in the GBM exponent) come from the same paper but live on different lines — mixing them up is THE common BS slip.",
+        lines: [6, 7],
+      },
+      {
+        caption:
+          "Hull canonical: r=5%, σ=20%, T=1, S=K=100 → delta ≈ 0.6368. With the bug present you get ~0.58 — the first test catches it.",
+        lines: [8],
+      },
+    ],
+  },
+
+  "quant-30-binomial-tree-pricer": {
+    code: [
+      "def crr_call(S, K, r, sigma, T, N) -> float:",
+      '    """N-step CRR binomial price of a European call.',
+      "",
+      "    Steps:",
+      "      dt = T / N",
+      "      u  = exp(σ·√dt);  d = 1/u",
+      "      p  = (exp(r·dt) - d) / (u - d)        # risk-neutral up prob",
+      "      S_T[i] = S · u^i · d^(N-i)            # terminal prices",
+      "      vals    = max(S_T - K, 0)              # terminal payoffs",
+      "      backward-induct:",
+      "        vals = exp(-r·dt) · (p·vals[1:] + (1-p)·vals[:-1])",
+      '    """',
+      '    raise NotImplementedError("Implement crr_call")',
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Setup constants from the inputs. `dt = T / N`. `u = exp(σ·√dt)`, `d = 1/u` (multiplicatively symmetric). Risk-neutral up-prob `p = (exp(r·dt) - d) / (u - d)`.",
+        lines: [4, 5, 6, 7],
+      },
+      {
+        caption:
+          "Terminal price tree at expiry: an (N+1)-element vector. `S_T[i] = S · u**i · d**(N-i)` for i in 0..N. Use `np.arange(N+1)` for the exponents to keep it vectorised.",
+        lines: [8],
+      },
+      {
+        caption: "Terminal payoffs: `np.maximum(S_T - K, 0)`.",
+        lines: [9],
+      },
+      {
+        caption:
+          "Backward induction: in a loop running N times, replace `vals` with `exp(-r·dt) * (p * vals[1:] + (1-p) * vals[:-1])`. Each step shrinks the array by one. After N steps `vals` has length 1 — that's the price.",
+        lines: [10, 11],
+      },
+    ],
+  },
+
+  "quant-33-sharpe-max-drawdown": {
+    code: [
+      "def risk_metrics(r: pd.Series) -> dict:",
+      '    """Return {\'sharpe\', \'max_drawdown\'} for a daily-return series."""',
+      "    # Bug: std scaling is wrong.",
+      "    sharpe = (r.mean() * 252) / (r.std() * 252)",
+      "    equity = (1 + r).cumprod()",
+      "    drawdown = equity / equity.cummax() - 1",
+      "    return {'sharpe': float(sharpe), 'max_drawdown': float(drawdown.min())}",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Annualised Sharpe for daily returns: `(mean × 252) / (std × √252)`. Returns SUM linearly so mean × 252; std SCALES by √n so std × √252.",
+        lines: [1, 2],
+      },
+      {
+        caption:
+          "Line 4 scales the mean correctly (× 252) but scales the std the same way (× 252) — should be × √252. The bug inflates Sharpe by `√252 ≈ 15.87` — turns a respectable 0.8 into a comically wrong 12.7. Fix the denominator.",
+        lines: [3, 4],
+      },
+      {
+        caption:
+          "Max drawdown is fine: build the equity curve, divide by the running max (`cummax`), subtract 1, take `min` for the deepest trough. Don't mirror the .cummax/.min — peak-to-trough is the standard.",
+        lines: [5, 6, 7],
+      },
+    ],
+  },
+
+  "quant-36-momentum-signal-regression": {
+    code: [
+      "def momentum_r2(returns: pd.Series) -> float:",
+      '    """Test-set R² of a 5-day momentum → next-day return model."""',
+      "    # Bug: missing .shift(1) on the momentum feature.",
+      "    df = pd.DataFrame({",
+      "        'mom':  returns.rolling(5).sum(),",
+      "        'next': returns,",
+      "    }).dropna()",
+      "    # ... chronological split + LinearRegression below ...",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Single-feature model: a 5-day rolling sum of returns predicting the next day's return. R² on random-walk data should be ~0.",
+        lines: [1, 2],
+      },
+      {
+        caption:
+          "A predictive feature at time `t` must use only data up to and INCLUDING `t-1`. The standard idiom: `r.shift(1).rolling(W).sum()` — shift first (drops today's return), then aggregate.",
+        lines: [3],
+      },
+      {
+        caption:
+          "Current line 5 builds `mom` from `returns.rolling(5).sum()` — today's return is INCLUDED in the rolling sum. The model trivially learns 'today's return predicts today's return', R² inflates from ~0 to >0.1. Add `.shift(1)` before `.rolling(5)`.",
+        lines: [4, 5, 6, 7],
+      },
+    ],
+  },
+
+  "quant-37-random-forest-direction-classifier": {
+    code: [
+      "def rf_accuracy(returns: pd.Series) -> float:",
+      '    """RF direction classifier; test accuracy."""',
+      "    df = build_features(returns)",
+      "    X = df[['mom', 'vol']].values",
+      "    y = df['next'].values",
+      "    # Bug: shuffle defaults to True — leaks future into training.",
+      "    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2)",
+      "    rf = RandomForestClassifier(n_estimators=100, random_state=1).fit(Xtr, ytr)",
+      "    return float(rf.score(Xte, yte))",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "Two-feature classifier: (5-day mom, 20-day vol) → sign(next return). On random-walk data, honest accuracy is ≈ 0.5. A leaky split can push it above 0.6 — fake skill.",
+        lines: [1, 2, 3, 4, 5],
+      },
+      {
+        caption:
+          "The trap: `train_test_split(X, y, test_size=0.2)` defaults to `shuffle=True`. Test rows are sampled randomly from anywhere, so the model trains on rows that came AFTER test rows. Lookahead leakage by definition.",
+        lines: [6, 7],
+      },
+      {
+        caption:
+          "Fix: pass `shuffle=False`. The last 20% becomes test, chronologically. Lopez de Prado's *Advances in Financial Machine Learning* opens with this exact pitfall.",
+        lines: [7, 8, 9],
+      },
+    ],
+  },
+
+  "quant-38-time-series-cross-validation": {
+    code: [
+      "def mean_cv_score(returns: pd.Series) -> float:",
+      '    """Mean 5-fold CV R² with a time-aware splitter."""',
+      "    df = build_features(returns)",
+      "    X = df[['mom']].values",
+      "    y = df['next'].values",
+      "    # Bug: KFold randomly partitions rows — leaks for time series.",
+      "    cv = KFold(n_splits=5)",
+      "    return float(cross_val_score(LinearRegression(), X, y, cv=cv).mean())",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "5-fold cross-validation on a momentum→next-return regression. The choice of CV splitter matters more than the model.",
+        lines: [1, 2, 3, 4, 5],
+      },
+      {
+        caption:
+          "`KFold(n_splits=5)` randomly partitions rows into 5 folds. Training folds will contain rows AFTER some test rows — the model gets to peek at the future. Same leak as `shuffle=True`.",
+        lines: [6, 7],
+      },
+      {
+        caption:
+          "Swap to `TimeSeriesSplit(n_splits=5)`. It yields expanding-window splits: test fold k always starts after the highest index in train fold k. No peek. Already imported at the top of the file.",
+        lines: [7, 8],
+      },
+    ],
+  },
+
+  // ─── cscript (worked C example, same shape as fillblank) ─────────
+
+  "quant-41-hello-c": {
+    code: [
+      "#include <stdio.h>",
+      "int main() {",
+      '    printf("hello, C!\\n");',
+      "    return 0;",
+      "}",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`#include <stdio.h>` brings in standard I/O — that's where `printf` lives. Like Python's import, but the header is textually substituted at compile time.",
+        lines: [1],
+      },
+      {
+        caption:
+          "`int main()` is C's entry point. Must return an `int` — 0 means success to the OS. Curly braces delimit the function body.",
+        lines: [2, 4, 5],
+      },
+      {
+        caption:
+          "`printf` writes a string to stdout. `\\n` is the newline character (no auto-newline in C). Every statement ends with a semicolon — not optional like Python.",
+        lines: [3],
+      },
+    ],
+  },
+
+  "quant-42-types-and-arithmetic": {
+    code: [
+      "#include <stdio.h>",
+      "int main() {",
+      '    printf("%d %.1f\\n", 7 / 2, 7.0 / 2);',
+      "    return 0;",
+      "}",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`%d` is the format placeholder for an int; `%.1f` is a float with one decimal place. `printf` substitutes them with the trailing arguments in order.",
+        lines: [3],
+      },
+      {
+        caption:
+          "`7 / 2` — both operands are ints, so C does INTEGER division: result is 3 (truncated toward zero, not rounded). This trips up everyone coming from Python.",
+        lines: [3],
+      },
+      {
+        caption:
+          "`7.0 / 2` — one operand is a float literal, so C promotes the other to float and does TRUE division: result is 3.5. To force this on int variables, cast: `(double) i / 2`.",
+        lines: [3],
+      },
+    ],
+  },
+
+  "quant-43-conditionals-and-loops": {
+    code: [
+      "#include <stdio.h>",
+      "int main() {",
+      "    for (int i = 1; i <= 5; i++) {",
+      '        printf("%d ", i * i);',
+      "    }",
+      '    printf("\\n");',
+      "    return 0;",
+      "}",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "C's `for` has three clauses: `init; condition; update`. Init runs once before the loop; condition is checked before each pass; update runs after each pass.",
+        lines: [3],
+      },
+      {
+        caption:
+          "`int i = 1; i <= 5; i++` runs the body with i = 1, 2, 3, 4, 5. `i++` is `i = i + 1` — every C-family language inherited the syntax.",
+        lines: [3],
+      },
+      {
+        caption:
+          'Body prints each square (`i * i`) followed by a space. After the loop, one final `printf("\\n")` ends the line.',
+        lines: [4, 5, 6],
+      },
+    ],
+  },
+
+  "quant-44-arrays-and-pointers": {
+    code: [
+      "#include <stdio.h>",
+      "int main() {",
+      "    int a[5] = {10, 20, 30, 40, 50};",
+      "    int *p = a;",
+      '    printf("%d\\n", *(p + 2));',
+      "    return 0;",
+      "}",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`int a[5] = {10, 20, 30, 40, 50}` — fixed-size array literal. 5 ints stored contiguously on the stack.",
+        lines: [3],
+      },
+      {
+        caption:
+          "`int *p = a` — declare a pointer `p`, initialise it to the array's address. An array name 'decays' to a pointer to its first element in any expression except `sizeof`.",
+        lines: [4],
+      },
+      {
+        caption:
+          "`*(p + 2)` reads as 'go to address `p`, advance by 2 × sizeof(int) bytes, dereference'. The compiler handles the sizeof scaling — you just write `+ 2`. Equivalent spellings: `a[2]`, `p[2]`, `*(a + 2)` — all 30.",
+        lines: [5],
+      },
+    ],
+  },
+
+  "quant-45-structs": {
+    code: [
+      "#include <stdio.h>",
+      "struct Bond {",
+      "    double face;",
+      "    int years;",
+      "};",
+      "int main() {",
+      "    struct Bond b;",
+      "    b.face = 1000.0;",
+      "    b.years = 5;",
+      '    printf("face=%.2f years=%d\\n", b.face, b.years);',
+      "    return 0;",
+      "}",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`struct Bond { ... }` declares the SHAPE — no instance allocated yet. Fields: `face` (8-byte double), `years` (4-byte int).",
+        lines: [2, 3, 4, 5],
+      },
+      {
+        caption:
+          "`struct Bond b;` declares an instance on the stack. C struct fields sit in declaration order in memory, plus padding to align natural word boundaries (double-after-int can add 4 bytes of padding).",
+        lines: [7],
+      },
+      {
+        caption:
+          "Field access uses `.` on instances (`b.face`) and `->` on pointers (`p->face`). Assign each field, then print both with their formats: `%.2f` for the double, `%d` for the int.",
+        lines: [8, 9, 10],
+      },
+    ],
+  },
+
+  "quant-46-function-pointers": {
+    code: [
+      "#include <stdio.h>",
+      "int square(int x) { return x * x; }",
+      "int apply(int (*f)(int), int x) { return f(x); }",
+      "int main() {",
+      '    printf("%d\\n", apply(square, 7));',
+      "    return 0;",
+      "}",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`int square(int x)` — a plain function. In any expression except its definition, its name decays to a function pointer.",
+        lines: [2],
+      },
+      {
+        caption:
+          "`int (*f)(int)` reads as 'pointer to a function taking int and returning int'. The parentheses around `*f` are required — without them you'd be declaring a function that returns an int pointer.",
+        lines: [3],
+      },
+      {
+        caption:
+          "`apply(square, 7)` passes the function value (not a call) — `square` decays to a function pointer. Inside `apply`, `f(x)` invokes it; equivalent to `(*f)(x)`. Returns 49.",
+        lines: [3, 5],
+      },
+    ],
+  },
+
+  "quant-47-malloc-and-free": {
+    code: [
+      "#include <stdio.h>",
+      "#include <stdlib.h>",
+      "int main() {",
+      "    int *p = (int *) malloc(3 * sizeof(int));",
+      "    p[0] = 7; p[1] = 8; p[2] = 9;",
+      '    printf("%d %d %d\\n", p[0], p[1], p[2]);',
+      "    free(p);",
+      "    return 0;",
+      "}",
+    ].join("\n"),
+    steps: [
+      {
+        caption:
+          "`malloc(N)` returns a `void *` to N bytes of uninitialised HEAP memory (separate from the stack), or `NULL` if it can't allocate. `<stdlib.h>` is where `malloc` and `free` live.",
+        lines: [2, 4],
+      },
+      {
+        caption:
+          "`3 * sizeof(int)` is the byte count for 3 ints — `sizeof(int)` adapts to the platform (usually 4 bytes on 64-bit systems). Cast `void *` to `int *` so you can index it like an array.",
+        lines: [4],
+      },
+      {
+        caption:
+          "Write to slots like an array: `p[0] = 7;` etc. The compiler turns `p[i]` into `*(p + i)` exactly as with stack arrays.",
+        lines: [5, 6],
+      },
+      {
+        caption:
+          "Always `free(p)` when done. Every `malloc` must have a matching `free`, or you leak memory. Forgetting `free` in a hot path (e.g. per-order in a matching engine) leaks gigabytes per trading day.",
+        lines: [7],
+      },
+    ],
+  },
 };
