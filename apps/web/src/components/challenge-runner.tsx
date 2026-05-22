@@ -645,17 +645,17 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [runState]);
 
-    // After each completed run, scroll the result banner into view so
-    // the learner immediately sees pass/fail (especially important on
-    // mobile, where the editor takes most of the viewport and the
-    // banner appears below the fold).
+    // After each completed run, scroll the result banner into view —
+    // but with `block: 'end'` so the banner appears at the BOTTOM of
+    // the visible area, keeping the editor visible above. The learner
+    // can see their code and the result side-by-side without losing
+    // either when iterating.
     useEffect(() => {
       if (runState.kind !== "done") return;
-      // requestAnimationFrame so the banner has rendered before scroll.
       const raf = requestAnimationFrame(() => {
         resultBannerRef.current?.scrollIntoView({
           behavior: "smooth",
-          block: "start",
+          block: "end",
         });
       });
       return () => cancelAnimationFrame(raf);
@@ -791,11 +791,16 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
               options={{
                 readOnly: !editable,
                 minimap: { enabled: false },
-                fontSize: 14,
-                lineHeight: 22,
+                fontSize: 13,
+                lineHeight: 20,
                 padding: { top: 10, bottom: 10 },
                 scrollBeyondLastLine: false,
                 tabSize: 4,
+                // Wrap long lines so mobile users never need horizontal
+                // scroll inside the editor. On desktop this also keeps
+                // long imports / chained method calls visible without a
+                // scroll bar.
+                wordWrap: "on",
               }}
               theme="vs-light"
               onMount={(editor) => {
