@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import type { ChallengeNavRef } from "@/lib/api";
 
@@ -19,13 +18,16 @@ type Props = {
 };
 
 /**
- * Compact strip at the top of a lesson page. Expanded by default so the
- * Concept / Example / action verb are visible on first visit; collapsed
- * state persists per challenge slug in localStorage so a learner who
- * already knows the lesson shape can hide it.
+ * Strip at the top of a lesson page. Everything is always visible —
+ * scenario, goal, and the Concept / Example / action verb reference.
+ * Page-level scroll handles taller content. No collapse toggle: the
+ * scenario carries the firm-scene framing that anchors why the lesson
+ * matters, and the reference block carries the technical setup the
+ * learner needs to attack the task. Both are worth keeping in view.
  */
 export function LessonContextStrip({
-  challengeSlug,
+  // challengeSlug retained for future per-slug behaviour; intentionally unused.
+  challengeSlug: _challengeSlug,
   moduleTitle,
   challengeTitle,
   scenario,
@@ -36,28 +38,7 @@ export function LessonContextStrip({
   position,
   total,
 }: Props) {
-  // SSR/CSR consistency: initial render uses the default-expanded state.
-  // The effect below restores a previously-collapsed choice once mounted.
-  const [expanded, setExpanded] = useState(true);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(
-      `prodready:strip-collapsed:${challengeSlug}`,
-    );
-    if (stored === "true") setExpanded(false);
-  }, [challengeSlug]);
-  const toggleExpanded = () => {
-    setExpanded((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          `prodready:strip-collapsed:${challengeSlug}`,
-          next ? "false" : "true",
-        );
-      }
-      return next;
-    });
-  };
+  void _challengeSlug;
   const showNav = total > 1;
   const pct =
     total > 1 ? Math.max(0, Math.min(100, (position / total) * 100)) : 0;
@@ -120,35 +101,23 @@ export function LessonContextStrip({
         </h1>
       </div>
 
-      {/* Row 3: scenario (always full text) + toggle for reference material */}
-      <div className="flex items-start gap-2 px-1 pb-2">
-        <p className="flex-1 text-sm leading-relaxed text-foreground">
-          {scenario}
-        </p>
-        <button
-          type="button"
-          onClick={toggleExpanded}
-          className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted"
-          aria-expanded={expanded}
-        >
-          {expanded ? "Hide reference ↑" : "Show reference ↓"}
-        </button>
+      {/* Row 3: scenario — always full text. */}
+      <div className="px-1 pb-2">
+        <p className="text-sm leading-relaxed text-foreground">{scenario}</p>
       </div>
 
-      {/* Expanded body: goal callout + full instructions reference */}
-      {expanded && (
-        <div className="space-y-3 border-t border-border bg-muted/10 px-3 py-3">
-          <div className="rounded-md border-l-4 border-primary bg-muted/40 px-3 py-2 text-sm leading-relaxed">
-            <span className="font-semibold">Your goal: </span>
-            {learnerGoal}
-          </div>
-          {instructions?.trim() && (
-            <div className="rounded-md border border-border bg-background px-3 py-2">
-              <Markdown>{instructions}</Markdown>
-            </div>
-          )}
+      {/* Reference body: goal callout + full instructions. Always shown. */}
+      <div className="space-y-3 border-t border-border bg-muted/10 px-3 py-3">
+        <div className="rounded-md border-l-4 border-primary bg-muted/40 px-3 py-2 text-sm leading-relaxed">
+          <span className="font-semibold">Your goal: </span>
+          {learnerGoal}
         </div>
-      )}
+        {instructions?.trim() && (
+          <div className="rounded-md border border-border bg-background px-3 py-2">
+            <Markdown>{instructions}</Markdown>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
