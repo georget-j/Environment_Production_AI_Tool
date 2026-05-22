@@ -165,7 +165,7 @@ export function LessonMatplot({ config, nextSlug, onCodeChange }: Props) {
           : "Run";
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-3 overflow-hidden rounded-lg border border-border bg-background p-4">
+    <section className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
       <header className="flex flex-none items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Plot it</h3>
         <div className="flex items-center gap-2">
@@ -186,7 +186,7 @@ export function LessonMatplot({ config, nextSlug, onCodeChange }: Props) {
         </div>
       </header>
 
-      <div className="min-h-[160px] flex-1 overflow-hidden rounded-md border border-border">
+      <div className="h-[45vh] min-h-[240px] overflow-hidden rounded-md border border-border">
         <MonacoEditor
           height="100%"
           defaultLanguage="python"

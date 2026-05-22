@@ -394,7 +394,13 @@ export function ChallengeView({
     </div>
   );
 
-  const solvePane = <div className="h-full overflow-hidden">{runner}</div>;
+  // The Solve pane scrolls internally — see
+  // memory/feedback_lesson_solve_stage_must_not_clip.md for the
+  // recurring bug this prevents. When tests fail and the result banner
+  // grows (or a post-submit success card with auto-advance appears),
+  // the bottom content must always be reachable via scroll instead of
+  // being clipped by a rigid flex layout.
+  const solvePane = <div className="h-full overflow-y-auto">{runner}</div>;
 
   return (
     <div className={gridClass}>

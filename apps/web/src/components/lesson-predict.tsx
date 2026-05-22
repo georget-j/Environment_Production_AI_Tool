@@ -55,7 +55,7 @@ export function LessonPredict({ config, nextSlug }: Props) {
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-background p-4">
+    <section className="flex flex-col gap-4 rounded-lg border border-border bg-background p-4">
       <div>
         <h3 className="mb-2 text-sm font-semibold">Read this code</h3>
         <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs leading-relaxed">
