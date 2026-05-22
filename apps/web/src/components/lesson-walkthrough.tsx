@@ -75,14 +75,19 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
               <div
                 key={i}
                 className={cn(
-                  "-mx-1 rounded px-1 transition-colors",
+                  "-mx-1 grid grid-cols-[2em_minmax(0,_1fr)] gap-1 rounded px-1 transition-colors",
                   isActive ? "bg-primary/15" : "",
                 )}
               >
-                <span className="mr-3 inline-block w-5 select-none text-right text-muted-foreground/60">
+                <span className="select-none text-right text-muted-foreground/60">
                   {lineNum}
                 </span>
-                <span className="whitespace-pre">{line || " "}</span>
+                {/* On mobile, wrap long lines so the learner doesn't have
+                 * to scroll the code pane horizontally. On lg+, preserve
+                 * the strict-pre layout — desktop has plenty of width. */}
+                <span className="whitespace-pre-wrap break-words lg:whitespace-pre lg:break-normal">
+                  {line || " "}
+                </span>
               </div>
             );
           })}
@@ -119,14 +124,23 @@ export function LessonWalkthrough({ code, steps, scrollTargetId }: Props) {
             >
               ← Back
             </button>
-            <button
-              type="button"
-              onClick={onContinue}
-              disabled={isLast}
-              className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-            >
-              {isLast ? "All steps read ✓" : "Next step →"}
-            </button>
+            {isLast ? (
+              <p className="text-right text-[11px] leading-snug text-muted-foreground">
+                All steps read. Tap{" "}
+                <span className="font-semibold text-foreground">
+                  Next: Approach →
+                </span>{" "}
+                below.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={onContinue}
+                className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Next step →
+              </button>
+            )}
           </div>
         </div>
 

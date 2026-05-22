@@ -28,6 +28,15 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* iOS Safari shows a grey overlay on tappable elements by default —
+   * disable it for buttons + links to stop the "grey bar" flash the
+   * user sees when advancing through walkthrough steps. */
+  button,
+  a,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 /* Monaco editor decorations driven by the challenge runner.
@@ -52,6 +61,10 @@
   margin-left: 2px;
 }
 @keyframes prodready-flash {
-  0% { background-color: rgba(250, 204, 21, 0.9); }
-  100% { background-color: rgba(254, 240, 138, 0.6); }
+  0% {
+    background-color: rgba(250, 204, 21, 0.9);
+  }
+  100% {
+    background-color: rgba(254, 240, 138, 0.6);
+  }
 }
