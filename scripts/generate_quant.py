@@ -2416,114 +2416,343 @@ LESSONS: list[Lesson] = [
         skills=["quant", "machine-learning", "backtesting"],
     ),
     Lesson(
-        n=36, stage=4, mode="fillblank",
+        n=36, stage=4, mode="debug",
         title="Momentum signal regression",
-        scenario="Time-series momentum (TSMOM) is the most-documented anomaly in finance — Asness, Moskowitz, Pedersen wrote the canonical paper at AQR. The naive form: 5-day past return predicts next-day return. Reality: at the daily horizon on a single liquid index, R² is essentially zero. Trend-following on TSMOM works at *much* longer horizons and across diverse markets, not on one daily SPY series — but you have to feel the small-sample noise before you can size a real strategy honestly.",
-        learner_goal="Fit a linear regression of next-day SPY return on lagged 5-day return; report the R².",
-        concept="Build a momentum feature: `mom = r.shift(1).rolling(5).sum()` — sum of the prior 5 days' returns, lagged by 1 so it uses only past info. Target: next day's return. Drop NaNs, split chronologically, fit. R² near zero on this single-feature, single-asset version is the honest answer; *don't* believe a positive R² on the same data with shuffled splitting.",
-        example_code=(
-            "import pandas as pd, numpy as np\n"
+        scenario="Junior at a quant fund builds a momentum-feature linear model and reports a *suspiciously high* R² in the morning standup. The senior raises an eyebrow — daily-horizon momentum on a single index has R² close to zero in honest cross-validation. A code review turns up the bug in the feature construction: the supposed 'lagged 5-day momentum' is rolling over the same-day return, so the model can see the future. Find the missing `.shift(1)`.",
+        learner_goal="Spot the look-ahead in the feature pipeline and add the missing lag.",
+        concept="A predictive feature at time `t` must be computable from data up to and including `t-1`. The standard idiom in pandas: `r.shift(1).rolling(W).sum()` shifts first (drops today's return) then aggregates over the prior window. Skipping the shift means today's return is in the feature, the model trivially learns 'today's return predicts today's return', and R² inflates from ~0 to >0.1. This is the most-shipped bug in junior quant-ML code; explicit tests on a synthetic random-walk catch it instantly.",
+        example_code="",
+        editable_template=(
+            "\"\"\"5-day momentum feature → next-day return regression.\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
             "from sklearn.linear_model import LinearRegression\n"
             "from sklearn.model_selection import train_test_split\n"
-            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
-            "df = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\n"
-            "X = df[['mom']].values; y = df['next'].values\n"
-            "Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
-            "score = LinearRegression().fit(Xtr, ytr).score(Xte, yte)\n"
-            "print(round(score, 4))"
+            "\n"
+            "\n"
+            "def momentum_r2(returns: pd.Series) -> float:\n"
+            "    \"\"\"Return the test-set R² of a single-feature model.\n"
+            "\n"
+            "    Feature: 5-day rolling sum of PRIOR returns (must lag by 1).\n"
+            "    Target : next-day return.\n"
+            "    Split  : chronological 80/20, no shuffle.\n"
+            "    \"\"\"\n"
+            "    # Bug: missing .shift(1) — the feature includes today's return.\n"
+            "    df = pd.DataFrame({\n"
+            "        'mom': returns.rolling(5).sum(),\n"
+            "        'next': returns,\n"
+            "    }).dropna()\n"
+            "    X = df[['mom']].values\n"
+            "    y = df['next'].values\n"
+            "    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
+            "    return float(LinearRegression().fit(Xtr, ytr).score(Xte, yte))\n"
         ),
-        template=(
-            "import pandas as pd, numpy as np\n"
+        reference_solution=(
+            "import numpy as np\n"
+            "import pandas as pd\n"
             "from sklearn.linear_model import LinearRegression\n"
             "from sklearn.model_selection import train_test_split\n"
-            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
-            "df = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\n"
-            "X = df[['mom']].values; y = df['next'].values\n"
-            "Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, ___=False)\n"
-            "score = LinearRegression().fit(Xtr, ytr).score(Xte, yte)\n"
-            "print(round(score, 4))"
+            "\n"
+            "\n"
+            "def momentum_r2(returns: pd.Series) -> float:\n"
+            "    df = pd.DataFrame({\n"
+            "        'mom': returns.shift(1).rolling(5).sum(),\n"
+            "        'next': returns,\n"
+            "    }).dropna()\n"
+            "    X = df[['mom']].values\n"
+            "    y = df['next'].values\n"
+            "    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
+            "    return float(LinearRegression().fit(Xtr, ytr).score(Xte, yte))\n"
         ),
-        your_turn="Replace `___` so the split keeps chronological order (no shuffling).",
-        expected_stdout="0.0049",
-        hint="Seven letters.",
-        skills=["quant", "machine-learning", "regression"],
-        datasets=["spy"],
+        tests_py=(
+            "\"\"\"Momentum-R² leak detection on a random-walk null.\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import momentum_r2\n"
+            "\n"
+            "\n"
+            "def _white_noise(n: int = 2000, seed: int = 0) -> pd.Series:\n"
+            "    rng = np.random.default_rng(seed)\n"
+            "    return pd.Series(rng.normal(0, 0.01, n))\n"
+            "\n"
+            "\n"
+            "def test_r2_near_zero_on_random_walk():\n"
+            "    # If features are properly lagged, R² on pure noise is ~0.\n"
+            "    # The leaky version returns R² > 0.1 — clearly distinguishable.\n"
+            "    score = momentum_r2(_white_noise(seed=1))\n"
+            "    assert abs(score) < 0.05\n"
+            "\n"
+            "\n"
+            "def test_r2_not_inflated_by_same_day_leak():\n"
+            "    # Run on three independent noise series; mean R² must stay near 0.\n"
+            "    mean_score = np.mean([\n"
+            "        momentum_r2(_white_noise(seed=k)) for k in range(3)\n"
+            "    ])\n"
+            "    assert abs(mean_score) < 0.05\n"
+            "\n"
+            "\n"
+            "def test_returns_a_float():\n"
+            "    out = momentum_r2(_white_noise())\n"
+            "    assert isinstance(out, float)\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_r2_near_zero_on_random_walk",
+                "On pure noise (no real signal), test R² stays near zero — catches the leak.",
+            ),
+            (
+                "tests/test_solution.py::test_r2_not_inflated_by_same_day_leak",
+                "Mean R² across 3 random-walk seeds is below 0.05.",
+            ),
+            (
+                "tests/test_solution.py::test_returns_a_float",
+                "Function returns a plain float (not a numpy scalar).",
+            ),
+        ],
+        your_turn="The feature includes the current day's return — that's the leak. Add the single `.shift(1)` that lags the feature by one day before the rolling sum.",
+        hint="`returns.shift(1).rolling(5).sum()` — shift first, then aggregate.",
+        skills=["quant", "machine-learning", "regression", "backtesting"],
     ),
     Lesson(
-        n=37, stage=4, mode="fillblank",
+        n=37, stage=4, mode="debug",
         title="Random forest direction classifier",
-        scenario="WorldQuant, Two Sigma, Renaissance — the ML-heavy shops moved from linear models to gradient boosting and forests in the 2010s for one reason: real markets have interaction effects that linear models can't capture (vol × momentum, momentum × yield-curve). A random forest is the simplest non-linear ML model that's still interpretable enough to put in production. Accuracy ~53% on a two-feature daily classifier is unremarkable — that's the point. The 'magic' is in feature engineering, not model complexity.",
-        learner_goal="Train a 100-tree random forest to predict next-day direction from 5-day momentum and rolling volatility.",
-        concept="`RandomForestClassifier(n_estimators=100)` builds 100 decision trees on bootstrap samples of the training data; the ensemble vote becomes the prediction. Features here: 5-day momentum and 20-day rolling std (a vol proxy). Label: `sign(next_return)`. Use `random_state=0` so results are reproducible across re-runs.",
-        example_code=(
-            "import pandas as pd, numpy as np\n"
+        scenario="A junior at a multi-strat shop trains a random forest on a two-feature direction classifier and reports 70% out-of-sample accuracy. The PM is sceptical — a real edge that strong would put the desk out of work. A code review finds the bug: `train_test_split` defaults to `shuffle=True`, so the test set is randomly drawn from across the full timeline. Future rows leak into the training fold. With chronological splitting the score collapses back to noise. Find the missing keyword.",
+        learner_goal="Find the `train_test_split` call that's secretly shuffling the time series and pin it back to chronological order.",
+        concept="`sklearn.model_selection.train_test_split(..., shuffle=True)` — the SILENT DEFAULT — randomly samples test rows from anywhere in the array. For tabular i.i.d. data that's correct. For time series it's lookahead leakage by definition: the model sees rows after the test points during training. Fix: pass `shuffle=False` to keep the last `test_size` fraction as the chronological holdout. Same trap whether you're using linear regression, gradient-boosted trees, or a neural net.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Two-feature random-forest direction classifier with chronological split.\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
             "from sklearn.ensemble import RandomForestClassifier\n"
             "from sklearn.model_selection import train_test_split\n"
-            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
-            "df = pd.DataFrame({\n"
-            "    'mom': r.shift(1).rolling(5).sum(),\n"
-            "    'vol': r.shift(1).rolling(20).std(),\n"
-            "    'next': np.sign(r),\n"
-            "}).dropna()\n"
-            "X = df[['mom','vol']].values; y = df['next'].values\n"
-            "Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
-            "score = RandomForestClassifier(n_estimators=100, random_state=0).fit(Xtr, ytr).score(Xte, yte)\n"
-            "print(round(score, 3))"
+            "\n"
+            "\n"
+            "def rf_accuracy(returns: pd.Series) -> float:\n"
+            "    \"\"\"Train a 100-tree RandomForest on (mom_5, vol_20) → sign(next).\n"
+            "    Returns the test-set accuracy.\n"
+            "\n"
+            "    On a random-walk null, honest accuracy is ~0.5. A buggy split\n"
+            "    can push it well above 0.6 — that's not skill, that's leakage.\n"
+            "    \"\"\"\n"
+            "    df = pd.DataFrame({\n"
+            "        'mom': returns.shift(1).rolling(5).sum(),\n"
+            "        'vol': returns.shift(1).rolling(20).std(),\n"
+            "        'next': np.sign(returns),\n"
+            "    }).dropna()\n"
+            "    X = df[['mom', 'vol']].values\n"
+            "    y = df['next'].values\n"
+            "    # Bug: train_test_split shuffles by DEFAULT — future rows mix into train.\n"
+            "    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=0)\n"
+            "    model = RandomForestClassifier(n_estimators=100, random_state=0).fit(Xtr, ytr)\n"
+            "    return float(model.score(Xte, yte))\n"
         ),
-        template=(
-            "import pandas as pd, numpy as np\n"
+        reference_solution=(
+            "import numpy as np\n"
+            "import pandas as pd\n"
             "from sklearn.ensemble import RandomForestClassifier\n"
             "from sklearn.model_selection import train_test_split\n"
-            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
-            "df = pd.DataFrame({\n"
-            "    'mom': r.shift(1).rolling(5).sum(),\n"
-            "    'vol': r.shift(1).rolling(20).std(),\n"
-            "    'next': np.sign(r),\n"
-            "}).dropna()\n"
-            "X = df[['mom','vol']].values; y = df['next'].values\n"
-            "Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n"
-            "score = RandomForestClassifier(n_estimators=100, random_state=0).___(Xtr, ytr).score(Xte, yte)\n"
-            "print(round(score, 3))"
+            "\n"
+            "\n"
+            "def rf_accuracy(returns: pd.Series) -> float:\n"
+            "    df = pd.DataFrame({\n"
+            "        'mom': returns.shift(1).rolling(5).sum(),\n"
+            "        'vol': returns.shift(1).rolling(20).std(),\n"
+            "        'next': np.sign(returns),\n"
+            "    }).dropna()\n"
+            "    X = df[['mom', 'vol']].values\n"
+            "    y = df['next'].values\n"
+            "    Xtr, Xte, ytr, yte = train_test_split(\n"
+            "        X, y, test_size=0.2, shuffle=False\n"
+            "    )\n"
+            "    model = RandomForestClassifier(n_estimators=100, random_state=0).fit(Xtr, ytr)\n"
+            "    return float(model.score(Xte, yte))\n"
         ),
-        your_turn="Replace `___` with the method that trains the forest.",
-        expected_stdout="0.526",
-        hint="Same method as every sklearn estimator.",
-        skills=["quant", "machine-learning"],
-        datasets=["spy"],
+        tests_py=(
+            "\"\"\"RF accuracy: deterministic fingerprints distinguish shuffle vs no-shuffle.\n"
+            "\n"
+            "Both `train_test_split(..., shuffle=True)` (the silent default) and\n"
+            "`shuffle=False` produce DETERMINISTIC outputs when random_state is\n"
+            "set — but different ones, because they pick different test rows.\n"
+            "We fingerprint the no-shuffle values on two seeds and assert the\n"
+            "function returns those exact values. The buggy editable shuffles,\n"
+            "so it lands on different (lower-on-these-seeds) numbers and fails.\n"
+            "\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import rf_accuracy\n"
+            "\n"
+            "\n"
+            "def _noise(n: int = 2000, seed: int = 0) -> pd.Series:\n"
+            "    rng = np.random.default_rng(seed)\n"
+            "    return pd.Series(rng.normal(0, 0.01, n))\n"
+            "\n"
+            "\n"
+            "# Both values computed with shuffle=False on the given seed.\n"
+            "EXPECTED_SEED_1 = 0.5076\n"
+            "EXPECTED_SEED_11 = 0.5278\n"
+            "\n"
+            "\n"
+            "def test_seed_1_matches_chronological_fingerprint():\n"
+            "    acc = rf_accuracy(_noise(seed=1))\n"
+            "    assert abs(acc - EXPECTED_SEED_1) < 5e-3\n"
+            "\n"
+            "\n"
+            "def test_seed_11_matches_chronological_fingerprint():\n"
+            "    acc = rf_accuracy(_noise(seed=11))\n"
+            "    assert abs(acc - EXPECTED_SEED_11) < 5e-3\n"
+            "\n"
+            "\n"
+            "def test_deterministic_across_calls():\n"
+            "    a = rf_accuracy(_noise(seed=3))\n"
+            "    b = rf_accuracy(_noise(seed=3))\n"
+            "    assert abs(a - b) < 1e-12\n"
+            "\n"
+            "\n"
+            "def test_returns_a_float():\n"
+            "    assert isinstance(rf_accuracy(_noise()), float)\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_seed_1_matches_chronological_fingerprint",
+                "Seed-1 result matches the shuffle=False fingerprint (≈0.5076).",
+            ),
+            (
+                "tests/test_solution.py::test_seed_11_matches_chronological_fingerprint",
+                "Seed-11 result matches the shuffle=False fingerprint (≈0.5278).",
+            ),
+            (
+                "tests/test_solution.py::test_deterministic_across_calls",
+                "Function returns the same value on repeated calls with the same input.",
+            ),
+            (
+                "tests/test_solution.py::test_returns_a_float",
+                "Function returns a plain Python float.",
+            ),
+        ],
+        your_turn="`train_test_split` is silently shuffling. Add `shuffle=False` so the test set is the last 20% chronologically.",
+        hint="`train_test_split(X, y, test_size=0.2, shuffle=False)` — the default is True.",
+        skills=["quant", "machine-learning", "backtesting"],
     ),
     Lesson(
-        n=38, stage=4, mode="fillblank",
+        n=38, stage=4, mode="debug",
         title="Time-series cross-validation",
-        scenario="Honest cross-validation on financial time series uses expanding-window splits: train on `[0..t1]`, test on `(t1..t2]`, then train on `[0..t2]`, test on `(t2..t3]`, and so on. Every test fold sits strictly after its train fold — no leakage, no peeking. Lopez de Prado's `purgedKFold` adds embargo gaps for serial-correlated labels; `TimeSeriesSplit` is the entry-level version that catches the worst sins.",
-        learner_goal="Run a 5-fold time-series CV on a linear model and average the fold scores.",
-        concept="`TimeSeriesSplit(n_splits=5)` yields five (train_idx, test_idx) tuples where every test starts after the previous train ends. `cross_val_score(model, X, y, cv=tscv)` runs them and returns a 5-element array of fold R²s — average to get the headline number. For honest backtests, this is the *minimum* bar.",
-        example_code=(
-            "import pandas as pd, numpy as np\n"
+        scenario="Same junior, third sprint. The notebook's CV scores look great. But the CV splitter is *KFold* — which shuffles by default. Future folds get used to predict past folds. The PR review catches it: change `KFold` → `TimeSeriesSplit`, scores collapse to noise, the strategy that was 'ready for live capital' isn't. This is the single biggest mistake quant ML reviewers look for, and the most-googled gotcha after Asness/Pedersen/Moskowitz.",
+        learner_goal="Find the wrong cross-validator and swap it for the expanding-window splitter.",
+        concept="`KFold(n_splits=5)` randomly partitions rows into 5 folds — for i.i.d. data, fine. For time series, each fold is contaminated: training folds contain rows AFTER some test rows, so the model peeks. `TimeSeriesSplit(n_splits=5)` instead yields *expanding-window* splits: test fold k always starts after train fold k ends. Same import path, same `cross_val_score(model, X, y, cv=...)` call shape — just the splitter class changes. Lopez de Prado's `purgedKFold` extends this with embargo gaps for serially-correlated labels.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Cross-validate a momentum regression with the right CV splitter.\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "from sklearn.linear_model import LinearRegression\n"
+            "from sklearn.model_selection import KFold, TimeSeriesSplit, cross_val_score\n"
+            "\n"
+            "\n"
+            "def mean_cv_score(returns: pd.Series) -> float:\n"
+            "    \"\"\"Return the mean of 5-fold CV R² on a momentum → next-return model.\n"
+            "\n"
+            "    Must use an EXPANDING-WINDOW (time-aware) splitter so test folds\n"
+            "    never see future training data.\n"
+            "    \"\"\"\n"
+            "    df = pd.DataFrame({\n"
+            "        'mom': returns.shift(1).rolling(5).sum(),\n"
+            "        'next': returns,\n"
+            "    }).dropna()\n"
+            "    X = df[['mom']].values\n"
+            "    y = df['next'].values\n"
+            "    # Bug: KFold shuffles folds — leaks future into the training data.\n"
+            "    cv = KFold(n_splits=5, shuffle=True, random_state=0)\n"
+            "    scores = cross_val_score(LinearRegression(), X, y, cv=cv)\n"
+            "    return float(scores.mean())\n"
+        ),
+        reference_solution=(
+            "import numpy as np\n"
+            "import pandas as pd\n"
             "from sklearn.linear_model import LinearRegression\n"
             "from sklearn.model_selection import TimeSeriesSplit, cross_val_score\n"
-            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
-            "df = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\n"
-            "X = df[['mom']].values; y = df['next'].values\n"
-            "tscv = TimeSeriesSplit(n_splits=5)\n"
-            "scores = cross_val_score(LinearRegression(), X, y, cv=tscv)\n"
-            "print(round(scores.mean(), 4))"
+            "\n"
+            "\n"
+            "def mean_cv_score(returns: pd.Series) -> float:\n"
+            "    df = pd.DataFrame({\n"
+            "        'mom': returns.shift(1).rolling(5).sum(),\n"
+            "        'next': returns,\n"
+            "    }).dropna()\n"
+            "    X = df[['mom']].values\n"
+            "    y = df['next'].values\n"
+            "    cv = TimeSeriesSplit(n_splits=5)\n"
+            "    scores = cross_val_score(LinearRegression(), X, y, cv=cv)\n"
+            "    return float(scores.mean())\n"
         ),
-        template=(
-            "import pandas as pd, numpy as np\n"
-            "from sklearn.linear_model import LinearRegression\n"
-            "from sklearn.model_selection import TimeSeriesSplit, cross_val_score\n"
-            "r = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\n"
-            "df = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\n"
-            "X = df[['mom']].values; y = df['next'].values\n"
-            "tscv = ___(n_splits=5)\n"
-            "scores = cross_val_score(LinearRegression(), X, y, cv=tscv)\n"
-            "print(round(scores.mean(), 4))"
+        tests_py=(
+            "\"\"\"CV-splitter selection check via deterministic fingerprint.\n"
+            "\n"
+            "Both KFold(shuffle=True, random_state=0) and TimeSeriesSplit give\n"
+            "DETERMINISTIC outputs for a fixed input — but different ones. We\n"
+            "fingerprint the TimeSeriesSplit answer and assert the function\n"
+            "matches; the leaky KFold answer is meaningfully off, so the\n"
+            "buggy editable fails.\n"
+            "\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import mean_cv_score\n"
+            "\n"
+            "\n"
+            "def _noise(n: int = 3000, seed: int = 0) -> pd.Series:\n"
+            "    rng = np.random.default_rng(seed)\n"
+            "    return pd.Series(rng.normal(0, 0.01, n))\n"
+            "\n"
+            "\n"
+            "EXPECTED_SEED_1 = -0.005549\n"
+            "EXPECTED_SEED_7 = -0.006750\n"
+            "\n"
+            "\n"
+            "def test_seed_1_matches_timeseries_split_fingerprint():\n"
+            "    score = mean_cv_score(_noise(seed=1))\n"
+            "    assert abs(score - EXPECTED_SEED_1) < 5e-5\n"
+            "\n"
+            "\n"
+            "def test_seed_7_matches_timeseries_split_fingerprint():\n"
+            "    score = mean_cv_score(_noise(seed=7))\n"
+            "    assert abs(score - EXPECTED_SEED_7) < 5e-5\n"
+            "\n"
+            "\n"
+            "def test_function_is_deterministic_across_calls():\n"
+            "    a = mean_cv_score(_noise(seed=2))\n"
+            "    b = mean_cv_score(_noise(seed=2))\n"
+            "    assert abs(a - b) < 1e-12\n"
+            "\n"
+            "\n"
+            "def test_returns_a_float():\n"
+            "    assert isinstance(mean_cv_score(_noise()), float)\n"
         ),
-        your_turn="Replace `___` with the splitter that respects chronological order.",
-        expected_stdout="0.0",
-        hint="Imported above — three words run together.",
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_seed_1_matches_timeseries_split_fingerprint",
+                "Seed-1 result matches the TimeSeriesSplit fingerprint (-0.005549).",
+            ),
+            (
+                "tests/test_solution.py::test_seed_7_matches_timeseries_split_fingerprint",
+                "Seed-7 result matches the TimeSeriesSplit fingerprint (-0.006750).",
+            ),
+            (
+                "tests/test_solution.py::test_function_is_deterministic_across_calls",
+                "Function returns the same value on repeated calls with the same input.",
+            ),
+            (
+                "tests/test_solution.py::test_returns_a_float",
+                "Function returns a plain Python float.",
+            ),
+        ],
+        your_turn="Swap `KFold` for `TimeSeriesSplit` (already imported). Same `cross_val_score` call works — the only thing that changes is the splitter you pass in.",
+        hint="`TimeSeriesSplit(n_splits=5)` — no shuffle argument, no random_state, it's expanding-window by design.",
         skills=["quant", "machine-learning", "backtesting"],
-        datasets=["spy"],
     ),
     Lesson(
         n=39, stage=4, mode="predict",

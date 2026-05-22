@@ -76,7 +76,7 @@ def verify_pytest_lesson(lesson) -> tuple[bool, str]:
 
         def run() -> int:
             res = subprocess.run(
-                ["python", "-m", "pytest", "-q", str(d)],
+                [sys.executable, "-m", "pytest", "-q", str(d)],
                 capture_output=True,
                 text=True,
                 cwd=str(d),

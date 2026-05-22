@@ -596,31 +596,93 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "prompt": "Type the list as Python prints it."
 },
   "quant-36-momentum-signal-regression": {
-  "mode": "fillblank",
-  "template": "import pandas as pd, numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import train_test_split\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\nX = df[['mom']].values; y = df['next'].values\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, ___=False)\nscore = LinearRegression().fit(Xtr, ytr).score(Xte, yte)\nprint(round(score, 4))",
-  "expected_stdout": "0.0049",
-  "hint": "Seven letters.",
-  "datasets": [
-    "spy"
-  ]
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_r2_near_zero_on_random_walk",
+      "description": "On pure noise (no real signal), test R\u00b2 stays near zero \u2014 catches the leak."
+    },
+    {
+      "id": "tests/test_solution.py::test_r2_not_inflated_by_same_day_leak",
+      "description": "Mean R\u00b2 across 3 random-walk seeds is below 0.05."
+    },
+    {
+      "id": "tests/test_solution.py::test_returns_a_float",
+      "description": "Function returns a plain float (not a numpy scalar)."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"5-day momentum feature \u2192 next-day return regression.\"\"\"\nimport numpy as np\nimport pandas as pd\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import train_test_split\n\n\ndef momentum_r2(returns: pd.Series) -> float:\n    \"\"\"Return the test-set R\u00b2 of a single-feature model.\n\n    Feature: 5-day rolling sum of PRIOR returns (must lag by 1).\n    Target : next-day return.\n    Split  : chronological 80/20, no shuffle.\n    \"\"\"\n    # Bug: missing .shift(1) \u2014 the feature includes today's return.\n    df = pd.DataFrame({\n        'mom': returns.rolling(5).sum(),\n        'next': returns,\n    }).dropna()\n    X = df[['mom']].values\n    y = df['next'].values\n    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\n    return float(LinearRegression().fit(Xtr, ytr).score(Xte, yte))\n",
+    "tests/test_solution.py": "\"\"\"Momentum-R\u00b2 leak detection on a random-walk null.\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import momentum_r2\n\n\ndef _white_noise(n: int = 2000, seed: int = 0) -> pd.Series:\n    rng = np.random.default_rng(seed)\n    return pd.Series(rng.normal(0, 0.01, n))\n\n\ndef test_r2_near_zero_on_random_walk():\n    # If features are properly lagged, R\u00b2 on pure noise is ~0.\n    # The leaky version returns R\u00b2 > 0.1 \u2014 clearly distinguishable.\n    score = momentum_r2(_white_noise(seed=1))\n    assert abs(score) < 0.05\n\n\ndef test_r2_not_inflated_by_same_day_leak():\n    # Run on three independent noise series; mean R\u00b2 must stay near 0.\n    mean_score = np.mean([\n        momentum_r2(_white_noise(seed=k)) for k in range(3)\n    ])\n    assert abs(mean_score) < 0.05\n\n\ndef test_returns_a_float():\n    out = momentum_r2(_white_noise())\n    assert isinstance(out, float)\n"
+  }
 },
   "quant-37-random-forest-direction-classifier": {
-  "mode": "fillblank",
-  "template": "import pandas as pd, numpy as np\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import train_test_split\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({\n    'mom': r.shift(1).rolling(5).sum(),\n    'vol': r.shift(1).rolling(20).std(),\n    'next': np.sign(r),\n}).dropna()\nX = df[['mom','vol']].values; y = df['next'].values\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, shuffle=False)\nscore = RandomForestClassifier(n_estimators=100, random_state=0).___(Xtr, ytr).score(Xte, yte)\nprint(round(score, 3))",
-  "expected_stdout": "0.526",
-  "hint": "Same method as every sklearn estimator.",
-  "datasets": [
-    "spy"
-  ]
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_seed_1_matches_chronological_fingerprint",
+      "description": "Seed-1 result matches the shuffle=False fingerprint (\u22480.5076)."
+    },
+    {
+      "id": "tests/test_solution.py::test_seed_11_matches_chronological_fingerprint",
+      "description": "Seed-11 result matches the shuffle=False fingerprint (\u22480.5278)."
+    },
+    {
+      "id": "tests/test_solution.py::test_deterministic_across_calls",
+      "description": "Function returns the same value on repeated calls with the same input."
+    },
+    {
+      "id": "tests/test_solution.py::test_returns_a_float",
+      "description": "Function returns a plain Python float."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Two-feature random-forest direction classifier with chronological split.\"\"\"\nimport numpy as np\nimport pandas as pd\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import train_test_split\n\n\ndef rf_accuracy(returns: pd.Series) -> float:\n    \"\"\"Train a 100-tree RandomForest on (mom_5, vol_20) \u2192 sign(next).\n    Returns the test-set accuracy.\n\n    On a random-walk null, honest accuracy is ~0.5. A buggy split\n    can push it well above 0.6 \u2014 that's not skill, that's leakage.\n    \"\"\"\n    df = pd.DataFrame({\n        'mom': returns.shift(1).rolling(5).sum(),\n        'vol': returns.shift(1).rolling(20).std(),\n        'next': np.sign(returns),\n    }).dropna()\n    X = df[['mom', 'vol']].values\n    y = df['next'].values\n    # Bug: train_test_split shuffles by DEFAULT \u2014 future rows mix into train.\n    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=0)\n    model = RandomForestClassifier(n_estimators=100, random_state=0).fit(Xtr, ytr)\n    return float(model.score(Xte, yte))\n",
+    "tests/test_solution.py": "\"\"\"RF accuracy: deterministic fingerprints distinguish shuffle vs no-shuffle.\n\nBoth `train_test_split(..., shuffle=True)` (the silent default) and\n`shuffle=False` produce DETERMINISTIC outputs when random_state is\nset \u2014 but different ones, because they pick different test rows.\nWe fingerprint the no-shuffle values on two seeds and assert the\nfunction returns those exact values. The buggy editable shuffles,\nso it lands on different (lower-on-these-seeds) numbers and fails.\n\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import rf_accuracy\n\n\ndef _noise(n: int = 2000, seed: int = 0) -> pd.Series:\n    rng = np.random.default_rng(seed)\n    return pd.Series(rng.normal(0, 0.01, n))\n\n\n# Both values computed with shuffle=False on the given seed.\nEXPECTED_SEED_1 = 0.5076\nEXPECTED_SEED_11 = 0.5278\n\n\ndef test_seed_1_matches_chronological_fingerprint():\n    acc = rf_accuracy(_noise(seed=1))\n    assert abs(acc - EXPECTED_SEED_1) < 5e-3\n\n\ndef test_seed_11_matches_chronological_fingerprint():\n    acc = rf_accuracy(_noise(seed=11))\n    assert abs(acc - EXPECTED_SEED_11) < 5e-3\n\n\ndef test_deterministic_across_calls():\n    a = rf_accuracy(_noise(seed=3))\n    b = rf_accuracy(_noise(seed=3))\n    assert abs(a - b) < 1e-12\n\n\ndef test_returns_a_float():\n    assert isinstance(rf_accuracy(_noise()), float)\n"
+  }
 },
   "quant-38-time-series-cross-validation": {
-  "mode": "fillblank",
-  "template": "import pandas as pd, numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import TimeSeriesSplit, cross_val_score\nr = pd.read_csv('/data/quant/spy.csv')['adj_close'].pct_change()\ndf = pd.DataFrame({'mom': r.shift(1).rolling(5).sum(), 'next': r}).dropna()\nX = df[['mom']].values; y = df['next'].values\ntscv = ___(n_splits=5)\nscores = cross_val_score(LinearRegression(), X, y, cv=tscv)\nprint(round(scores.mean(), 4))",
-  "expected_stdout": "0.0",
-  "hint": "Imported above \u2014 three words run together.",
-  "datasets": [
-    "spy"
-  ]
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_seed_1_matches_timeseries_split_fingerprint",
+      "description": "Seed-1 result matches the TimeSeriesSplit fingerprint (-0.005549)."
+    },
+    {
+      "id": "tests/test_solution.py::test_seed_7_matches_timeseries_split_fingerprint",
+      "description": "Seed-7 result matches the TimeSeriesSplit fingerprint (-0.006750)."
+    },
+    {
+      "id": "tests/test_solution.py::test_function_is_deterministic_across_calls",
+      "description": "Function returns the same value on repeated calls with the same input."
+    },
+    {
+      "id": "tests/test_solution.py::test_returns_a_float",
+      "description": "Function returns a plain Python float."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Cross-validate a momentum regression with the right CV splitter.\"\"\"\nimport numpy as np\nimport pandas as pd\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.model_selection import KFold, TimeSeriesSplit, cross_val_score\n\n\ndef mean_cv_score(returns: pd.Series) -> float:\n    \"\"\"Return the mean of 5-fold CV R\u00b2 on a momentum \u2192 next-return model.\n\n    Must use an EXPANDING-WINDOW (time-aware) splitter so test folds\n    never see future training data.\n    \"\"\"\n    df = pd.DataFrame({\n        'mom': returns.shift(1).rolling(5).sum(),\n        'next': returns,\n    }).dropna()\n    X = df[['mom']].values\n    y = df['next'].values\n    # Bug: KFold shuffles folds \u2014 leaks future into the training data.\n    cv = KFold(n_splits=5, shuffle=True, random_state=0)\n    scores = cross_val_score(LinearRegression(), X, y, cv=cv)\n    return float(scores.mean())\n",
+    "tests/test_solution.py": "\"\"\"CV-splitter selection check via deterministic fingerprint.\n\nBoth KFold(shuffle=True, random_state=0) and TimeSeriesSplit give\nDETERMINISTIC outputs for a fixed input \u2014 but different ones. We\nfingerprint the TimeSeriesSplit answer and assert the function\nmatches; the leaky KFold answer is meaningfully off, so the\nbuggy editable fails.\n\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import mean_cv_score\n\n\ndef _noise(n: int = 3000, seed: int = 0) -> pd.Series:\n    rng = np.random.default_rng(seed)\n    return pd.Series(rng.normal(0, 0.01, n))\n\n\nEXPECTED_SEED_1 = -0.005549\nEXPECTED_SEED_7 = -0.006750\n\n\ndef test_seed_1_matches_timeseries_split_fingerprint():\n    score = mean_cv_score(_noise(seed=1))\n    assert abs(score - EXPECTED_SEED_1) < 5e-5\n\n\ndef test_seed_7_matches_timeseries_split_fingerprint():\n    score = mean_cv_score(_noise(seed=7))\n    assert abs(score - EXPECTED_SEED_7) < 5e-5\n\n\ndef test_function_is_deterministic_across_calls():\n    a = mean_cv_score(_noise(seed=2))\n    b = mean_cv_score(_noise(seed=2))\n    assert abs(a - b) < 1e-12\n\n\ndef test_returns_a_float():\n    assert isinstance(mean_cv_score(_noise()), float)\n"
+  }
 },
   "quant-39-the-p-hacked-sharpe-trap": {
   "mode": "predict",
