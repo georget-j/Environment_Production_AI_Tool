@@ -306,10 +306,18 @@ function ReadStage({
           <p className="mt-1 whitespace-pre-wrap font-mono">{tryAttempt}</p>
         </div>
       )}
-      <article className="prose prose-sm max-w-none">
-        <ReactMarkdown>{concept.worked_example_md}</ReactMarkdown>
-        <hr />
+      <div className="rounded-md border border-border bg-muted/30 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          The idea, in one line
+        </p>
+        <p className="mt-1 text-sm font-medium">{concept.one_line}</p>
+      </div>
+      <article className="prose prose-sm max-w-none prose-headings:mt-4 prose-headings:mb-1 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-pre:my-2">
         <ReactMarkdown>{concept.exposition_md}</ReactMarkdown>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Worked example
+        </p>
+        <ReactMarkdown>{concept.worked_example_md}</ReactMarkdown>
       </article>
       {error && <p className="text-xs text-red-700">{error}</p>}
       <div className="flex justify-end">
@@ -396,17 +404,20 @@ function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
           const isWrong = submitted && chosen !== correct;
           return (
             <li key={qi} className="rounded-md border border-border p-3">
-              <p className="text-sm font-medium">
-                {qi + 1}. {mcq.q}
-              </p>
-              <ul className="mt-2 flex flex-col gap-1">
+              <div className="flex gap-2 text-sm font-medium">
+                <span className="shrink-0">{qi + 1}.</span>
+                <div className="prose prose-sm max-w-none prose-p:my-0 prose-pre:my-2 prose-pre:bg-muted prose-pre:text-foreground prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none">
+                  <ReactMarkdown>{mcq.q}</ReactMarkdown>
+                </div>
+              </div>
+              <ul className="mt-3 flex flex-col gap-1">
                 {mcq.options.map((opt: string, oi: number) => {
                   const picked = chosen === oi;
                   const showCorrect = submitted && oi === correct;
                   return (
                     <li key={oi}>
                       <label
-                        className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm ${
+                        className={`flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 text-sm ${
                           showCorrect
                             ? "bg-green-50 text-green-900"
                             : picked && submitted
@@ -424,22 +435,27 @@ function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
                             setAnswers((a) => ({ ...a, [qi]: oi }))
                           }
                           disabled={submitted}
+                          className="mt-1 shrink-0"
                         />
-                        <span>{opt}</span>
+                        <div className="prose prose-sm max-w-none prose-p:my-0 prose-code:rounded prose-code:bg-background/60 prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none">
+                          <ReactMarkdown>{opt}</ReactMarkdown>
+                        </div>
                       </label>
                     </li>
                   );
                 })}
               </ul>
               {isCorrect && mcq.why && (
-                <p className="mt-2 text-xs text-green-800">
-                  Correct — {mcq.why}
-                </p>
+                <div className="prose prose-xs mt-2 max-w-none text-xs text-green-800 prose-p:my-0 prose-code:rounded prose-code:bg-green-100 prose-code:px-1 prose-code:font-mono prose-code:text-[0.9em] prose-code:before:content-none prose-code:after:content-none">
+                  <strong>Correct — </strong>
+                  <ReactMarkdown>{mcq.why}</ReactMarkdown>
+                </div>
               )}
               {isWrong && mcq.why && (
-                <p className="mt-2 text-xs text-red-800">
-                  Not quite. {mcq.why}
-                </p>
+                <div className="prose prose-xs mt-2 max-w-none text-xs text-red-800 prose-p:my-0 prose-code:rounded prose-code:bg-red-100 prose-code:px-1 prose-code:font-mono prose-code:text-[0.9em] prose-code:before:content-none prose-code:after:content-none">
+                  <strong>Not quite. </strong>
+                  <ReactMarkdown>{mcq.why}</ReactMarkdown>
+                </div>
               )}
             </li>
           );

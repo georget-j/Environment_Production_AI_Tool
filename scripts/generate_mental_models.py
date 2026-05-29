@@ -207,21 +207,19 @@ CONCEPTS: list[Concept] = [
                 ),
             },
         ],
-        # Read — concrete worked example FIRST, then abstract exposition.
+        # Read — short, scannable. Bret Victor's principle: surface the
+        # mental model first ("arrow from name to value"), then bullet the
+        # three rules. Worked example renders below.
         exposition_md=(
-            "A variable is not a box. It's a **name bound to a value in a "
-            "scope**. Two names can be bound to the same value at once; "
-            "mutating that value affects every name pointing at it.\n\n"
-            "The mental model that catches *most* Python aliasing bugs is "
-            "this: imagine an arrow from each name to the underlying object. "
-            "`a = [1, 2, 3]` draws one arrow. `b = a` draws a second arrow "
-            "to the *same* list (no second list is created). When you call "
-            "`b.append(4)`, the list both arrows point at gets a new element "
-            "— so `a` and `b` both reflect the change.\n\n"
-            "This is different from immutable values like ints and strings. "
-            "`x = 5; y = x; y = 6` doesn't change `x`, because integers are "
-            "immutable — `y = 6` rebinds `y` to a different object instead "
-            "of mutating the old one."
+            "**Mental model:** a variable is an arrow from a *name* to a *value*. "
+            "Two names can point at the same value.\n\n"
+            "Three rules cover almost every Python aliasing bug:\n\n"
+            "- `b = a` does **not** copy. It points `b` at whatever `a` is already pointing at.\n"
+            "- Mutating the value (e.g. `b.append(4)`) is visible through *every* name pointing at it.\n"
+            "- Re-assigning a name (e.g. `b = 99`) only moves *that* name's arrow — it doesn't touch the old value or other names.\n\n"
+            "Lists, dicts, and sets are **mutable** — the gotcha above applies. "
+            "Ints, strings, and tuples are **immutable** — you can't mutate them, "
+            "so two names pointing at the same int can never surprise each other."
         ),
         worked_example_md=(
             "```python\n"
@@ -273,30 +271,51 @@ CONCEPTS: list[Concept] = [
             ],
         },
         # Check — 2 MCQs with surface-feature variability (different containers,
-        # different mutation methods — same underlying concept).
+        # different mutation methods — same underlying concept). The `q` is
+        # rendered as markdown — fenced code blocks read better than inline soup.
         check_mcqs=[
             {
                 "q": (
-                    "Given `xs = {'k': 1}` and `ys = xs`, what does "
-                    "`ys['k'] = 9; print(xs)` print?"
+                    "What does this print?\n\n"
+                    "```python\n"
+                    "xs = {'k': 1}\n"
+                    "ys = xs\n"
+                    "ys['k'] = 9\n"
+                    "print(xs)\n"
+                    "```"
                 ),
-                "options": ["{'k': 1}", "{'k': 9}", "TypeError", "None"],
+                "options": [
+                    "`{'k': 1}`",
+                    "`{'k': 9}`",
+                    "`TypeError`",
+                    "`None`",
+                ],
                 "correct": 1,
                 "why": (
-                    "`ys = xs` binds `ys` to the *same* dict. Mutating via "
+                    "`ys = xs` points `ys` at the *same* dict. Mutating via "
                     "either name is visible through the other."
                 ),
             },
             {
                 "q": (
-                    "Given `s = 'hi'; t = s; t = t + '!'`, what does "
-                    "`print(s)` print?"
+                    "What does this print?\n\n"
+                    "```python\n"
+                    "s = 'hi'\n"
+                    "t = s\n"
+                    "t = t + '!'\n"
+                    "print(s)\n"
+                    "```"
                 ),
-                "options": ["'hi'", "'hi!'", "'!hi'", "Error"],
+                "options": [
+                    "`'hi'`",
+                    "`'hi!'`",
+                    "`'!hi'`",
+                    "`Error`",
+                ],
                 "correct": 0,
                 "why": (
-                    "Strings are immutable. `t = t + '!'` rebinds `t` to a "
-                    "new string; `s` still points at the original 'hi'."
+                    "Strings are immutable. `t = t + '!'` builds a new string "
+                    "and points `t` at it — `s` still points at the original."
                 ),
             },
         ],
@@ -311,19 +330,15 @@ CONCEPTS: list[Concept] = [
             "in Python — and why `b = a` followed by `b.append(4)` changes "
             "`a` too."
         ),
+        # Kept small on purpose. The grader treats this as a guide, not a
+        # checklist (see system_prompts.md → "Reflect grade prompt"). A
+        # paraphrase like "two names point at the same list, so changing
+        # it through b shows up through a" should pass.
         reflect_rubric={
-            "must_mention": [
-                "name",
-                "value",
-                "scope",
-            ],
-            "must_distinguish": [
-                ["binding", "copying"],
-                ["mutable", "immutable"],
-            ],
+            "must_mention": ["name", "value"],
+            "must_distinguish": [["mutable", "immutable"]],
             "must_explain": [
-                "two names can be bound to the same object",
-                "mutating the object affects every name bound to it",
+                "two names can point at the same value; mutating it is visible through both",
             ],
         },
         # Recall pool — 3 short checks, one drawn at random per spaced-recall visit.

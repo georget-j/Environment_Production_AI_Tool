@@ -322,8 +322,12 @@ def reflect_grade(
     ]
 
     client = OpenAI(api_key=settings.openai_api_key)
+    # Reflect grading is a judgement call across a few lines of prose; use
+    # the stronger model (same one PR review uses). The lighter `gpt-4o-mini`
+    # tended to read the rubric as a literal checklist and mark almost any
+    # paraphrased two-sentence answer "shallow".
     completion = client.chat.completions.create(
-        model=settings.openai_model_chat,
+        model=settings.openai_model_review,
         messages=messages,  # type: ignore[arg-type]
         temperature=0.2,
         response_format={"type": "json_object"},
