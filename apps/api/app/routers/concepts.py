@@ -182,6 +182,7 @@ def get_concept(
         play_widget_json=concept.play_widget_json or {},
         check_mcqs_json=concept.check_mcqs_json or [],
         apply_challenge_slug=concept.apply_challenge_slug,
+        apply_skeleton_json=concept.apply_skeleton_json,
         reflect_question=concept.reflect_question,
         reflect_rubric_json=concept.reflect_rubric_json or {},
         recall_checks_json=concept.recall_checks_json or [],

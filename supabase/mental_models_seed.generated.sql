@@ -20,7 +20,7 @@ delete from public.concept_prereqs where concept_id in (select id from public.co
 delete from public.diagnostic_questions where track_slug = 'mental-models';
 
 insert into public.concepts (
-  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, apply_skeleton_json, reflect_question, reflect_rubric_json, recall_checks_json, order_index
 ) values (
   '00000000-0000-0000-0000-000000000400',
   'variables-names',
@@ -37,6 +37,7 @@ insert into public.concepts (
   E'{"title":"Step through a name-binding scenario","code":"a = [1, 2, 3]\\nb = a\\nb.append(4)\\nprint(a)","steps":[{"line":1,"bindings":{"a":"→ list#1 [1, 2, 3]"},"heap":[{"id":"list#1","value":"[1, 2, 3]"}],"caption":"`a` is bound to a list — one arrow from `a` to list#1."},{"line":2,"bindings":{"a":"→ list#1","b":"→ list#1"},"heap":[{"id":"list#1","value":"[1, 2, 3]"}],"caption":"`b = a` does NOT copy — it draws a second arrow to the same list#1."},{"line":3,"bindings":{"a":"→ list#1","b":"→ list#1"},"heap":[{"id":"list#1","value":"[1, 2, 3, 4]"}],"caption":"`b.append(4)` mutates list#1 itself — both `a` and `b` see the change."},{"line":4,"bindings":{"a":"→ list#1","b":"→ list#1"},"heap":[{"id":"list#1","value":"[1, 2, 3, 4]"}],"caption":"`print(a)` reads the (now-mutated) list. Output: [1, 2, 3, 4]."}]}'::jsonb,
   E'[{"q":"What does this print?\\n\\n```python\\nxs = {''k'': 1}\\nys = xs\\nys[''k''] = 9\\nprint(xs)\\n```","options":["`{''k'': 1}`","`{''k'': 9}`","`TypeError`","`None`"],"correct":1,"why":"`ys = xs` points `ys` at the *same* dict. Mutating via either name is visible through the other."},{"q":"What does this print?\\n\\n```python\\ns = ''hi''\\nt = s\\nt = t + ''!''\\nprint(s)\\n```","options":["`''hi''`","`''hi!''`","`''!hi''`","`Error`"],"correct":0,"why":"Strings are immutable. `t = t + ''!''` builds a new string and points `t` at it — `s` still points at the original."}]'::jsonb,
   null,
+  E'{"instructions_md":"Write `update_in_place(target, source)` that copies every element of `source` into `target` **without rebinding `target`** — so the caller''s reference still sees the new values.","starter_code":"def update_in_place(target, source):\\n    # TODO: mutate `target` so it ends up equal to `source`.\\n    # Do not write `target = source` — that rebinds the parameter\\n    # locally and the caller sees no change.\\n    pass\\n","hidden_test":"from solution import update_in_place\\n\\ndef test_target_is_mutated():\\n    a = [1, 2, 3]\\n    original_id = id(a)\\n    update_in_place(a, [9, 8, 7, 6])\\n    assert a == [9, 8, 7, 6]\\n    assert id(a) == original_id, (\\n        ''target was rebound; caller would not see the change''\\n    )\\n"}'::jsonb,
   E'In two sentences, explain to a colleague what a *variable* is in Python — and why `b = a` followed by `b.append(4)` changes `a` too.',
   E'{"must_mention":["name","value"],"must_distinguish":[["mutable","immutable"]],"must_explain":["two names can point at the same value; mutating it is visible through both"]}'::jsonb,
   E'[{"kind":"mcq","q":"Given `xs = [1]; ys = xs; ys.append(2)`, what is `xs`?","options":["[1]","[1, 2]","TypeError"],"correct":1},{"kind":"mcq","q":"If `s = ''a''; t = s; t = ''b''`, what is `s`?","options":["''a''","''b''","None"],"correct":0},{"kind":"mcq","q":"What does `b = a` do when `a` is a list?","options":["Copies the list","Creates a second name for the same list","Raises an exception"],"correct":1}]'::jsonb,
@@ -56,13 +57,14 @@ on conflict (slug) do update set
   play_widget_json = excluded.play_widget_json,
   check_mcqs_json = excluded.check_mcqs_json,
   apply_challenge_slug = excluded.apply_challenge_slug,
+  apply_skeleton_json = excluded.apply_skeleton_json,
   reflect_question = excluded.reflect_question,
   reflect_rubric_json = excluded.reflect_rubric_json,
   recall_checks_json = excluded.recall_checks_json,
   order_index = excluded.order_index;
 
 insert into public.concepts (
-  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, apply_skeleton_json, reflect_question, reflect_rubric_json, recall_checks_json, order_index
 ) values (
   '00000000-0000-0000-0000-000000000401',
   'references-values',
@@ -79,6 +81,7 @@ insert into public.concepts (
   E'{"title":"The shared default list","frames":[{"caption":"At function definition: Python builds the default list once.","stack":[{"name":"(module)","vars":{}}],"heap":[{"id":"list#1","value":"[]","labels":["add_one.__defaults__[0]"]}]},{"caption":"Call 1: xs binds to list#1 → append(1) mutates it.","stack":[{"name":"(module)","vars":{}},{"name":"add_one","vars":{"xs":"→ list#1"}}],"heap":[{"id":"list#1","value":"[1]","labels":["add_one.__defaults__[0]","xs"]}]},{"caption":"Call 2: xs binds to the SAME list#1 → another mutation.","stack":[{"name":"(module)","vars":{}},{"name":"add_one","vars":{"xs":"→ list#1"}}],"heap":[{"id":"list#1","value":"[1, 1]","labels":["add_one.__defaults__[0]","xs"]}]}]}'::jsonb,
   E'[{"q":"What does this print?\\n\\n```\\ndef f(d={}):\\n    d[''n''] = d.get(''n'', 0) + 1\\n    return d\\n\\nprint(f()); print(f())\\n```","options":["{''n'': 1} {''n'': 1}","{''n'': 1} {''n'': 2}","{''n'': 0} {''n'': 1}","TypeError"],"correct":1,"why":"Same trap as lists. The dict default is built once and reused across calls."},{"q":"Which is the safe default for a list-typed argument in Python?","options":["`def f(xs=[]):`","`def f(xs=list()):`","`def f(xs=None):` and create the list inside","`def f(xs):` and document that the caller must pass one"],"correct":2,"why":"The None-sentinel pattern is the canonical fix — a fresh list per call, no shared state."}]'::jsonb,
   null,
+  E'{"instructions_md":"Implement `add_one_safe(xs=None)` that appends `1` to `xs` and returns it — but does **not** share state across calls when no argument is passed. Use the None-sentinel pattern.","starter_code":"def add_one_safe(xs=None):\\n    # TODO: handle the default safely.\\n    xs.append(1)\\n    return xs\\n","hidden_test":"from solution import add_one_safe\\n\\ndef test_independent_calls():\\n    assert add_one_safe() == [1]\\n    assert add_one_safe() == [1]\\n\\ndef test_caller_list_is_extended():\\n    xs = [0]\\n    out = add_one_safe(xs)\\n    assert out == [0, 1]\\n    assert xs is out\\n"}'::jsonb,
   E'In two sentences, explain why mutating a default argument value in Python can leak state across calls — and how to fix it.',
   E'{"must_mention":["default","mutable","shared"],"must_distinguish":[["evaluation at definition","evaluation per call"]],"must_explain":["the default object is created once","every call without the argument reuses that same object","use None as the sentinel and create a fresh object inside"]}'::jsonb,
   E'[{"kind":"mcq","q":"Calling `f()` twice when `f` has `xs=[]` as default and appends 1 produces what after the second call?","options":["[1]","[1, 1]","[]"],"correct":1},{"kind":"mcq","q":"The Pythonic safe-default pattern is:","options":["`xs=[]`","`xs=None` + check inside","`xs=list()`"],"correct":1},{"kind":"mcq","q":"Default arguments in Python are evaluated…","options":["once, at definition","every call","lazily, on first use"],"correct":0}]'::jsonb,
@@ -98,13 +101,14 @@ on conflict (slug) do update set
   play_widget_json = excluded.play_widget_json,
   check_mcqs_json = excluded.check_mcqs_json,
   apply_challenge_slug = excluded.apply_challenge_slug,
+  apply_skeleton_json = excluded.apply_skeleton_json,
   reflect_question = excluded.reflect_question,
   reflect_rubric_json = excluded.reflect_rubric_json,
   recall_checks_json = excluded.recall_checks_json,
   order_index = excluded.order_index;
 
 insert into public.concepts (
-  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, apply_skeleton_json, reflect_question, reflect_rubric_json, recall_checks_json, order_index
 ) values (
   '00000000-0000-0000-0000-000000000402',
   'control-flow',
@@ -121,6 +125,7 @@ insert into public.concepts (
   E'{"title":"Step through a continue-in-a-loop","code":"total = 0\\nfor i in range(6):\\n    if i % 2 != 0:\\n        continue\\n    total += i\\nprint(total)","steps":[{"line":1,"bindings":{"total":"0"},"caption":"`total` starts at 0."},{"line":2,"bindings":{"total":"0","i":"0"},"caption":"First iteration: i=0 (even)."},{"line":5,"bindings":{"total":"0","i":"0"},"caption":"0 % 2 == 0, so we skip continue and reach the add."},{"line":5,"bindings":{"total":"0","i":"1"},"caption":"Second iteration: i=1 (odd). Condition triggers."},{"line":4,"bindings":{"total":"0","i":"1"},"caption":"`continue` — jump straight back to the loop header. `total` unchanged."},{"line":5,"bindings":{"total":"2","i":"2"},"caption":"i=2 (even). 0 + 2 = 2."},{"line":5,"bindings":{"total":"2","i":"3"},"caption":"i=3 (odd). continue again. No change."},{"line":5,"bindings":{"total":"6","i":"4"},"caption":"i=4 (even). 2 + 4 = 6."},{"line":5,"bindings":{"total":"6","i":"5"},"caption":"i=5 (odd). continue. Final total 6."},{"line":6,"bindings":{"total":"6"},"caption":"Print 6 — the sum of even numbers 0..4."}]}'::jsonb,
   E'[{"q":"How many times does the body of `for i in range(4): if i == 2: break; print(i)` actually print?","options":["1","2","3","4"],"correct":1,"why":"`break` exits the loop entirely at i=2 — only i=0 and i=1 reach the print, so 2 lines."},{"q":"What does `continue` do inside a `for` loop?","options":["Exits the loop entirely","Skips the rest of the current iteration and starts the next","Restarts the loop from the beginning","Pauses execution"],"correct":1,"why":"`continue` is a per-iteration shortcut, not a per-loop shortcut. The loop header runs again immediately."}]'::jsonb,
   null,
+  E'{"instructions_md":"Implement `count_evens(nums)` — return the number of even values in the iterable `nums`. Use a loop, not `sum(... % 2 == 0 ...)`.","starter_code":"def count_evens(nums):\\n    # TODO: iterate; count evens.\\n    return 0\\n","hidden_test":"from solution import count_evens\\n\\ndef test_count_evens():\\n    assert count_evens([]) == 0\\n    assert count_evens([1, 3, 5]) == 0\\n    assert count_evens([2, 4, 6]) == 3\\n    assert count_evens([1, 2, 3, 4]) == 2\\n"}'::jsonb,
   E'In two sentences, describe how `break` and `continue` differ — and why someone reading code at a glance might confuse them.',
   E'{"must_mention":["break","continue","loop"],"must_distinguish":[["exit the loop","skip the iteration"]],"must_explain":["break exits the enclosing loop entirely","continue jumps to the next iteration of the same loop","both are early-exit shortcuts inside the loop body"]}'::jsonb,
   E'[{"kind":"mcq","q":"`break` inside a `for` loop:","options":["skips one iteration","exits the loop","restarts the loop"],"correct":1},{"kind":"mcq","q":"`continue` inside a `for` loop:","options":["skips to next iteration","exits the loop","raises an exception"],"correct":0},{"kind":"mcq","q":"If an `if` condition is False, the matching block:","options":["runs","is skipped","raises TypeError"],"correct":1}]'::jsonb,
@@ -140,13 +145,14 @@ on conflict (slug) do update set
   play_widget_json = excluded.play_widget_json,
   check_mcqs_json = excluded.check_mcqs_json,
   apply_challenge_slug = excluded.apply_challenge_slug,
+  apply_skeleton_json = excluded.apply_skeleton_json,
   reflect_question = excluded.reflect_question,
   reflect_rubric_json = excluded.reflect_rubric_json,
   recall_checks_json = excluded.recall_checks_json,
   order_index = excluded.order_index;
 
 insert into public.concepts (
-  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, apply_skeleton_json, reflect_question, reflect_rubric_json, recall_checks_json, order_index
 ) values (
   '00000000-0000-0000-0000-000000000403',
   'functions',
@@ -163,6 +169,7 @@ insert into public.concepts (
   E'{"title":"Step through a function call","code":"def square(n):\\n    return n * n\\n\\nx = square(4)\\nprint(x)","steps":[{"line":4,"bindings":{},"caption":"Call square(4). Push a frame for square."},{"line":1,"bindings":{"n":"4"},"caption":"Inside square: parameter n is bound to 4 in the new frame."},{"line":2,"bindings":{"n":"4"},"caption":"Compute n * n = 16. Return value pops the frame."},{"line":4,"bindings":{"x":"16"},"caption":"Back in the caller. x is bound to the returned 16."},{"line":5,"bindings":{"x":"16"},"caption":"Print x → 16."}]}'::jsonb,
   E'[{"q":"Which of these is a **pure** function?\\n\\n```\\ndef a(xs): xs.append(1); return xs\\ndef b(xs): return xs + [1]\\ndef c(): print(''hi'')\\n```","options":["a","b","c","All three"],"correct":1,"why":"b returns a new list and mutates nothing. a mutates its argument; c prints (side effect)."},{"q":"What does this print?\\n\\n```\\ndef f(): pass\\nprint(f())\\n```","options":["nothing","0","None","Error"],"correct":2,"why":"No `return` → implicitly returns None."}]'::jsonb,
   null,
+  E'{"instructions_md":"Implement `apply_twice(fn, x)` — return `fn(fn(x))`. Then make sure `apply_twice(lambda v: v + 1, 5)` returns 7.","starter_code":"def apply_twice(fn, x):\\n    # TODO: call fn twice on x.\\n    return x\\n","hidden_test":"from solution import apply_twice\\n\\ndef test_apply_twice():\\n    assert apply_twice(lambda v: v + 1, 5) == 7\\n    assert apply_twice(lambda v: v * 2, 3) == 12\\n    assert apply_twice(str.upper, ''hi'') == ''HI''\\n"}'::jsonb,
   E'In two sentences, distinguish a *pure* function from one with *side effects* — and explain why pure functions are easier to test.',
   E'{"must_mention":["pure","side effect","return"],"must_distinguish":[["return value","side effect"]],"must_explain":["pure: same input always gives same output","pure: no observable state change outside the function","purity makes tests deterministic"]}'::jsonb,
   E'[{"kind":"mcq","q":"A function with no `return` returns:","options":["0","None","the last expression"],"correct":1},{"kind":"mcq","q":"Reassigning a parameter inside a function affects the caller''s binding?","options":["Yes","No","Only for ints"],"correct":1},{"kind":"mcq","q":"A pure function has:","options":["no return value","no side effects and a deterministic return","no arguments"],"correct":1}]'::jsonb,
@@ -182,13 +189,14 @@ on conflict (slug) do update set
   play_widget_json = excluded.play_widget_json,
   check_mcqs_json = excluded.check_mcqs_json,
   apply_challenge_slug = excluded.apply_challenge_slug,
+  apply_skeleton_json = excluded.apply_skeleton_json,
   reflect_question = excluded.reflect_question,
   reflect_rubric_json = excluded.reflect_rubric_json,
   recall_checks_json = excluded.recall_checks_json,
   order_index = excluded.order_index;
 
 insert into public.concepts (
-  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, apply_skeleton_json, reflect_question, reflect_rubric_json, recall_checks_json, order_index
 ) values (
   '00000000-0000-0000-0000-000000000405',
   'complexity',
@@ -205,6 +213,7 @@ insert into public.concepts (
   E'{"title":"Growth families on a log/linear plot","x_label":"N (input size)","y_label":"operations","curves":[{"label":"O(1)","kind":"constant"},{"label":"O(log N)","kind":"log"},{"label":"O(N)","kind":"linear"},{"label":"O(N log N)","kind":"nlogn"},{"label":"O(N²)","kind":"quadratic"}],"controls":{"max_n":{"min":100,"max":10000,"step":100,"default":1000}}}'::jsonb,
   E'[{"q":"What''s the time complexity of this?\\n\\n```\\ndef f(xs):\\n    seen = set()\\n    for x in xs:\\n        seen.add(x)\\n    return len(seen)\\n```","options":["O(1)","O(log N)","O(N)","O(N²)"],"correct":2,"why":"Single pass through xs; set ops are O(1) on average."},{"q":"If algorithm A takes 1 second on N = 1000 and is O(N²), how long should it take on N = 10000?","options":["~10 seconds","~100 seconds","~1000 seconds","~1 second"],"correct":1,"why":"N grew 10×; cost grows as N² → 100×."}]'::jsonb,
   null,
+  E'{"instructions_md":"Implement `has_duplicate(xs)` in O(n) time — return True iff any value appears twice. The obvious O(n²) version (two nested loops) will time out on the large test.","starter_code":"def has_duplicate(xs):\\n    # TODO: O(n). A set is your friend.\\n    return False\\n","hidden_test":"from solution import has_duplicate\\n\\ndef test_small():\\n    assert has_duplicate([1, 2, 3]) is False\\n    assert has_duplicate([1, 2, 1]) is True\\n    assert has_duplicate([]) is False\\n\\ndef test_large_unique():\\n    # 5_000 unique values — naive O(n^2) would still finish here,\\n    # but the next test forces the linear path.\\n    assert has_duplicate(list(range(5_000))) is False\\n\\ndef test_large_with_dup():\\n    xs = list(range(5_000)) + [42]\\n    assert has_duplicate(xs) is True\\n"}'::jsonb,
   E'In two sentences, explain what `O(N²)` means — and give one common code shape that produces it.',
   E'{"must_mention":["input size","operations","grow"],"must_distinguish":[["O(N)","O(N²)"]],"must_explain":["operations grow as the square of the input size","doubling N quadruples cost","nested loops over the same data are the canonical source"]}'::jsonb,
   E'[{"kind":"mcq","q":"Doubling N in an O(N²) algorithm multiplies cost by:","options":["2","4","8"],"correct":1},{"kind":"mcq","q":"Hash-set membership is typically:","options":["O(1)","O(log N)","O(N)"],"correct":0},{"kind":"mcq","q":"A single pass over a list is:","options":["O(1)","O(N)","O(N²)"],"correct":1}]'::jsonb,
@@ -224,13 +233,14 @@ on conflict (slug) do update set
   play_widget_json = excluded.play_widget_json,
   check_mcqs_json = excluded.check_mcqs_json,
   apply_challenge_slug = excluded.apply_challenge_slug,
+  apply_skeleton_json = excluded.apply_skeleton_json,
   reflect_question = excluded.reflect_question,
   reflect_rubric_json = excluded.reflect_rubric_json,
   recall_checks_json = excluded.recall_checks_json,
   order_index = excluded.order_index;
 
 insert into public.concepts (
-  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, apply_skeleton_json, reflect_question, reflect_rubric_json, recall_checks_json, order_index
 ) values (
   '00000000-0000-0000-0000-000000000406',
   'code-as-state-machine',
@@ -247,6 +257,7 @@ insert into public.concepts (
   E'{"title":"Traffic light cycle","states":["RED","GREEN","YELLOW"],"initial":"RED","transitions":[{"from":"RED","event":"tick","to":"GREEN"},{"from":"GREEN","event":"tick","to":"YELLOW"},{"from":"YELLOW","event":"tick","to":"RED"}]}'::jsonb,
   E'[{"q":"A vending machine has states IDLE, COIN_INSERTED, DISPENSING. Which transition is most suspicious in a real implementation?","options":["IDLE → COIN_INSERTED on `insert_coin`","COIN_INSERTED → DISPENSING on `select`","DISPENSING → COIN_INSERTED on `insert_coin`","DISPENSING → IDLE on `done`"],"correct":2,"why":"Inserting a coin while dispensing is almost certainly an error path — most state machines block input during the busy state."},{"q":"Which is the best reason to model a workflow as an explicit state machine in code?","options":["It''s faster at runtime","It makes invalid transitions visible — and catchable","It uses less memory","It avoids exceptions"],"correct":1,"why":"The structural win is debuggability — illegal transitions become explicit instead of accidental."}]'::jsonb,
   null,
+  E'{"instructions_md":"Model a traffic light. `step(state)` returns the next state in the cycle `red → green → yellow → red`. Anything else raises `ValueError`.","starter_code":"def step(state):\\n    # TODO: red → green → yellow → red. Else: ValueError.\\n    return state\\n","hidden_test":"import pytest\\nfrom solution import step\\n\\ndef test_cycle():\\n    assert step(''red'') == ''green''\\n    assert step(''green'') == ''yellow''\\n    assert step(''yellow'') == ''red''\\n\\ndef test_invalid_state():\\n    with pytest.raises(ValueError):\\n        step(''purple'')\\n"}'::jsonb,
   E'In two sentences, explain what it means to model a piece of code as a *state machine* — and why doing so often makes bugs easier to spot.',
   E'{"must_mention":["state","transition","explicit"],"must_distinguish":[["state","transition"]],"must_explain":["a state machine is a finite set of named states plus transition rules","making transitions explicit data flags impossible transitions","current-state plus allowed-transitions answers debugging questions reliably"]}'::jsonb,
   E'[{"kind":"mcq","q":"A state machine is:","options":["a class with no methods","a finite set of states + transition rules","any loop with break"],"correct":1},{"kind":"mcq","q":"Encoding transitions as data (e.g. a dict) helps because:","options":["It''s faster than if/elif","Adding a state is a one-line edit","It uses less memory"],"correct":1},{"kind":"mcq","q":"TCP, vending machines, and form workflows are all examples of:","options":["sorted data","state machines","pure functions"],"correct":1}]'::jsonb,
@@ -266,13 +277,14 @@ on conflict (slug) do update set
   play_widget_json = excluded.play_widget_json,
   check_mcqs_json = excluded.check_mcqs_json,
   apply_challenge_slug = excluded.apply_challenge_slug,
+  apply_skeleton_json = excluded.apply_skeleton_json,
   reflect_question = excluded.reflect_question,
   reflect_rubric_json = excluded.reflect_rubric_json,
   recall_checks_json = excluded.recall_checks_json,
   order_index = excluded.order_index;
 
 insert into public.concepts (
-  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, apply_skeleton_json, reflect_question, reflect_rubric_json, recall_checks_json, order_index
 ) values (
   '00000000-0000-0000-0000-000000000404',
   'recursion',
@@ -289,6 +301,7 @@ insert into public.concepts (
   E'{"title":"Watch the call stack of fact(4)","function_name":"fact","frames":[{"caption":"Initial call.","stack":["fact(4)"]},{"caption":"fact(4) calls fact(3).","stack":["fact(4)","fact(3)"]},{"caption":"fact(3) calls fact(2).","stack":["fact(4)","fact(3)","fact(2)"]},{"caption":"fact(2) calls fact(1).","stack":["fact(4)","fact(3)","fact(2)","fact(1)"]},{"caption":"fact(1) hits the base case and returns 1. The frame pops.","stack":["fact(4)","fact(3)","fact(2) ← 1"]},{"caption":"fact(2) computes 2 * 1 = 2 and returns. Pop.","stack":["fact(4)","fact(3) ← 2"]},{"caption":"fact(3) computes 3 * 2 = 6 and returns. Pop.","stack":["fact(4) ← 6"]},{"caption":"fact(4) computes 4 * 6 = 24 and returns. Stack empty.","stack":[]}]}'::jsonb,
   E'[{"q":"What''s missing from this recursive function?\\n\\n```\\ndef count_down(n):\\n    print(n)\\n    count_down(n - 1)\\n```","options":["Nothing — it works","A base case","A return statement","A loop"],"correct":1,"why":"No base case → infinite recursion → RecursionError. Add `if n <= 0: return` at the top."},{"q":"How many stack frames are live (not yet returned) at the moment `fact(1)` is about to compute its return value, when called as `fact(5)`?","options":["1","3","5","Infinite"],"correct":2,"why":"fact(5), fact(4), fact(3), fact(2), fact(1) — five frames all live until the base case starts unwinding."}]'::jsonb,
   null,
+  E'{"instructions_md":"Implement `factorial(n)` recursively. Define `factorial(0) == 1` and `factorial(n) == n * factorial(n-1)`. Negative inputs raise `ValueError`.","starter_code":"def factorial(n):\\n    # TODO: base case + recursive case.\\n    return 1\\n","hidden_test":"import pytest\\nfrom solution import factorial\\n\\ndef test_base_case():\\n    assert factorial(0) == 1\\n    assert factorial(1) == 1\\n\\ndef test_recursive():\\n    assert factorial(5) == 120\\n    assert factorial(7) == 5040\\n\\ndef test_negative():\\n    with pytest.raises(ValueError):\\n        factorial(-1)\\n"}'::jsonb,
   E'In two sentences, explain why a recursive function needs a base case — and what happens at runtime if you forget it.',
   E'{"must_mention":["base case","stack","recursive"],"must_distinguish":[["recursive case","base case"]],"must_explain":["the base case is the input the function can answer without recursing","without it the stack grows until RecursionError","each call adds a frame; the base case starts the unwinding"]}'::jsonb,
   E'[{"kind":"mcq","q":"A recursive function with no base case will:","options":["return None","raise RecursionError","loop forever"],"correct":1},{"kind":"mcq","q":"Each recursive call adds:","options":["a CPU register","a stack frame","a global variable"],"correct":1},{"kind":"mcq","q":"fact(3) calls how many functions before the first return?","options":["1","3","9"],"correct":1}]'::jsonb,
@@ -308,6 +321,7 @@ on conflict (slug) do update set
   play_widget_json = excluded.play_widget_json,
   check_mcqs_json = excluded.check_mcqs_json,
   apply_challenge_slug = excluded.apply_challenge_slug,
+  apply_skeleton_json = excluded.apply_skeleton_json,
   reflect_question = excluded.reflect_question,
   reflect_rubric_json = excluded.reflect_rubric_json,
   recall_checks_json = excluded.recall_checks_json,

@@ -25,6 +25,7 @@ import {
   recordTryAttempt,
 } from "@/lib/concepts";
 import { Button } from "@/components/ui/button";
+import { ConceptApplyRunner } from "@/components/concept-apply-runner";
 import { ConceptMentor } from "@/components/concept-mentor";
 import { ConceptPlay } from "@/components/concept-play";
 import { createClient } from "@/lib/supabase/client";
@@ -130,7 +131,7 @@ export function ConceptUnit({ concept }: { concept: ConceptDetail }) {
             />
           )}
           {stage === "apply" && (
-            <ApplyStagePlaceholder
+            <ApplyStage
               concept={concept}
               progress={progress}
               onProgressChange={setProgress}
@@ -662,43 +663,70 @@ function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
   );
 }
 
-function ApplyStagePlaceholder({
-  concept,
-  onProgressChange,
-  onAdvance,
-}: StageProps) {
+/**
+ * ApplyStage — real Pyodide runner (M2). Dispatches on which Apply mode
+ * the concept declares:
+ *   - apply_skeleton_json  → inline Pyodide runner (instructions + textarea + pytest)
+ *   - apply_challenge_slug → link to an existing challenge
+ *   - neither              → legacy placeholder + "Mark complete" escape hatch
+ */
+function ApplyStage({ concept, onProgressChange, onAdvance }: StageProps) {
   const [busy, setBusy] = useState(false);
+
+  async function markComplete() {
+    const token = await getAccessToken();
+    if (!token) return;
+    const res = await markStageComplete(token, concept.slug, "apply");
+    onProgressChange(res.progress);
+    onAdvance();
+  }
+
+  if (concept.apply_skeleton_json) {
+    return (
+      <ConceptApplyRunner
+        skeleton={concept.apply_skeleton_json}
+        onPass={markComplete}
+      />
+    );
+  }
+
+  if (concept.apply_challenge_slug) {
+    return (
+      <div className="flex flex-col gap-4 text-sm">
+        <p className="font-semibold">Apply this concept on a real task.</p>
+        <p>
+          This concept&apos;s Apply lesson is the existing challenge{" "}
+          <code className="rounded bg-muted px-1">
+            {concept.apply_challenge_slug}
+          </code>
+          . Complete it there, then return here to Reflect.
+        </p>
+        <div className="flex justify-end">
+          <Link href={`/challenges/${concept.apply_challenge_slug}`}>
+            <Button>Open the Apply challenge →</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Last-resort fallback so the flow never hard-blocks if a future concept
+  // is authored without either Apply mode.
   async function advance() {
     setBusy(true);
     try {
-      const token = await getAccessToken();
-      if (!token) return;
-      const res = await markStageComplete(token, concept.slug, "apply");
-      onProgressChange(res.progress);
-      onAdvance();
+      await markComplete();
     } finally {
       setBusy(false);
     }
   }
-
   return (
     <div className="flex flex-col gap-4 text-sm">
       <p className="font-semibold">Apply stage.</p>
-      {concept.apply_challenge_slug ? (
-        <p>
-          When this stage is fully wired, it deep-links to the existing
-          challenge{" "}
-          <code className="rounded bg-muted px-1">
-            {concept.apply_challenge_slug}
-          </code>
-          .
-        </p>
-      ) : (
-        <p className="text-muted-foreground">
-          No Apply challenge linked yet for this concept. CC.5 wires one per
-          concept (existing skeleton/fillblank lesson reused).
-        </p>
-      )}
+      <p className="text-muted-foreground">
+        No runnable Apply is attached to this concept yet. You can mark this
+        stage complete and continue.
+      </p>
       <div className="flex justify-end">
         <Button onClick={advance} disabled={busy}>
           {busy ? "…" : "Mark Apply complete → Reflect"}

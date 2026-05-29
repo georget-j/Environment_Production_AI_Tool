@@ -105,6 +105,11 @@ class Concept:
 
     # Apply stage
     apply_challenge_slug: str | None = None
+    # M2 — inline Pyodide skeleton. Shape:
+    #   {instructions_md: str, starter_code: str, hidden_test: str}
+    # When non-null, the Apply stage renders a runner that loads
+    # starter_code + hidden_test and runs pytest. Pass → stage complete.
+    apply_skeleton: dict | None = None
 
     # Reflect stage
     reflect_question: str = ""
@@ -1442,6 +1447,203 @@ CONCEPTS: list[Concept] = [
 
 
 # ============================================================================
+# APPLY SKELETONS — M2 (Apply made real)
+# ============================================================================
+#
+# One tiny Pyodide skeleton per concept. Each is:
+#   instructions_md: rendered above the runner
+#   starter_code:    appears pre-filled in the textarea
+#   hidden_test:     run by pytest; the learner does NOT see this directly
+#
+# The skeletons are intentionally small (~5-10 lines starter + ~5-10 lines
+# test) — the goal is "apply the concept once on something runnable", not a
+# full task. The challenges in the existing tracks remain the bigger lifts.
+
+APPLY_SKELETONS: dict[str, dict] = {
+    "variables-names": {
+        "instructions_md": (
+            "Write `update_in_place(target, source)` that copies every element "
+            "of `source` into `target` **without rebinding `target`** — so the "
+            "caller's reference still sees the new values."
+        ),
+        "starter_code": (
+            "def update_in_place(target, source):\n"
+            "    # TODO: mutate `target` so it ends up equal to `source`.\n"
+            "    # Do not write `target = source` — that rebinds the parameter\n"
+            "    # locally and the caller sees no change.\n"
+            "    pass\n"
+        ),
+        "hidden_test": (
+            "from solution import update_in_place\n"
+            "\n"
+            "def test_target_is_mutated():\n"
+            "    a = [1, 2, 3]\n"
+            "    original_id = id(a)\n"
+            "    update_in_place(a, [9, 8, 7, 6])\n"
+            "    assert a == [9, 8, 7, 6]\n"
+            "    assert id(a) == original_id, (\n"
+            "        'target was rebound; caller would not see the change'\n"
+            "    )\n"
+        ),
+    },
+    "references-values": {
+        "instructions_md": (
+            "Implement `add_one_safe(xs=None)` that appends `1` to `xs` and "
+            "returns it — but does **not** share state across calls when no "
+            "argument is passed. Use the None-sentinel pattern."
+        ),
+        "starter_code": (
+            "def add_one_safe(xs=None):\n"
+            "    # TODO: handle the default safely.\n"
+            "    xs.append(1)\n"
+            "    return xs\n"
+        ),
+        "hidden_test": (
+            "from solution import add_one_safe\n"
+            "\n"
+            "def test_independent_calls():\n"
+            "    assert add_one_safe() == [1]\n"
+            "    assert add_one_safe() == [1]\n"
+            "\n"
+            "def test_caller_list_is_extended():\n"
+            "    xs = [0]\n"
+            "    out = add_one_safe(xs)\n"
+            "    assert out == [0, 1]\n"
+            "    assert xs is out\n"
+        ),
+    },
+    "control-flow": {
+        "instructions_md": (
+            "Implement `count_evens(nums)` — return the number of even values "
+            "in the iterable `nums`. Use a loop, not `sum(... % 2 == 0 ...)`."
+        ),
+        "starter_code": (
+            "def count_evens(nums):\n"
+            "    # TODO: iterate; count evens.\n"
+            "    return 0\n"
+        ),
+        "hidden_test": (
+            "from solution import count_evens\n"
+            "\n"
+            "def test_count_evens():\n"
+            "    assert count_evens([]) == 0\n"
+            "    assert count_evens([1, 3, 5]) == 0\n"
+            "    assert count_evens([2, 4, 6]) == 3\n"
+            "    assert count_evens([1, 2, 3, 4]) == 2\n"
+        ),
+    },
+    "functions": {
+        "instructions_md": (
+            "Implement `apply_twice(fn, x)` — return `fn(fn(x))`. Then make "
+            "sure `apply_twice(lambda v: v + 1, 5)` returns 7."
+        ),
+        "starter_code": (
+            "def apply_twice(fn, x):\n"
+            "    # TODO: call fn twice on x.\n"
+            "    return x\n"
+        ),
+        "hidden_test": (
+            "from solution import apply_twice\n"
+            "\n"
+            "def test_apply_twice():\n"
+            "    assert apply_twice(lambda v: v + 1, 5) == 7\n"
+            "    assert apply_twice(lambda v: v * 2, 3) == 12\n"
+            "    assert apply_twice(str.upper, 'hi') == 'HI'\n"
+        ),
+    },
+    "complexity": {
+        "instructions_md": (
+            "Implement `has_duplicate(xs)` in O(n) time — return True iff any "
+            "value appears twice. The obvious O(n²) version (two nested loops) "
+            "will time out on the large test."
+        ),
+        "starter_code": (
+            "def has_duplicate(xs):\n"
+            "    # TODO: O(n). A set is your friend.\n"
+            "    return False\n"
+        ),
+        "hidden_test": (
+            "from solution import has_duplicate\n"
+            "\n"
+            "def test_small():\n"
+            "    assert has_duplicate([1, 2, 3]) is False\n"
+            "    assert has_duplicate([1, 2, 1]) is True\n"
+            "    assert has_duplicate([]) is False\n"
+            "\n"
+            "def test_large_unique():\n"
+            "    # 5_000 unique values — naive O(n^2) would still finish here,\n"
+            "    # but the next test forces the linear path.\n"
+            "    assert has_duplicate(list(range(5_000))) is False\n"
+            "\n"
+            "def test_large_with_dup():\n"
+            "    xs = list(range(5_000)) + [42]\n"
+            "    assert has_duplicate(xs) is True\n"
+        ),
+    },
+    "code-as-state-machine": {
+        "instructions_md": (
+            "Model a traffic light. `step(state)` returns the next state in the "
+            "cycle `red → green → yellow → red`. Anything else raises "
+            "`ValueError`."
+        ),
+        "starter_code": (
+            "def step(state):\n"
+            "    # TODO: red → green → yellow → red. Else: ValueError.\n"
+            "    return state\n"
+        ),
+        "hidden_test": (
+            "import pytest\n"
+            "from solution import step\n"
+            "\n"
+            "def test_cycle():\n"
+            "    assert step('red') == 'green'\n"
+            "    assert step('green') == 'yellow'\n"
+            "    assert step('yellow') == 'red'\n"
+            "\n"
+            "def test_invalid_state():\n"
+            "    with pytest.raises(ValueError):\n"
+            "        step('purple')\n"
+        ),
+    },
+    "recursion": {
+        "instructions_md": (
+            "Implement `factorial(n)` recursively. Define `factorial(0) == 1` "
+            "and `factorial(n) == n * factorial(n-1)`. Negative inputs raise "
+            "`ValueError`."
+        ),
+        "starter_code": (
+            "def factorial(n):\n"
+            "    # TODO: base case + recursive case.\n"
+            "    return 1\n"
+        ),
+        "hidden_test": (
+            "import pytest\n"
+            "from solution import factorial\n"
+            "\n"
+            "def test_base_case():\n"
+            "    assert factorial(0) == 1\n"
+            "    assert factorial(1) == 1\n"
+            "\n"
+            "def test_recursive():\n"
+            "    assert factorial(5) == 120\n"
+            "    assert factorial(7) == 5040\n"
+            "\n"
+            "def test_negative():\n"
+            "    with pytest.raises(ValueError):\n"
+            "        factorial(-1)\n"
+        ),
+    },
+}
+
+# Wire skeletons onto the CONCEPTS list. Done as a post-pass so the skeleton
+# content lives in one block above (easier to scan + edit) and individual
+# Concept constructors stay focused on the 6-stage content.
+for _c in CONCEPTS:
+    if _c.slug in APPLY_SKELETONS:
+        _c.apply_skeleton = APPLY_SKELETONS[_c.slug]
+
+
+# ============================================================================
 # DIAGNOSTIC — Layer-0 placement questions
 # ============================================================================
 #
@@ -1548,6 +1750,7 @@ def write_sql() -> Path:
         "play_widget_json",
         "check_mcqs_json",
         "apply_challenge_slug",
+        "apply_skeleton_json",
         "reflect_question",
         "reflect_rubric_json",
         "recall_checks_json",
@@ -1561,7 +1764,7 @@ def write_sql() -> Path:
             " try_prompt_md, try_kind, try_expected_attempts_json,"
             " exposition_md, worked_example_md,"
             " play_widget_kind, play_widget_json,"
-            " check_mcqs_json, apply_challenge_slug,"
+            " check_mcqs_json, apply_challenge_slug, apply_skeleton_json,"
             " reflect_question, reflect_rubric_json,"
             " recall_checks_json, order_index"
         )
@@ -1584,6 +1787,10 @@ def write_sql() -> Path:
         lines.append(f"  {jsonb_lit(concept.check_mcqs)},")
         if concept.apply_challenge_slug:
             lines.append(f"  '{concept.apply_challenge_slug}',")
+        else:
+            lines.append("  null,")
+        if concept.apply_skeleton:
+            lines.append(f"  {jsonb_lit(concept.apply_skeleton)},")
         else:
             lines.append("  null,")
         lines.append(f"  E'{sql_escape(concept.reflect_question)}',")

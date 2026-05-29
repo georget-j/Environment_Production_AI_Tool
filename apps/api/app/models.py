@@ -148,6 +148,10 @@ class Concept(Base):
     check_mcqs_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     # Apply stage
     apply_challenge_slug: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Inline Pyodide skeleton (M2). When non-null, the Apply stage renders
+    # a runner that executes starter_code + hidden_test under pytest.
+    # Shape: {instructions_md, starter_code, hidden_test}.
+    apply_skeleton_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # Reflect stage
     reflect_question: Mapped[str] = mapped_column(Text, nullable=False)
     reflect_rubric_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)

@@ -165,6 +165,9 @@ class ConceptDetail(ConceptSummary):
     play_widget_json: dict
     check_mcqs_json: list
     apply_challenge_slug: str | None
+    # M2 — inline Pyodide skeleton for Apply.
+    # Shape: {instructions_md, starter_code, hidden_test} or None.
+    apply_skeleton_json: dict | None = None
     reflect_question: str
     reflect_rubric_json: dict
     recall_checks_json: list

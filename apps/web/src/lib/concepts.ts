@@ -44,6 +44,12 @@ export type ConceptSummary = {
   order_index: number;
 };
 
+export type ApplySkeleton = {
+  instructions_md: string;
+  starter_code: string;
+  hidden_test: string;
+};
+
 export type ConceptDetail = ConceptSummary & {
   try_prompt_md: string;
   try_kind: "code" | "text-reasoning";
@@ -54,6 +60,7 @@ export type ConceptDetail = ConceptSummary & {
   play_widget_json: Record<string, unknown>;
   check_mcqs_json: ConceptMCQ[];
   apply_challenge_slug: string | null;
+  apply_skeleton_json: ApplySkeleton | null;
   reflect_question: string;
   reflect_rubric_json: Record<string, unknown>;
   recall_checks_json: Array<Record<string, unknown>>;
