@@ -2647,6 +2647,174 @@ LESSONS: list[Lesson] = [
         skills=["quant", "options", "black-scholes", "greeks"],
     ),
     Lesson(
+        n=58, stage=3, mode="skeleton",
+        n_label="28d",
+        order_index_override=2840,
+        title="Design a pricer API",
+        scenario="So far each pricer (BS call, BS put, binomial American put) has been its own function. In a real options system you want one *interface* the strategy code talks to — call it with three arguments, get a price back, no matter what's behind it (closed-form, tree, MC). This lesson asks you to design that interface and implement it. The signatures are yours to pick.",
+        learner_goal="Design and implement an `OptionPricer` class exposing european_call, european_put, and american_put with the same calling convention; pass tests that check Hull-canonical prices and the American >= European put inequality.",
+        concept="Designing an API is half the engineering work — once you've picked argument order, return shape, and method names, the *implementation* is largely mechanical. The tests below specify the *behaviour* (canonical price within tolerance; American put >= European put) but not the internal structure: you can split helpers however you want, use closed-form vs trees, even take parameters via dataclass vs scalars. Multiple correct designs will pass.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Option pricer interface — you design the implementation.\n"
+            "\n"
+            "Specification:\n"
+            "    Create a class `OptionPricer` that prices three options with the\n"
+            "    same calling convention. The methods, helpers, and internal\n"
+            "    structure are yours to design — the tests check behaviour, not\n"
+            "    signatures. The required calls are:\n"
+            "\n"
+            "        OptionPricer().european_call(S, K, r, sigma, T) -> float\n"
+            "        OptionPricer().european_put(S, K, r, sigma, T) -> float\n"
+            "        OptionPricer().american_put(S, K, r, sigma, T, N=200) -> float\n"
+            "\n"
+            "    European call/put: closed-form Black-Scholes within 1e-3 of the\n"
+            "    Hull canonical (S=K=100, r=0.05, σ=0.20, T=1y) → call ≈ 10.4506,\n"
+            "    put ≈ 5.5735.\n"
+            "    American put: N-step CRR binomial with early-exercise check.\n"
+            "    Must be ≥ the European put on every input.\n"
+            "\"\"\"\n"
+            "\n"
+            "\n"
+            "class OptionPricer:\n"
+            "    def european_call(self, S, K, r, sigma, T):\n"
+            "        raise NotImplementedError(\"Implement european_call\")\n"
+            "\n"
+            "    def european_put(self, S, K, r, sigma, T):\n"
+            "        raise NotImplementedError(\"Implement european_put\")\n"
+            "\n"
+            "    def american_put(self, S, K, r, sigma, T, N=200):\n"
+            "        raise NotImplementedError(\"Implement american_put\")\n"
+        ),
+        reference_solution=(
+            "import math\n"
+            "from scipy.stats import norm\n"
+            "\n"
+            "\n"
+            "class OptionPricer:\n"
+            "    def european_call(self, S, K, r, sigma, T):\n"
+            "        d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "        d2 = d1 - sigma*math.sqrt(T)\n"
+            "        return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)\n"
+            "\n"
+            "    def european_put(self, S, K, r, sigma, T):\n"
+            "        d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "        d2 = d1 - sigma*math.sqrt(T)\n"
+            "        return K*math.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)\n"
+            "\n"
+            "    def american_put(self, S, K, r, sigma, T, N=200):\n"
+            "        dt = T / N\n"
+            "        u = math.exp(sigma * math.sqrt(dt))\n"
+            "        d = 1 / u\n"
+            "        q = (math.exp(r * dt) - d) / (u - d)\n"
+            "        values = [\n"
+            "            max(K - S * (u ** (N - i)) * (d ** i), 0)\n"
+            "            for i in range(N + 1)\n"
+            "        ]\n"
+            "        for step in range(N - 1, -1, -1):\n"
+            "            new_vals = []\n"
+            "            for i in range(step + 1):\n"
+            "                hold = math.exp(-r * dt) * (q * values[i] + (1 - q) * values[i + 1])\n"
+            "                spot = S * (u ** (step - i)) * (d ** i)\n"
+            "                exercise = max(K - spot, 0)\n"
+            "                new_vals.append(max(hold, exercise))\n"
+            "            values = new_vals\n"
+            "        return float(values[0])\n"
+        ),
+        tests_py=(
+            "\"\"\"OptionPricer: behavioural checks; multiple internal designs may pass.\"\"\"\n"
+            "import inspect\n"
+            "import pytest\n"
+            "\n"
+            "from solution import OptionPricer\n"
+            "\n"
+            "\n"
+            "def test_class_exists():\n"
+            "    assert inspect.isclass(OptionPricer)\n"
+            "\n"
+            "\n"
+            "def test_european_call_matches_hull_canonical():\n"
+            "    p = OptionPricer()\n"
+            "    assert abs(p.european_call(100, 100, 0.05, 0.20, 1.0) - 10.4506) < 1e-3\n"
+            "\n"
+            "\n"
+            "def test_european_put_matches_hull_canonical():\n"
+            "    p = OptionPricer()\n"
+            "    # Hull example: put ≈ 5.5735 via parity from call ≈ 10.4506.\n"
+            "    assert abs(p.european_put(100, 100, 0.05, 0.20, 1.0) - 5.5735) < 1e-3\n"
+            "\n"
+            "\n"
+            "def test_american_put_close_to_european_at_money():\n"
+            "    p = OptionPricer()\n"
+            "    eu = p.european_put(100, 100, 0.05, 0.20, 1.0)\n"
+            "    am = p.american_put(100, 100, 0.05, 0.20, 1.0, N=400)\n"
+            "    # Hull ATM early-exercise premium is ~0.5; allow up to 1.0\n"
+            "    # for small N or alternative discretisations.\n"
+            "    assert 0 <= (am - eu) < 1.0\n"
+            "\n"
+            "\n"
+            "def test_american_put_dominates_european_on_ditm():\n"
+            "    p = OptionPricer()\n"
+            "    # Deep ITM put: early exercise is valuable, American premium is real.\n"
+            "    eu = p.european_put(60, 100, 0.05, 0.20, 1.0)\n"
+            "    am = p.american_put(60, 100, 0.05, 0.20, 1.0, N=400)\n"
+            "    assert am >= eu\n"
+            "    # Hull canonical: at S=60 K=100 the American put exceeds the European\n"
+            "    # by a clear margin (early exercise valuable).\n"
+            "    assert am - eu > 0.5\n"
+            "\n"
+            "\n"
+            "def test_european_call_monotone_in_spot():\n"
+            "    p = OptionPricer()\n"
+            "    a = p.european_call(95, 100, 0.05, 0.20, 1.0)\n"
+            "    b = p.european_call(100, 100, 0.05, 0.20, 1.0)\n"
+            "    c = p.european_call(110, 100, 0.05, 0.20, 1.0)\n"
+            "    assert a < b < c\n"
+            "\n"
+            "\n"
+            "def test_european_put_monotone_in_strike():\n"
+            "    p = OptionPricer()\n"
+            "    a = p.european_put(100, 90, 0.05, 0.20, 1.0)\n"
+            "    b = p.european_put(100, 100, 0.05, 0.20, 1.0)\n"
+            "    c = p.european_put(100, 110, 0.05, 0.20, 1.0)\n"
+            "    assert a < b < c\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_class_exists",
+                "OptionPricer is a class (any internal design is fine).",
+            ),
+            (
+                "tests/test_solution.py::test_european_call_matches_hull_canonical",
+                "ATM european_call matches Hull canonical 10.4506 within 1e-3.",
+            ),
+            (
+                "tests/test_solution.py::test_european_put_matches_hull_canonical",
+                "ATM european_put matches Hull canonical 5.5735 within 1e-3.",
+            ),
+            (
+                "tests/test_solution.py::test_american_put_close_to_european_at_money",
+                "ATM american_put exceeds european_put by < 0.5 (small early-exercise premium).",
+            ),
+            (
+                "tests/test_solution.py::test_american_put_dominates_european_on_ditm",
+                "Deep-ITM american_put exceeds european_put by > 0.5 (early-exercise valuable).",
+            ),
+            (
+                "tests/test_solution.py::test_european_call_monotone_in_spot",
+                "european_call is monotonically increasing in spot.",
+            ),
+            (
+                "tests/test_solution.py::test_european_put_monotone_in_strike",
+                "european_put is monotonically increasing in strike.",
+            ),
+        ],
+        your_turn="Design and implement OptionPricer. The tests check behaviour at canonical points and a few monotonicity invariants — multiple valid designs pass. Reuse the bs_call body from lesson 28 and the binomial backward-induction from lesson 30 if you want.",
+        hint="Three method bodies. European call/put → closed-form Black-Scholes. American put → N-step CRR with `max(hold, exercise)` at each step. ~25 lines total.",
+        why_this="Designing an interface (then implementing it) is the engineering muscle that lets you swap closed-form for tree for MC without touching strategy code. Real options libraries (QuantLib, py_vollib) do exactly this with a `Pricer` abstraction.",
+        skills=["quant", "options", "black-scholes"],
+    ),
+    Lesson(
         n=29, stage=3, mode="debug",
         title="Greeks: delta of a call",
         scenario="The vol-trading desk runs `compute_delta` against every open option position thousands of times a second to keep the book delta-neutral. The junior ships an implementation, the smoke test passes (ATM call delta in the right ballpark), but the senior risk auditor reviewing the PR notices the d1 formula uses `(r − σ²/2)` instead of `(r + σ²/2)`. Subtle, but it gives systematically wrong deltas — and the desk's hedges drift. Find and fix the sign.",
@@ -3007,6 +3175,185 @@ LESSONS: list[Lesson] = [
         hint="`r.std() * np.sqrt(252)`.",
         why_this="These are the two numbers fund-of-funds ask about before they read the IC ticket. Get the annualisation wrong and your IR-2 looks like an IR-30 — which gets you laughed out of the meeting, not funded.",
         skills=["quant", "pandas", "risk-metrics"],
+    ),
+    Lesson(
+        n=59, stage=3, mode="skeleton",
+        n_label="33a",
+        order_index_override=3310,
+        title="Design a Portfolio class",
+        scenario="You've implemented sharpe(), max_drawdown(), and value-at-date as separate functions across a few lessons. Real strategy code packages them into one object — a `Portfolio` you construct once with weights + returns, then query for any metric. This lesson asks you to design that object. The interior is yours; the contract is below.",
+        learner_goal="Design and implement a `Portfolio` class that takes weights and a returns DataFrame, and exposes sharpe(), max_drawdown(), and value_at_date(date).",
+        concept="Same engineering muscle as the pricer lesson: pick names, return types, and method bodies that meet a behavioural spec. The implementation can pre-compute the portfolio return series once and cache it, or recompute on each call — either passes. The lesson is: 'API first, then implementation'. Real desk libraries (zipline, vectorbt, qstrader) all expose some flavour of this object.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Portfolio analytics class — you design the implementation.\n"
+            "\n"
+            "Specification:\n"
+            "    Create a class `Portfolio` with this behaviour:\n"
+            "\n"
+            "    Constructor: Portfolio(weights, returns)\n"
+            "      - weights: dict mapping asset name (str) → weight (float).\n"
+            "                 Weights sum to 1.0 (no leverage; long-only or short).\n"
+            "      - returns: pd.DataFrame indexed by date, columns are asset\n"
+            "                 names matching the weights keys.\n"
+            "\n"
+            "    Methods:\n"
+            "      - sharpe() -> float\n"
+            "          Annualised Sharpe of the portfolio return series.\n"
+            "          252 trading days/year. (mean*252) / (std*sqrt(252)).\n"
+            "      - max_drawdown() -> float\n"
+            "          Worst peak-to-trough loss as a NEGATIVE fraction.\n"
+            "      - value_at_date(date) -> float\n"
+            "          Portfolio NAV (starting at 1.0) compounded through `date`.\n"
+            "\n"
+            "Multiple valid designs pass — the tests check behaviour, not internals.\n"
+            "\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "\n"
+            "\n"
+            "class Portfolio:\n"
+            "    def __init__(self, weights: dict, returns: pd.DataFrame):\n"
+            "        raise NotImplementedError(\"Design and implement Portfolio\")\n"
+            "\n"
+            "    def sharpe(self) -> float:\n"
+            "        raise NotImplementedError(\"Implement sharpe\")\n"
+            "\n"
+            "    def max_drawdown(self) -> float:\n"
+            "        raise NotImplementedError(\"Implement max_drawdown\")\n"
+            "\n"
+            "    def value_at_date(self, date) -> float:\n"
+            "        raise NotImplementedError(\"Implement value_at_date\")\n"
+        ),
+        reference_solution=(
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "\n"
+            "\n"
+            "class Portfolio:\n"
+            "    def __init__(self, weights: dict, returns: pd.DataFrame):\n"
+            "        self.weights = pd.Series(weights)\n"
+            "        self.returns = returns\n"
+            "        self._port_rets = (returns * self.weights).sum(axis=1)\n"
+            "\n"
+            "    def sharpe(self) -> float:\n"
+            "        r = self._port_rets\n"
+            "        if r.std() == 0:\n"
+            "            return 0.0\n"
+            "        return float((r.mean() * 252) / (r.std() * np.sqrt(252)))\n"
+            "\n"
+            "    def max_drawdown(self) -> float:\n"
+            "        eq = (1 + self._port_rets).cumprod()\n"
+            "        return float((eq / eq.cummax() - 1).min())\n"
+            "\n"
+            "    def value_at_date(self, date) -> float:\n"
+            "        eq = (1 + self._port_rets).cumprod()\n"
+            "        return float(eq.loc[date])\n"
+        ),
+        tests_py=(
+            "\"\"\"Portfolio: behavioural checks; many valid internal designs.\"\"\"\n"
+            "import inspect\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import Portfolio\n"
+            "\n"
+            "\n"
+            "def _toy_returns():\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    dates = pd.date_range('2024-01-01', periods=200, freq='D')\n"
+            "    spy = rng.normal(0.0005, 0.012, 200)\n"
+            "    aapl = rng.normal(0.0008, 0.015, 200)\n"
+            "    return pd.DataFrame({'SPY': spy, 'AAPL': aapl}, index=dates)\n"
+            "\n"
+            "\n"
+            "def test_class_exists():\n"
+            "    assert inspect.isclass(Portfolio)\n"
+            "\n"
+            "\n"
+            "def test_sharpe_returns_finite_float():\n"
+            "    p = Portfolio({'SPY': 0.6, 'AAPL': 0.4}, _toy_returns())\n"
+            "    s = p.sharpe()\n"
+            "    assert isinstance(s, float) and np.isfinite(s)\n"
+            "\n"
+            "\n"
+            "def test_sharpe_matches_hand_calc():\n"
+            "    df = _toy_returns()\n"
+            "    weights = {'SPY': 0.6, 'AAPL': 0.4}\n"
+            "    p = Portfolio(weights, df)\n"
+            "    port_rets = 0.6 * df['SPY'] + 0.4 * df['AAPL']\n"
+            "    expected = (port_rets.mean() * 252) / (port_rets.std() * np.sqrt(252))\n"
+            "    assert abs(p.sharpe() - expected) < 1e-6\n"
+            "\n"
+            "\n"
+            "def test_max_drawdown_is_nonpositive_float():\n"
+            "    p = Portfolio({'SPY': 1.0, 'AAPL': 0.0}, _toy_returns())\n"
+            "    dd = p.max_drawdown()\n"
+            "    assert isinstance(dd, float)\n"
+            "    assert dd <= 0.0\n"
+            "\n"
+            "\n"
+            "def test_max_drawdown_zero_on_monotone_up_series():\n"
+            "    dates = pd.date_range('2024-01-01', periods=50, freq='D')\n"
+            "    df = pd.DataFrame(\n"
+            "        {'SPY': [0.01]*50, 'AAPL': [0.02]*50},\n"
+            "        index=dates,\n"
+            "    )\n"
+            "    p = Portfolio({'SPY': 0.5, 'AAPL': 0.5}, df)\n"
+            "    assert abs(p.max_drawdown()) < 1e-9\n"
+            "\n"
+            "\n"
+            "def test_value_at_first_date():\n"
+            "    df = _toy_returns()\n"
+            "    p = Portfolio({'SPY': 0.5, 'AAPL': 0.5}, df)\n"
+            "    v0 = p.value_at_date(df.index[0])\n"
+            "    expected = 1.0 + 0.5 * df.iloc[0]['SPY'] + 0.5 * df.iloc[0]['AAPL']\n"
+            "    assert abs(v0 - expected) < 1e-9\n"
+            "\n"
+            "\n"
+            "def test_value_at_last_date_compounds():\n"
+            "    df = _toy_returns()\n"
+            "    p = Portfolio({'SPY': 0.5, 'AAPL': 0.5}, df)\n"
+            "    v = p.value_at_date(df.index[-1])\n"
+            "    port_rets = 0.5 * df['SPY'] + 0.5 * df['AAPL']\n"
+            "    expected = float((1 + port_rets).prod())\n"
+            "    assert abs(v - expected) < 1e-9\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_class_exists",
+                "Portfolio is a class (internal design is your choice).",
+            ),
+            (
+                "tests/test_solution.py::test_sharpe_returns_finite_float",
+                "sharpe() returns a finite float on a typical 200-day series.",
+            ),
+            (
+                "tests/test_solution.py::test_sharpe_matches_hand_calc",
+                "sharpe() matches the analytical formula on a controlled portfolio.",
+            ),
+            (
+                "tests/test_solution.py::test_max_drawdown_is_nonpositive_float",
+                "max_drawdown() returns a float <= 0 (loss as a negative fraction).",
+            ),
+            (
+                "tests/test_solution.py::test_max_drawdown_zero_on_monotone_up_series",
+                "Monotone-up returns produce zero drawdown.",
+            ),
+            (
+                "tests/test_solution.py::test_value_at_first_date",
+                "value_at_date on day 0 equals 1 + first day's portfolio return.",
+            ),
+            (
+                "tests/test_solution.py::test_value_at_last_date_compounds",
+                "value_at_date on the last day equals the compounded NAV from day 0.",
+            ),
+        ],
+        your_turn="Design and implement Portfolio. The constructor receives weights + returns; the three methods are sharpe, max_drawdown, value_at_date. Tests check behaviour at canonical points — many valid internal designs pass. Reuse the formulas from lesson 33.",
+        hint="Compute the portfolio return series in the constructor (`(returns * weights).sum(axis=1)`); all three methods reduce to one-liners on that series.",
+        why_this="The first thing real strategy code does after a backtest is package the result into one object the rest of the pipeline can query. Designing it well saves rewriting the same five method calls across every notebook.",
+        skills=["quant", "pandas", "risk-metrics", "portfolio"],
     ),
 
     # ============ Stage 4 — Machine Learning for Finance (6 lessons) ============

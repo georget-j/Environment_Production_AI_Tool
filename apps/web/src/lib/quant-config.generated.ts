@@ -615,6 +615,49 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "tests/test_solution.py": "\"\"\"hedge_pnl: daily-rebalance delta hedge of a short European call.\n\nTests check the residual P&L is small on deterministic GBM paths\n(seed-controlled). A correct hedge leaves ~1% of premium as gamma\nslippage; the threshold here is loose to account for the fixed seed.\n\"\"\"\nimport math\nimport numpy as np\nimport pytest\n\nfrom solution import bs_call, hedge_pnl\n\n\ndef _gbm_path(seed: int, S0=100.0, mu=0.05, sigma=0.20, T=0.25, n=63):\n    \"\"\"Daily GBM path under the real-world measure (mu drift).\n    n = 63 steps ~ one quarter at daily granularity.\"\"\"\n    rng = np.random.default_rng(seed)\n    dt = T / n\n    Z = rng.standard_normal(n)\n    log_steps = (mu - sigma**2/2)*dt + sigma*math.sqrt(dt)*Z\n    path = np.empty(n + 1)\n    path[0] = S0\n    path[1:] = S0 * np.exp(np.cumsum(log_steps))\n    return path\n\n\ndef test_pnl_is_finite():\n    path = _gbm_path(seed=0)\n    pnl = hedge_pnl(list(path), K=100.0, r=0.05, sigma=0.20, T=0.25)\n    assert math.isfinite(pnl)\n\n\ndef test_pnl_magnitude_under_one_percent_premium():\n    # Premium of a 3-month ATM call with \u03c3=20%, r=5% is \u2248 4.6.\n    # Daily rebalance should leave residual << premium.\n    premium = bs_call(100.0, 100.0, 0.05, 0.20, 0.25)\n    pnls = [\n        hedge_pnl(list(_gbm_path(seed)), 100.0, 0.05, 0.20, 0.25)\n        for seed in range(20)\n    ]\n    # Loose 30% threshold: gamma slippage on individual paths is bounded\n    # but not zero. Tightens with more steps.\n    assert max(abs(p) for p in pnls) < 0.30 * premium\n\n\ndef test_unhedged_short_call_loses_when_itm():\n    # Sanity: if the function ignored hedging and just shorted the call,\n    # the P&L on a path where S_T >> K would be very negative.\n    # Conversely, a working hedge keeps the loss bounded.\n    path = list(_gbm_path(seed=42))\n    pnl = hedge_pnl(path, K=100.0, r=0.05, sigma=0.20, T=0.25)\n    # On any path, a properly hedged short call's loss is bounded by\n    # a few times the premium even if S_T finishes deep ITM.\n    assert pnl > -5.0\n\n\ndef test_zero_volatility_path_makes_theta():\n    # On a constant-spot path the realised vol is zero but the\n    # option was priced at \u03c3=20%. The short-call seller pockets\n    # theta (time-decay) and pays nothing back to gamma. P&L is\n    # positive, bounded by a couple of premiums.\n    n = 63\n    path = [100.0] * (n + 1)\n    pnl = hedge_pnl(path, K=100.0, r=0.05, sigma=0.20, T=0.25)\n    premium = bs_call(100.0, 100.0, 0.05, 0.20, 0.25)\n    assert 0 < pnl < 2 * premium\n"
   }
 },
+  "quant-28d-design-a-pricer-api": {
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_class_exists",
+      "description": "OptionPricer is a class (any internal design is fine)."
+    },
+    {
+      "id": "tests/test_solution.py::test_european_call_matches_hull_canonical",
+      "description": "ATM european_call matches Hull canonical 10.4506 within 1e-3."
+    },
+    {
+      "id": "tests/test_solution.py::test_european_put_matches_hull_canonical",
+      "description": "ATM european_put matches Hull canonical 5.5735 within 1e-3."
+    },
+    {
+      "id": "tests/test_solution.py::test_american_put_close_to_european_at_money",
+      "description": "ATM american_put exceeds european_put by < 0.5 (small early-exercise premium)."
+    },
+    {
+      "id": "tests/test_solution.py::test_american_put_dominates_european_on_ditm",
+      "description": "Deep-ITM american_put exceeds european_put by > 0.5 (early-exercise valuable)."
+    },
+    {
+      "id": "tests/test_solution.py::test_european_call_monotone_in_spot",
+      "description": "european_call is monotonically increasing in spot."
+    },
+    {
+      "id": "tests/test_solution.py::test_european_put_monotone_in_strike",
+      "description": "european_put is monotonically increasing in strike."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Option pricer interface \u2014 you design the implementation.\n\nSpecification:\n    Create a class `OptionPricer` that prices three options with the\n    same calling convention. The methods, helpers, and internal\n    structure are yours to design \u2014 the tests check behaviour, not\n    signatures. The required calls are:\n\n        OptionPricer().european_call(S, K, r, sigma, T) -> float\n        OptionPricer().european_put(S, K, r, sigma, T) -> float\n        OptionPricer().american_put(S, K, r, sigma, T, N=200) -> float\n\n    European call/put: closed-form Black-Scholes within 1e-3 of the\n    Hull canonical (S=K=100, r=0.05, \u03c3=0.20, T=1y) \u2192 call \u2248 10.4506,\n    put \u2248 5.5735.\n    American put: N-step CRR binomial with early-exercise check.\n    Must be \u2265 the European put on every input.\n\"\"\"\n\n\nclass OptionPricer:\n    def european_call(self, S, K, r, sigma, T):\n        raise NotImplementedError(\"Implement european_call\")\n\n    def european_put(self, S, K, r, sigma, T):\n        raise NotImplementedError(\"Implement european_put\")\n\n    def american_put(self, S, K, r, sigma, T, N=200):\n        raise NotImplementedError(\"Implement american_put\")\n",
+    "tests/test_solution.py": "\"\"\"OptionPricer: behavioural checks; multiple internal designs may pass.\"\"\"\nimport inspect\nimport pytest\n\nfrom solution import OptionPricer\n\n\ndef test_class_exists():\n    assert inspect.isclass(OptionPricer)\n\n\ndef test_european_call_matches_hull_canonical():\n    p = OptionPricer()\n    assert abs(p.european_call(100, 100, 0.05, 0.20, 1.0) - 10.4506) < 1e-3\n\n\ndef test_european_put_matches_hull_canonical():\n    p = OptionPricer()\n    # Hull example: put \u2248 5.5735 via parity from call \u2248 10.4506.\n    assert abs(p.european_put(100, 100, 0.05, 0.20, 1.0) - 5.5735) < 1e-3\n\n\ndef test_american_put_close_to_european_at_money():\n    p = OptionPricer()\n    eu = p.european_put(100, 100, 0.05, 0.20, 1.0)\n    am = p.american_put(100, 100, 0.05, 0.20, 1.0, N=400)\n    # Hull ATM early-exercise premium is ~0.5; allow up to 1.0\n    # for small N or alternative discretisations.\n    assert 0 <= (am - eu) < 1.0\n\n\ndef test_american_put_dominates_european_on_ditm():\n    p = OptionPricer()\n    # Deep ITM put: early exercise is valuable, American premium is real.\n    eu = p.european_put(60, 100, 0.05, 0.20, 1.0)\n    am = p.american_put(60, 100, 0.05, 0.20, 1.0, N=400)\n    assert am >= eu\n    # Hull canonical: at S=60 K=100 the American put exceeds the European\n    # by a clear margin (early exercise valuable).\n    assert am - eu > 0.5\n\n\ndef test_european_call_monotone_in_spot():\n    p = OptionPricer()\n    a = p.european_call(95, 100, 0.05, 0.20, 1.0)\n    b = p.european_call(100, 100, 0.05, 0.20, 1.0)\n    c = p.european_call(110, 100, 0.05, 0.20, 1.0)\n    assert a < b < c\n\n\ndef test_european_put_monotone_in_strike():\n    p = OptionPricer()\n    a = p.european_put(100, 90, 0.05, 0.20, 1.0)\n    b = p.european_put(100, 100, 0.05, 0.20, 1.0)\n    c = p.european_put(100, 110, 0.05, 0.20, 1.0)\n    assert a < b < c\n"
+  }
+},
   "quant-29-greeks-delta-of-a-call": {
   "mode": "pyodide",
   "editable": [
@@ -723,6 +766,49 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "inline": {
     "solution.py": "\"\"\"Annualised Sharpe ratio and max drawdown for daily returns.\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef risk_metrics(r: pd.Series) -> dict:\n    \"\"\"Return {sharpe, max_drawdown} for a daily-return series.\n\n    - sharpe       : annualised Sharpe = (mean*252) / (std*sqrt(252))\n    - max_drawdown : worst peak-to-trough loss as a negative fraction\n    \"\"\"\n    sharpe = (r.mean() * 252) / r.std()\n    eq = (1 + r).cumprod()\n    dd = (eq / eq.cummax() - 1).min()\n    return {\"sharpe\": float(sharpe), \"max_drawdown\": float(dd)}\n",
     "tests/test_solution.py": "\"\"\"risk_metrics: Sharpe annualisation + drawdown direction.\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import risk_metrics\n\n\ndef test_sharpe_on_known_series():\n    # Constructed: mean = 0.001 daily, std = 0.012 daily.\n    # Expected annualised Sharpe = 0.001*252 / (0.012*sqrt(252))\n    #                            = 0.252 / 0.1904... \u2248 1.323.\n    rng = np.random.default_rng(0)\n    raw = rng.normal(0.001, 0.012, 10_000)\n    raw -= raw.mean() - 0.001\n    raw *= 0.012 / raw.std()\n    s = pd.Series(raw)\n    m = risk_metrics(s)\n    expected = (s.mean() * 252) / (s.std() * np.sqrt(252))\n    assert abs(m[\"sharpe\"] - expected) < 1e-9\n\n\ndef test_sharpe_doesnt_blow_up_by_factor_of_sqrt_252():\n    # With the bug present, Sharpe is \u221a252 (~15.87) too large.\n    # Reasonable strategies have Sharpe well under 5.\n    rng = np.random.default_rng(1)\n    s = pd.Series(rng.normal(0.0005, 0.012, 5000))\n    m = risk_metrics(s)\n    assert abs(m[\"sharpe\"]) < 5\n\n\ndef test_max_drawdown_is_negative_on_lossy_series():\n    # 30%-drop pattern \u2192 drawdown \u2248 -0.3.\n    s = pd.Series([0.0, -0.10, -0.10, -0.15])\n    m = risk_metrics(s)\n    assert m[\"max_drawdown\"] < -0.25\n\n\ndef test_max_drawdown_zero_on_monotone_up():\n    s = pd.Series([0.01] * 100)\n    m = risk_metrics(s)\n    assert abs(m[\"max_drawdown\"]) < 1e-9\n"
+  }
+},
+  "quant-33a-design-a-portfolio-class": {
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_class_exists",
+      "description": "Portfolio is a class (internal design is your choice)."
+    },
+    {
+      "id": "tests/test_solution.py::test_sharpe_returns_finite_float",
+      "description": "sharpe() returns a finite float on a typical 200-day series."
+    },
+    {
+      "id": "tests/test_solution.py::test_sharpe_matches_hand_calc",
+      "description": "sharpe() matches the analytical formula on a controlled portfolio."
+    },
+    {
+      "id": "tests/test_solution.py::test_max_drawdown_is_nonpositive_float",
+      "description": "max_drawdown() returns a float <= 0 (loss as a negative fraction)."
+    },
+    {
+      "id": "tests/test_solution.py::test_max_drawdown_zero_on_monotone_up_series",
+      "description": "Monotone-up returns produce zero drawdown."
+    },
+    {
+      "id": "tests/test_solution.py::test_value_at_first_date",
+      "description": "value_at_date on day 0 equals 1 + first day's portfolio return."
+    },
+    {
+      "id": "tests/test_solution.py::test_value_at_last_date_compounds",
+      "description": "value_at_date on the last day equals the compounded NAV from day 0."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Portfolio analytics class \u2014 you design the implementation.\n\nSpecification:\n    Create a class `Portfolio` with this behaviour:\n\n    Constructor: Portfolio(weights, returns)\n      - weights: dict mapping asset name (str) \u2192 weight (float).\n                 Weights sum to 1.0 (no leverage; long-only or short).\n      - returns: pd.DataFrame indexed by date, columns are asset\n                 names matching the weights keys.\n\n    Methods:\n      - sharpe() -> float\n          Annualised Sharpe of the portfolio return series.\n          252 trading days/year. (mean*252) / (std*sqrt(252)).\n      - max_drawdown() -> float\n          Worst peak-to-trough loss as a NEGATIVE fraction.\n      - value_at_date(date) -> float\n          Portfolio NAV (starting at 1.0) compounded through `date`.\n\nMultiple valid designs pass \u2014 the tests check behaviour, not internals.\n\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\nclass Portfolio:\n    def __init__(self, weights: dict, returns: pd.DataFrame):\n        raise NotImplementedError(\"Design and implement Portfolio\")\n\n    def sharpe(self) -> float:\n        raise NotImplementedError(\"Implement sharpe\")\n\n    def max_drawdown(self) -> float:\n        raise NotImplementedError(\"Implement max_drawdown\")\n\n    def value_at_date(self, date) -> float:\n        raise NotImplementedError(\"Implement value_at_date\")\n",
+    "tests/test_solution.py": "\"\"\"Portfolio: behavioural checks; many valid internal designs.\"\"\"\nimport inspect\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import Portfolio\n\n\ndef _toy_returns():\n    rng = np.random.default_rng(0)\n    dates = pd.date_range('2024-01-01', periods=200, freq='D')\n    spy = rng.normal(0.0005, 0.012, 200)\n    aapl = rng.normal(0.0008, 0.015, 200)\n    return pd.DataFrame({'SPY': spy, 'AAPL': aapl}, index=dates)\n\n\ndef test_class_exists():\n    assert inspect.isclass(Portfolio)\n\n\ndef test_sharpe_returns_finite_float():\n    p = Portfolio({'SPY': 0.6, 'AAPL': 0.4}, _toy_returns())\n    s = p.sharpe()\n    assert isinstance(s, float) and np.isfinite(s)\n\n\ndef test_sharpe_matches_hand_calc():\n    df = _toy_returns()\n    weights = {'SPY': 0.6, 'AAPL': 0.4}\n    p = Portfolio(weights, df)\n    port_rets = 0.6 * df['SPY'] + 0.4 * df['AAPL']\n    expected = (port_rets.mean() * 252) / (port_rets.std() * np.sqrt(252))\n    assert abs(p.sharpe() - expected) < 1e-6\n\n\ndef test_max_drawdown_is_nonpositive_float():\n    p = Portfolio({'SPY': 1.0, 'AAPL': 0.0}, _toy_returns())\n    dd = p.max_drawdown()\n    assert isinstance(dd, float)\n    assert dd <= 0.0\n\n\ndef test_max_drawdown_zero_on_monotone_up_series():\n    dates = pd.date_range('2024-01-01', periods=50, freq='D')\n    df = pd.DataFrame(\n        {'SPY': [0.01]*50, 'AAPL': [0.02]*50},\n        index=dates,\n    )\n    p = Portfolio({'SPY': 0.5, 'AAPL': 0.5}, df)\n    assert abs(p.max_drawdown()) < 1e-9\n\n\ndef test_value_at_first_date():\n    df = _toy_returns()\n    p = Portfolio({'SPY': 0.5, 'AAPL': 0.5}, df)\n    v0 = p.value_at_date(df.index[0])\n    expected = 1.0 + 0.5 * df.iloc[0]['SPY'] + 0.5 * df.iloc[0]['AAPL']\n    assert abs(v0 - expected) < 1e-9\n\n\ndef test_value_at_last_date_compounds():\n    df = _toy_returns()\n    p = Portfolio({'SPY': 0.5, 'AAPL': 0.5}, df)\n    v = p.value_at_date(df.index[-1])\n    port_rets = 0.5 * df['SPY'] + 0.5 * df['AAPL']\n    expected = float((1 + port_rets).prod())\n    assert abs(v - expected) < 1e-9\n"
   }
 },
   "quant-34-sklearn-fit-and-predict": {

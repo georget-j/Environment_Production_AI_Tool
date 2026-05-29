@@ -1131,6 +1131,40 @@ insert into public.challenges (
   repo_template_url, repo_branch, validation_config_json, ai_rules_json,
   skills, is_free, order_index
 ) values (
+  '00000000-0000-0000-0000-000000000339',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-28d-design-a-pricer-api',
+  E'Design a pricer API',
+  E'So far each pricer (BS call, BS put, binomial American put) has been its own function. In a real options system you want one *interface* the strategy code talks to — call it with three arguments, get a price back, no matter what''s behind it (closed-form, tree, MC). This lesson asks you to design that interface and implement it. The signatures are yours to pick.',
+  E'Design and implement an `OptionPricer` class exposing european_call, european_put, and american_put with the same calling convention; pass tests that check Hull-canonical prices and the American >= European put inequality.',
+  E'**Concept.** Designing an API is half the engineering work — once you''ve picked argument order, return shape, and method names, the *implementation* is largely mechanical. The tests below specify the *behaviour* (canonical price within tolerance; American put >= European put) but not the internal structure: you can split helpers however you want, use closed-form vs trees, even take parameters via dataclass vs scalars. Multiple correct designs will pass.\n\n**Implement the function.** Design and implement OptionPricer. The tests check behaviour at canonical points and a few monotonicity invariants — multiple valid designs pass. Reuse the bs_call body from lesson 28 and the binomial backward-induction from lesson 30 if you want.\n\n**Expected.** All tests pass.\n\n**Why this?** Designing an interface (then implementing it) is the engineering muscle that lets you swap closed-form for tree for MC without touching strategy code. Real options libraries (QuantLib, py_vollib) do exactly this with a `Pricer` abstraction.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'black-scholes'],
+  true,
+  2840
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
   '00000000-0000-0000-0000-00000000031c',
   '00000000-0000-0000-0000-000000000033',
   'quant-29-greeks-delta-of-a-call',
@@ -1281,6 +1315,40 @@ insert into public.challenges (
   array['quant', 'pandas', 'risk-metrics'],
   true,
   3300
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-00000000033a',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-33a-design-a-portfolio-class',
+  E'Design a Portfolio class',
+  E'You''ve implemented sharpe(), max_drawdown(), and value-at-date as separate functions across a few lessons. Real strategy code packages them into one object — a `Portfolio` you construct once with weights + returns, then query for any metric. This lesson asks you to design that object. The interior is yours; the contract is below.',
+  E'Design and implement a `Portfolio` class that takes weights and a returns DataFrame, and exposes sharpe(), max_drawdown(), and value_at_date(date).',
+  E'**Concept.** Same engineering muscle as the pricer lesson: pick names, return types, and method bodies that meet a behavioural spec. The implementation can pre-compute the portfolio return series once and cache it, or recompute on each call — either passes. The lesson is: ''API first, then implementation''. Real desk libraries (zipline, vectorbt, qstrader) all expose some flavour of this object.\n\n**Implement the function.** Design and implement Portfolio. The constructor receives weights + returns; the three methods are sharpe, max_drawdown, value_at_date. Tests check behaviour at canonical points — many valid internal designs pass. Reuse the formulas from lesson 33.\n\n**Expected.** All tests pass.\n\n**Why this?** The first thing real strategy code does after a backtest is package the result into one object the rest of the pipeline can query. Designing it well saves rewriting the same five method calls across every notebook.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'risk-metrics', 'portfolio'],
+  true,
+  3310
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
