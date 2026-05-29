@@ -24,6 +24,7 @@ import {
   recordTryAttempt,
 } from "@/lib/concepts";
 import { Button } from "@/components/ui/button";
+import { ConceptPlay } from "@/components/concept-play";
 import { createClient } from "@/lib/supabase/client";
 
 type Stage = "try" | "read" | "play" | "check" | "apply" | "reflect";
@@ -101,7 +102,7 @@ export function ConceptUnit({ concept }: { concept: ConceptDetail }) {
           />
         )}
         {stage === "play" && (
-          <PlayStagePlaceholder
+          <PlayStage
             concept={concept}
             progress={progress}
             onProgressChange={setProgress}
@@ -320,44 +321,21 @@ function ReadStage({
   );
 }
 
-function PlayStagePlaceholder({
-  onProgressChange,
-  concept,
-  onAdvance,
-}: StageProps) {
-  // CC.2 ships the widget framework. For CC.1 the Play stage is a
-  // placeholder that completes immediately on click — enough to wire
-  // the mastery roll-forward without blocking later phases.
-  const [busy, setBusy] = useState(false);
-
-  async function advance() {
-    setBusy(true);
-    try {
-      const token = await getAccessToken();
-      if (!token) return;
-      const res = await markStageComplete(token, concept.slug, "play");
-      onProgressChange(res.progress);
-      onAdvance();
-    } finally {
-      setBusy(false);
-    }
-  }
-
+function PlayStage({ concept, onProgressChange, onAdvance }: StageProps) {
+  // The widget host dispatches on the concept's play_widget_kind. The
+  // mastery roll-forward fires when the host calls onComplete.
   return (
-    <div className="flex flex-col gap-4 text-sm">
-      <p className="font-semibold">
-        Play stage — interactive widget ({concept.play_widget_kind}).
-      </p>
-      <p className="text-muted-foreground">
-        The widget framework ships in Phase CC.2. For now, this stage is a
-        placeholder so the unit shell can be exercised end-to-end.
-      </p>
-      <div className="flex justify-end">
-        <Button onClick={advance} disabled={busy}>
-          {busy ? "…" : "Mark Play complete → Check"}
-        </Button>
-      </div>
-    </div>
+    <ConceptPlay
+      widgetKind={concept.play_widget_kind}
+      widgetConfig={concept.play_widget_json}
+      onComplete={async () => {
+        const token = await getAccessToken();
+        if (!token) return;
+        const res = await markStageComplete(token, concept.slug, "play");
+        onProgressChange(res.progress);
+        onAdvance();
+      }}
+    />
   );
 }
 
