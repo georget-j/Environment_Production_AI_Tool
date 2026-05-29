@@ -25,6 +25,7 @@ import {
   recordTryAttempt,
 } from "@/lib/concepts";
 import { Button } from "@/components/ui/button";
+import { ConceptMentor } from "@/components/concept-mentor";
 import { ConceptPlay } from "@/components/concept-play";
 import { createClient } from "@/lib/supabase/client";
 
@@ -68,6 +69,9 @@ export function ConceptUnit({ concept }: { concept: ConceptDetail }) {
   const [stage, setStage] = useState<Stage>(() =>
     firstIncompleteStage(concept.progress),
   );
+  // Mobile slide-up sheet visibility for the mentor. On lg+ the panel
+  // sits in the right column and this flag is ignored.
+  const [mentorOpen, setMentorOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-4">
@@ -91,55 +95,97 @@ export function ConceptUnit({ concept }: { concept: ConceptDetail }) {
 
       <ProgressBar stage={stage} progress={progress} onJumpTo={setStage} />
 
-      <main className="min-h-[400px] rounded-lg border border-border bg-background p-5">
-        {stage === "try" && (
-          <TryStage
-            concept={concept}
-            progress={progress}
-            onProgressChange={setProgress}
-            onAdvance={() => setStage("read")}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+        <main className="min-h-[400px] rounded-lg border border-border bg-background p-5">
+          {stage === "try" && (
+            <TryStage
+              concept={concept}
+              progress={progress}
+              onProgressChange={setProgress}
+              onAdvance={() => setStage("read")}
+            />
+          )}
+          {stage === "read" && (
+            <ReadStage
+              concept={concept}
+              progress={progress}
+              onProgressChange={setProgress}
+              onAdvance={() => setStage("play")}
+            />
+          )}
+          {stage === "play" && (
+            <PlayStage
+              concept={concept}
+              progress={progress}
+              onProgressChange={setProgress}
+              onAdvance={() => setStage("check")}
+            />
+          )}
+          {stage === "check" && (
+            <CheckStage
+              concept={concept}
+              progress={progress}
+              onProgressChange={setProgress}
+              onAdvance={() => setStage("apply")}
+            />
+          )}
+          {stage === "apply" && (
+            <ApplyStagePlaceholder
+              concept={concept}
+              progress={progress}
+              onProgressChange={setProgress}
+              onAdvance={() => setStage("reflect")}
+            />
+          )}
+          {stage === "reflect" && (
+            <ReflectStage
+              concept={concept}
+              progress={progress}
+              onProgressChange={setProgress}
+            />
+          )}
+        </main>
+
+        {/* lg+ right-rail mentor */}
+        <div className="hidden lg:block">
+          <ConceptMentor conceptSlug={concept.slug} stage={stage} />
+        </div>
+      </div>
+
+      {/* Mobile / md: floating button + slide-up sheet */}
+      <button
+        type="button"
+        onClick={() => setMentorOpen(true)}
+        className="fixed bottom-4 right-4 z-30 rounded-full bg-foreground px-4 py-3 text-sm font-medium text-background shadow-lg lg:hidden"
+        aria-label="Ask the mentor"
+      >
+        Ask the mentor
+      </button>
+      {mentorOpen && (
+        <div className="fixed inset-0 z-40 flex flex-col lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMentorOpen(false)}
+            className="flex-1 bg-black/40"
+            aria-label="Close mentor"
           />
-        )}
-        {stage === "read" && (
-          <ReadStage
-            concept={concept}
-            progress={progress}
-            onProgressChange={setProgress}
-            onAdvance={() => setStage("play")}
-          />
-        )}
-        {stage === "play" && (
-          <PlayStage
-            concept={concept}
-            progress={progress}
-            onProgressChange={setProgress}
-            onAdvance={() => setStage("check")}
-          />
-        )}
-        {stage === "check" && (
-          <CheckStage
-            concept={concept}
-            progress={progress}
-            onProgressChange={setProgress}
-            onAdvance={() => setStage("apply")}
-          />
-        )}
-        {stage === "apply" && (
-          <ApplyStagePlaceholder
-            concept={concept}
-            progress={progress}
-            onProgressChange={setProgress}
-            onAdvance={() => setStage("reflect")}
-          />
-        )}
-        {stage === "reflect" && (
-          <ReflectStage
-            concept={concept}
-            progress={progress}
-            onProgressChange={setProgress}
-          />
-        )}
-      </main>
+          <div className="max-h-[80vh] overflow-hidden rounded-t-lg border-t border-border bg-background shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <p className="text-sm font-semibold">Mentor</p>
+              <button
+                type="button"
+                onClick={() => setMentorOpen(false)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            <div className="overflow-y-auto p-3">
+              <ConceptMentor conceptSlug={concept.slug} stage={stage} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

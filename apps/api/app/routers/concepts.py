@@ -23,12 +23,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai.mentor import ConceptContext, reflect_grade
+from app.ai.mentor import ConceptContext, reflect_grade, socratic_teach
 from app.auth import AuthUser, get_current_user
 from app.db import get_db
 from app.models import Concept, ConceptMastery, ConceptPrereq
 from app.schemas import (
     ConceptDetail,
+    ConceptMentorRequest,
+    ConceptMentorResponse,
     ConceptStageProgress,
     ConceptSummary,
     ReflectGradeRequest,
@@ -301,4 +303,60 @@ def grade_reflect(
         follow_up=grade.follow_up,
         rubric_hits=grade.rubric_hits,
         progress=_progress_from_row(row),
+    )
+
+
+# ----------------------------------------------------------------------------
+# Mentor — concept-mode Socratic teaching (M1).
+# Used by the concept page's mentor sidebar. NOT the task-flow mentor; that
+# one stays on /api/ai/chat. Returns a single sanitised reply per call.
+# ----------------------------------------------------------------------------
+
+
+@router.post("/{slug}/mentor", response_model=ConceptMentorResponse)
+def concept_mentor(
+    slug: str,
+    body: ConceptMentorRequest,
+    db: Session = Depends(get_db),
+    user: AuthUser = Depends(get_current_user),
+) -> ConceptMentorResponse:
+    concept = _load_concept_or_404(db, slug)
+    row = db.scalar(
+        select(ConceptMastery).where(
+            ConceptMastery.user_id == user.id,
+            ConceptMastery.concept_id == concept.id,
+        )
+    )
+
+    mastered_rows = list(
+        db.execute(
+            select(Concept.slug)
+            .join(ConceptMastery, ConceptMastery.concept_id == Concept.id)
+            .where(
+                ConceptMastery.user_id == user.id,
+                ConceptMastery.mastered_at.is_not(None),
+            )
+        ).all()
+    )
+    mastered_slugs = tuple(r[0] for r in mastered_rows)
+    all_slug_rows = list(db.execute(select(Concept.slug)).all())
+    all_slugs = tuple(r[0] for r in all_slug_rows)
+
+    ctx = ConceptContext(
+        slug=concept.slug,
+        title=concept.title,
+        one_line=concept.one_line,
+        exposition_md=concept.exposition_md,
+        worked_example_md=concept.worked_example_md,
+        try_attempt_text=row.try_attempt_text if row else None,
+        concepts_mastered=mastered_slugs,
+        all_concept_slugs=all_slugs,
+    )
+    history = [
+        {"role": t.role, "content": t.content} for t in body.history if t.content
+    ]
+    reply, meta = socratic_teach(ctx, history, body.message)
+    return ConceptMentorResponse(
+        reply=reply,
+        removed_forward_refs=list(meta.get("removed_forward_refs") or []),
     )

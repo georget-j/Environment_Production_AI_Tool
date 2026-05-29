@@ -206,3 +206,27 @@ class ReflectGradeResponse(_Base):
     rubric_hits: dict = {}
     # When verdict == 'complete', the server also marks reflect_completed_at.
     progress: ConceptStageProgress
+
+
+class ConceptMentorTurn(_Base):
+    """One historical message in the concept-mentor conversation."""
+
+    role: str  # 'user' | 'assistant'
+    content: str
+
+
+class ConceptMentorRequest(_Base):
+    """POST body for the concept-mode mentor (Read/Try teaching)."""
+
+    message: str
+    history: list[ConceptMentorTurn] = []
+    # Optional active stage hint so the mentor knows what the learner is
+    # looking at right now. Server-side this is just additional context.
+    stage: str | None = None
+
+
+class ConceptMentorResponse(_Base):
+    reply: str
+    # Slugs of concepts the mentor mentioned that were stripped by the
+    # forward-reference sanitiser; surfaced for debugging only.
+    removed_forward_refs: list[str] = []

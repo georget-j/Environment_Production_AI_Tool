@@ -133,3 +133,32 @@ export async function gradeReflect(
     explanation,
   });
 }
+
+// ----------------------------------------------------------------------------
+// Mentor (M1) — concept-mode Socratic teaching. Stateless on the server
+// (history is sent with every call). UI keeps the running transcript.
+// ----------------------------------------------------------------------------
+
+export type ConceptMentorTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type ConceptMentorResponse = {
+  reply: string;
+  removed_forward_refs: string[];
+};
+
+export async function askConceptMentor(
+  accessToken: string,
+  slug: string,
+  message: string,
+  history: ConceptMentorTurn[],
+  stage?: string,
+): Promise<ConceptMentorResponse> {
+  return authedPost(accessToken, `/api/concepts/${slug}/mentor`, {
+    message,
+    history,
+    stage: stage ?? null,
+  });
+}
