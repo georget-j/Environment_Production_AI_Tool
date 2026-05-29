@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { SiteNav } from "@/components/site-nav";
 import "./globals.css";
 
@@ -6,6 +6,17 @@ export const metadata: Metadata = {
   title: "ProdReady AI",
   description:
     "AI-powered production coding simulator. The missing bridge between coding tutorials and a first production software engineering job.",
+};
+
+// Explicit viewport so mobile browsers render at device-width (not the
+// desktop-width-then-scale-down default). `maximumScale: 5` keeps pinch-
+// zoom available — never disable it (accessibility). `viewportFit: cover`
+// lets content extend into iOS notch / home-indicator safe areas.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -32,7 +43,9 @@ export default function RootLayout({
         {/* No py-* here — each page owns its own vertical padding so the
          * lesson workspace can claim the full viewport height below the
          * nav. Non-lesson pages add their own py-8 / py-10. */}
-        <main className="mx-auto max-w-6xl px-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-3 sm:px-4 lg:px-6">
+          {children}
+        </main>
       </body>
     </html>
   );

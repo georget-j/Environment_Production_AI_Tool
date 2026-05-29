@@ -861,7 +861,12 @@ export const ChallengeRunner = forwardRef<ChallengeRunnerHandle, Props>(
               ✕
             </button>
           </div>
-          <div className="space-y-3 overflow-y-auto p-3 pb-6 lg:contents lg:overflow-visible">
+          <div
+            className="space-y-3 overflow-y-auto p-3 lg:contents lg:overflow-visible"
+            style={{
+              paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+            }}
+          >
             {runState.kind === "done" && (
               <section
                 ref={resultBannerRef}
