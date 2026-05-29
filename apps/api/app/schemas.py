@@ -157,6 +157,9 @@ class ConceptSummary(_Base):
     title: str
     one_line: str
     order_index: int
+    # M9 — used by the concept map to draw prerequisite edges. List of
+    # prerequisite concept slugs. Empty for foundation concepts.
+    prereqs: list[str] = []
 
 
 class ConceptDetail(ConceptSummary):

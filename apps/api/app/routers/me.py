@@ -226,6 +226,47 @@ def get_my_progress(
     return MeProgressOut(tracks=track_out, continue_lesson=overall_continue)
 
 
+@router.get("/concept-mastery")
+def get_my_concept_mastery(
+    db: Session = Depends(get_db),
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, dict]:
+    """Per-concept mastery map for the authenticated user.
+
+    Shape: { "<slug>": { mastered_at, status, started: bool, ... }, ... }
+
+    Used by the concept-map UI (M9) to colour nodes. Concepts the learner
+    hasn't touched yet are omitted (callers default them to "untouched").
+    """
+    rows = list(
+        db.execute(
+            select(Concept.slug, ConceptMastery)
+            .join(ConceptMastery, ConceptMastery.concept_id == Concept.id)
+            .where(ConceptMastery.user_id == user.id)
+        ).all()
+    )
+    out: dict[str, dict] = {}
+    for slug, m in rows:
+        started = (
+            m.try_attempted_at is not None
+            or m.read_completed_at is not None
+            or m.play_completed_at is not None
+            or m.check_completed_at is not None
+            or m.apply_completed_at is not None
+        )
+        out[slug] = {
+            "mastered_at": m.mastered_at.isoformat() if m.mastered_at else None,
+            "status": m.status,
+            "started": started,
+            "next_recall_due_at": (
+                m.next_recall_due_at.isoformat()
+                if m.next_recall_due_at
+                else None
+            ),
+        }
+    return out
+
+
 @router.get("/track/{slug}/progress", response_model=TrackProgressDetail)
 def get_track_progress(
     slug: str,

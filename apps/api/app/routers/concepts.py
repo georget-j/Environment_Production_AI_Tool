@@ -167,14 +167,39 @@ def _prereq_slugs_for(db: Session, concept_id) -> list[str]:
 def list_concepts(
     db: Session = Depends(get_db),
     user: AuthUser = Depends(get_current_user),
-) -> list[Concept]:
+) -> list[ConceptSummary]:
     # Auth required: concepts are part of the paid learner experience.
-    # The `user` dependency is intentionally unused here; the auth-check
-    # is its only purpose at this endpoint.
     del user
-    return list(
+    concepts = list(
         db.scalars(select(Concept).order_by(Concept.layer, Concept.order_index)).all()
     )
+    # Hydrate prereq slugs in a single pass (M9). prereq rows join through
+    # concept ids; we fetch the join then re-key by the consumer's id.
+    prereq_pairs = list(
+        db.execute(
+            select(
+                ConceptPrereq.concept_id,
+                Concept.slug,
+            )
+            .join(Concept, Concept.id == ConceptPrereq.prereq_concept_id)
+        ).all()
+    )
+    prereqs_by_concept_id: dict = {}
+    for cid, prereq_slug in prereq_pairs:
+        prereqs_by_concept_id.setdefault(cid, []).append(prereq_slug)
+    return [
+        ConceptSummary(
+            id=c.id,
+            slug=c.slug,
+            layer=c.layer,
+            topic_slug=c.topic_slug,
+            title=c.title,
+            one_line=c.one_line,
+            order_index=c.order_index,
+            prereqs=prereqs_by_concept_id.get(c.id, []),
+        )
+        for c in concepts
+    ]
 
 
 @router.get("/{slug}", response_model=ConceptDetail)

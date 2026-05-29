@@ -42,6 +42,8 @@ export type ConceptSummary = {
   title: string;
   one_line: string;
   order_index: number;
+  /** M9 — prerequisite concept slugs (for the concept-map edges). */
+  prereqs?: string[];
 };
 
 export type ApplySkeleton = {

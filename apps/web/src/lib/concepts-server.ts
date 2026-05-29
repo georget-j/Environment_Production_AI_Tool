@@ -22,3 +22,24 @@ export async function listConcepts(): Promise<ConceptSummary[]> {
     requireAuth: true,
   });
 }
+
+/**
+ * M9 — concept-mastery rollup for the authenticated user. Keyed by concept
+ * slug. Concepts the learner hasn't touched are omitted (caller defaults
+ * to "untouched"). Used by the concept-map UI to colour nodes.
+ */
+export type ConceptMasteryEntry = {
+  mastered_at: string | null;
+  status: "in_progress" | "mastered" | "needs_review";
+  started: boolean;
+  next_recall_due_at: string | null;
+};
+
+export async function fetchMyConceptMastery(): Promise<
+  Record<string, ConceptMasteryEntry>
+> {
+  return apiFetch<Record<string, ConceptMasteryEntry>>(
+    `/api/me/concept-mastery`,
+    { requireAuth: true },
+  );
+}
