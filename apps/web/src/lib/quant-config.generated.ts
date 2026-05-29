@@ -20,13 +20,13 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "predict",
   "code": "import numpy as np\nraw = np.full((4, 3), 0.012)\nrf = np.array([0.0001, 0.0001, 0.0002])\nexcess = raw - rf\nprint(excess[0])",
   "expected_stdout": "[0.0119 0.0119 0.0118]",
-  "prompt": "Type the row as numpy prints it."
+  "prompt": "Predict the printed output."
 },
   "quant-04-broadcasting-gotchas": {
   "mode": "predict",
   "code": "import numpy as np\nraw = np.full((4, 3), 0.01)\nweights = np.array([1.0, 0.5, 2.0, 1.5])\nscaled = raw * weights.reshape(4, 1)\nprint(scaled[:, 0])",
   "expected_stdout": "[0.01  0.005 0.02  0.015]",
-  "prompt": "Type the column as numpy prints it."
+  "prompt": "Predict the printed output."
 },
   "quant-05-boolean-masks": {
   "mode": "fillblank",
@@ -61,7 +61,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     }
   ],
   "inline": {
-    "solution.py": "\"\"\"Compute sample variance from first principles.\n\nThis is the function we ship to production. It's been reviewed by\ntwo engineers and passes a smoke test against a small array. But\nthe head of risk has just emailed: 'your vol numbers are\nsystematically smaller than mine.' Find why.\n\"\"\"\nimport numpy as np\n\n\ndef sample_variance(x: np.ndarray) -> float:\n    \"\"\"Sample variance: sum of squared deviations from the mean,\n    divided by the appropriate denominator for an unbiased estimator.\n    \"\"\"\n    mu = x.mean()\n    deviations = x - mu\n    squared = deviations ** 2\n    # Bug lives on the next line. Read the docstring above.\n    return float(squared.sum() / len(x))\n",
+    "solution.py": "\"\"\"Compute sample variance from first principles.\n\nThis is the function we ship to production. It's been reviewed by\ntwo engineers and passes a smoke test against a small array. But\nthe head of risk has just emailed: 'your vol numbers are\nsystematically smaller than mine.' Find why.\n\"\"\"\nimport numpy as np\n\n\ndef sample_variance(x: np.ndarray) -> float:\n    \"\"\"Sample variance: sum of squared deviations from the mean,\n    divided by the appropriate denominator for an unbiased estimator.\n    \"\"\"\n    mu = x.mean()\n    deviations = x - mu\n    squared = deviations ** 2\n    return float(squared.sum() / len(x))\n",
     "tests/test_solution.py": "\"\"\"Sample-variance correctness against numpy's ddof=1 reference.\"\"\"\nimport numpy as np\nimport pytest\n\nfrom solution import sample_variance\n\n\ndef test_matches_numpy_ddof_1_on_small_array():\n    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n    assert abs(sample_variance(x) - x.var(ddof=1)) < 1e-12\n\n\ndef test_matches_numpy_ddof_1_on_returns_like_array():\n    rng = np.random.default_rng(0)\n    x = rng.normal(0.0, 0.02, 1000)\n    assert abs(sample_variance(x) - x.var(ddof=1)) < 1e-12\n\n\ndef test_two_element_sample_variance_is_half_squared_diff():\n    # For a 2-element sample, var = (x1 - x2)^2 / 2.\n    assert abs(sample_variance(np.array([10.0, 12.0])) - 2.0) < 1e-12\n\n\ndef test_constant_array_has_zero_variance():\n    x = np.full(50, 3.14)\n    # `mean()` of a constant array can leave a tiny float residual,\n    # so allow numerical-precision slack rather than == 0.\n    assert sample_variance(x) < 1e-20\n"
   }
 },
@@ -92,7 +92,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     }
   ],
   "inline": {
-    "solution.py": "\"\"\"Sample covariance matrix of column-stacked return series.\n\nShape contract: input X is (n_obs, n_assets); output is\n(n_assets, n_assets) sample covariance. Compared against\n`np.cov(X, rowvar=False)` in tests.\n\"\"\"\nimport numpy as np\n\n\ndef covariance_matrix(X: np.ndarray) -> np.ndarray:\n    \"\"\"Return the sample covariance matrix of X.\n\n    Steps the reviewer expects:\n      1. Demean each column.\n      2. Cross-product Xd\u1d40 Xd.\n      3. Divide by (n - 1) for the unbiased estimator.\n    \"\"\"\n    n = X.shape[0]\n    # Bug: step 1 missing.\n    return (X.T @ X) / (n - 1)\n",
+    "solution.py": "\"\"\"Sample covariance matrix of column-stacked return series.\n\nShape contract: input X is (n_obs, n_assets); output is\n(n_assets, n_assets) sample covariance. Compared against\n`np.cov(X, rowvar=False)` in tests.\n\"\"\"\nimport numpy as np\n\n\ndef covariance_matrix(X: np.ndarray) -> np.ndarray:\n    \"\"\"Return the sample covariance matrix of X.\n\n    Steps the reviewer expects:\n      1. Demean each column.\n      2. Cross-product Xd\u1d40 Xd.\n      3. Divide by (n - 1) for the unbiased estimator.\n    \"\"\"\n    n = X.shape[0]\n    return (X.T @ X) / (n - 1)\n",
     "tests/test_solution.py": "\"\"\"Covariance-matrix correctness tests, including the with-drift trap.\"\"\"\nimport numpy as np\nimport pytest\n\nfrom solution import covariance_matrix\n\n\ndef test_matches_numpy_cov_zero_mean():\n    rng = np.random.default_rng(0)\n    X = rng.normal(0.0, 1.0, (1000, 2))\n    assert np.allclose(covariance_matrix(X), np.cov(X, rowvar=False))\n\n\ndef test_matches_numpy_cov_with_drift():\n    # The KEY test \u2014 fails when demean is missing.\n    rng = np.random.default_rng(1)\n    X = rng.normal(0.0, 1.0, (500, 3)) + np.array([10.0, -5.0, 2.5])\n    assert np.allclose(covariance_matrix(X), np.cov(X, rowvar=False))\n\n\ndef test_output_shape_is_n_assets_by_n_assets():\n    X = np.random.default_rng(2).normal(size=(100, 4))\n    out = covariance_matrix(X)\n    assert out.shape == (4, 4)\n\n\ndef test_diagonal_is_per_asset_variance():\n    rng = np.random.default_rng(3)\n    X = rng.normal(0.0, 1.0, (500, 2))\n    out = covariance_matrix(X)\n    # Sample variance per column matches np.var(..., ddof=1).\n    assert abs(out[0, 0] - X[:, 0].var(ddof=1)) < 1e-12\n    assert abs(out[1, 1] - X[:, 1].var(ddof=1)) < 1e-12\n"
   }
 },
@@ -129,7 +129,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     }
   ],
   "inline": {
-    "solution.py": "\"\"\"Summary statistics used by the desk's daily research email.\"\"\"\nimport numpy as np\n\n\ndef summary_stats(r: np.ndarray) -> dict:\n    \"\"\"Return mean, std, and 95th percentile of a return series.\n\n    The 95th percentile (`p95`) is the value such that 95% of\n    observations are at or below it \u2014 used to size tail bands.\n    \"\"\"\n    return {\n        \"mean\": float(r.mean()),\n        \"std\": float(r.std()),\n        # Junior wrote it like pandas .quantile \u2014 bug lives here.\n        \"p95\": float(np.percentile(r, 0.95)),\n    }\n",
+    "solution.py": "\"\"\"Summary statistics used by the desk's daily research email.\"\"\"\nimport numpy as np\n\n\ndef summary_stats(r: np.ndarray) -> dict:\n    \"\"\"Return mean, std, and 95th percentile of a return series.\n\n    The 95th percentile (`p95`) is the value such that 95% of\n    observations are at or below it \u2014 used to size tail bands.\n    \"\"\"\n    return {\n        \"mean\": float(r.mean()),\n        \"std\": float(r.std()),\n        \"p95\": float(np.percentile(r, 0.95)),\n    }\n",
     "tests/test_solution.py": "\"\"\"summary_stats: mean, std, and 95th percentile checks.\"\"\"\nimport numpy as np\nimport pytest\n\nfrom solution import summary_stats\n\n\ndef test_mean_is_correct_on_synthetic_returns():\n    rng = np.random.default_rng(0)\n    r = rng.normal(0.001, 0.02, 10_000)\n    s = summary_stats(r)\n    assert abs(s[\"mean\"] - 0.0011) < 1e-3\n\n\ndef test_std_is_correct_on_synthetic_returns():\n    rng = np.random.default_rng(0)\n    r = rng.normal(0.001, 0.02, 10_000)\n    s = summary_stats(r)\n    assert abs(s[\"std\"] - 0.02) < 5e-4\n\n\ndef test_p95_is_a_high_value_not_a_low_one():\n    # The KEY test. The buggy version asks numpy for the 0.95th\n    # percentile, which is near the minimum (~ -0.06 here), not\n    # the 95th percentile (~ +0.034).\n    rng = np.random.default_rng(0)\n    r = rng.normal(0.001, 0.02, 10_000)\n    s = summary_stats(r)\n    assert s[\"p95\"] > 0.02  # 95th percentile must be on the right tail.\n\n\ndef test_p95_matches_numpy_reference():\n    rng = np.random.default_rng(0)\n    r = rng.normal(0.001, 0.02, 10_000)\n    s = summary_stats(r)\n    assert abs(s[\"p95\"] - float(np.percentile(r, 95))) < 1e-12\n"
   }
 },
@@ -137,13 +137,13 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "predict",
   "code": "import numpy as np\nx = np.arange(1_000_000)\nprint(int(x.sum()))",
   "expected_stdout": "499999500000",
-  "prompt": "Type the integer."
+  "prompt": "Predict the printed output."
 },
   "quant-11-the-slow-python-rolling-mean": {
   "mode": "predict",
   "code": "x = [1, 2, 3, 4, 5, 6]\nw = 3\nrolling = []\nfor i in range(w - 1, len(x)):\n    s = 0\n    for j in range(i - w + 1, i + 1):\n        s += x[j]\n    rolling.append(s / w)\nprint(rolling)",
   "expected_stdout": "[2.0, 3.0, 4.0, 5.0]",
-  "prompt": "Type the list as Python prints it."
+  "prompt": "Predict the printed output."
 },
   "quant-12-vectorising-with-cumsum": {
   "mode": "pyodide",
@@ -199,7 +199,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "predict",
   "code": "import pandas as pd\ndf = pd.DataFrame({'price': [100, 101, 99]}, index=['a', 'b', 'c'])\nprint(df.iloc[0]['price'], df.loc['b', 'price'])",
   "expected_stdout": "100 101",
-  "prompt": "Two space-separated numbers."
+  "prompt": "Predict the printed output."
 },
   "quant-16-boolean-filtering-on-real-prices": {
   "mode": "pyodide",
@@ -228,7 +228,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     }
   ],
   "inline": {
-    "solution.py": "\"\"\"Count gap-up days in a price frame.\"\"\"\nimport pandas as pd\n\n\ndef count_gap_ups(df: pd.DataFrame) -> int:\n    \"\"\"Return the number of days where today's open is strictly\n    above YESTERDAY's close. `df` has columns open, close, ...\n    indexed in chronological order.\n    \"\"\"\n    # Bug: the right-hand side should be yesterday's close, not\n    # today's close. The shift is missing.\n    mask = df[\"open\"] > df[\"close\"]\n    return int(mask.sum())\n",
+    "solution.py": "\"\"\"Count gap-up days in a price frame.\"\"\"\nimport pandas as pd\n\n\ndef count_gap_ups(df: pd.DataFrame) -> int:\n    \"\"\"Return the number of days where today's open is strictly\n    above YESTERDAY's close. `df` has columns open, close, ...\n    indexed in chronological order.\n    \"\"\"\n    mask = df[\"open\"] > df[\"close\"]\n    return int(mask.sum())\n",
     "tests/test_solution.py": "\"\"\"Gap-up counter correctness.\"\"\"\nimport pandas as pd\nimport pytest\n\nfrom solution import count_gap_ups\n\n\ndef _frame(open_, close):\n    return pd.DataFrame({\"open\": open_, \"close\": close})\n\n\ndef test_strict_gap_up_hand_calc():\n    # Closes: 100, 101, 99, 105. Opens: 100, 102, 100, 99.\n    # Day 0: no prior close. Day 1: open 102 > close[0]=100 -> gap.\n    # Day 2: open 100 < close[1]=101 -> no gap.\n    # Day 3: open 99  < close[2]=99  -> no gap (strict >).\n    df = _frame([100, 102, 100, 99], [100, 101, 99, 105])\n    assert count_gap_ups(df) == 1\n\n\ndef test_no_gap_when_open_equals_prior_close():\n    # opens 100, 100, 101; closes 100, 101, 99.\n    # Day 1: open[1]=100 == close[0]=100 -> no strict gap.\n    # Day 2: open[2]=101 == close[1]=101 -> no strict gap.\n    df = _frame([100, 100, 101], [100, 101, 99])\n    assert count_gap_ups(df) == 0\n\n\ndef test_all_gaps_when_each_open_clears_prior_close():\n    # Each open strictly above the previous day's close.\n    df = _frame([100, 105, 110, 120], [100, 102, 108, 115])\n    # Days 1, 2, 3 all gap up; Day 0 has no prior so doesn't count.\n    assert count_gap_ups(df) == 3\n\n\ndef test_zero_on_one_row():\n    df = _frame([100], [101])\n    assert count_gap_ups(df) == 0\n"
   }
 },
@@ -308,7 +308,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     }
   ],
   "inline": {
-    "solution.py": "\"\"\"Align two return frames on shared trading dates.\"\"\"\nimport pandas as pd\n\n\ndef aligned_returns(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Merge two daily-bar frames on 'date', keeping only dates that\n    appear in BOTH inputs. The output has both frames' columns,\n    suffixed _a / _b on the collisions.\n\n    Used to pair crypto vs equity tapes, US vs Europe, paper vs\n    benchmark. Wrong join type here = NaNs leak into the backtest.\n    \"\"\"\n    # Bug lives in the how= argument: this isn't the join type the\n    # docstring promises.\n    return pd.merge(a, b, on='date', how='outer', suffixes=('_a', '_b'))\n",
+    "solution.py": "\"\"\"Align two return frames on shared trading dates.\"\"\"\nimport pandas as pd\n\n\ndef aligned_returns(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Merge two daily-bar frames on 'date', keeping only dates that\n    appear in BOTH inputs. The output has both frames' columns,\n    suffixed _a / _b on the collisions.\n\n    Used to pair crypto vs equity tapes, US vs Europe, paper vs\n    benchmark.\n    \"\"\"\n    return pd.merge(a, b, on='date', how='outer', suffixes=('_a', '_b'))\n",
     "tests/test_solution.py": "\"\"\"aligned_returns: shared-date inner join with no NaN leakage.\"\"\"\nimport pandas as pd\nimport pytest\n\nfrom solution import aligned_returns\n\n\nSPY_DATES = ['2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05']\nBTC_DATES = [\n    '2024-01-02', '2024-01-03', '2024-01-04',\n    '2024-01-05', '2024-01-06', '2024-01-07',  # weekend prints\n]\n\n\ndef _spy():\n    return pd.DataFrame({'date': SPY_DATES, 'close': [470.0, 472.0, 471.5, 473.0]})\n\n\ndef _btc():\n    return pd.DataFrame({'date': BTC_DATES, 'close': [44000.0, 45000.0, 45500.0, 46000.0, 46500.0, 47000.0]})\n\n\ndef test_only_shared_dates_survive():\n    out = aligned_returns(_spy(), _btc())\n    assert list(out['date']) == SPY_DATES  # 4 weekday rows; weekends dropped\n\n\ndef test_no_nan_in_close_columns():\n    out = aligned_returns(_spy(), _btc())\n    # Both close columns must be fully populated.\n    assert out['close_a'].isna().sum() == 0\n    assert out['close_b'].isna().sum() == 0\n\n\ndef test_row_count_equals_min_of_two_inputs():\n    out = aligned_returns(_spy(), _btc())\n    assert len(out) == min(len(_spy()), len(_btc()))\n\n\ndef test_no_extra_rows_appear_when_inputs_identical():\n    df = _spy()\n    out = aligned_returns(df, df)\n    assert len(out) == len(df)\n"
   }
 },
@@ -362,7 +362,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "predict",
   "code": "import pandas as pd\nfrom statsmodels.tsa.stattools import adfuller\ndf = pd.read_csv('/data/quant/spy.csv')\np_price = adfuller(df['adj_close'])[1]\np_ret = adfuller(df['adj_close'].pct_change().dropna())[1]\nprint(p_price > 0.05, p_ret < 0.05)",
   "expected_stdout": "True True",
-  "prompt": "Two booleans."
+  "prompt": "Predict the printed output."
 },
   "quant-24-present-value-of-a-single-cash-flow": {
   "mode": "fillblank",
@@ -434,7 +434,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     }
   ],
   "inline": {
-    "solution.py": "\"\"\"Put price implied by put-call parity from a call price.\"\"\"\nimport math\n\n\ndef parity_put_from_call(\n    call: float, S: float, K: float, r: float, T: float\n) -> float:\n    \"\"\"Return the no-arb put price implied by C - P = S - K*exp(-r*T).\n\n    Parameters\n    ----------\n    call : current call price\n    S    : spot\n    K    : strike\n    r    : risk-free rate (annualised)\n    T    : years to expiry\n    \"\"\"\n    # Discount factor sign is wrong. Strike's PV must use exp(-r*T).\n    return call - S + K * math.exp(r * T)\n",
+    "solution.py": "\"\"\"Put price implied by put-call parity from a call price.\"\"\"\nimport math\n\n\ndef parity_put_from_call(\n    call: float, S: float, K: float, r: float, T: float\n) -> float:\n    \"\"\"Return the no-arb put price implied by C - P = S - K*exp(-r*T).\n\n    Parameters\n    ----------\n    call : current call price\n    S    : spot\n    K    : strike\n    r    : risk-free rate (annualised)\n    T    : years to expiry\n    \"\"\"\n    return call - S + K * math.exp(r * T)\n",
     "tests/test_solution.py": "\"\"\"parity_put_from_call: sign-of-exponent check on the discount.\"\"\"\nimport math\nimport pytest\n\nfrom solution import parity_put_from_call\n\n\ndef test_at_money_textbook_example():\n    # S=K=100, r=4%, T=1y, call=9.6 \u2192 put \u2248 5.68.\n    put = parity_put_from_call(9.6, 100, 100, 0.04, 1.0)\n    assert abs(put - 5.68) < 0.02\n\n\ndef test_zero_rate_collapses_to_call_minus_S_plus_K():\n    # With r=0, exp(-r*T)=1, so put = call - S + K.\n    put = parity_put_from_call(7.0, 100, 100, 0.0, 1.0)\n    assert abs(put - 7.0) < 1e-12  # call - S + K = 7 - 100 + 100\n\n\ndef test_high_rate_pulls_put_below_call():\n    # At higher rate, the PV(K) shrinks, so put should be SMALLER.\n    put_low = parity_put_from_call(9.6, 100, 100, 0.02, 1.0)\n    put_high = parity_put_from_call(9.6, 100, 100, 0.10, 1.0)\n    assert put_high < put_low\n\n\ndef test_at_par_at_zero_rate_equals_call_when_S_equals_K():\n    # Edge: zero rate, S=K. Then exp(-rT)=1 \u2192 put = call.\n    put = parity_put_from_call(7.5, 100, 100, 0.0, 1.0)\n    assert abs(put - 7.5) < 1e-12\n"
   }
 },
@@ -500,7 +500,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     }
   ],
   "inline": {
-    "solution.py": "\"\"\"Black-Scholes delta for a European call.\"\"\"\nimport math\nfrom scipy.stats import norm\n\n\ndef compute_delta(S: float, K: float, r: float, sigma: float, T: float) -> float:\n    \"\"\"Return the Black-Scholes delta of a European call: \u0394 = N(d1).\n\n    d1 = (ln(S/K) + (r + \u03c3\u00b2/2)\u00b7T) / (\u03c3\u00b7\u221aT)\n    \"\"\"\n    # Bug: the convexity term has the wrong sign.\n    d1 = (math.log(S / K) + (r - sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))\n    return float(norm.cdf(d1))\n",
+    "solution.py": "\"\"\"Black-Scholes delta for a European call.\"\"\"\nimport math\nfrom scipy.stats import norm\n\n\ndef compute_delta(S: float, K: float, r: float, sigma: float, T: float) -> float:\n    \"\"\"Return the Black-Scholes delta of a European call: \u0394 = N(d1).\n\n    d1 = (ln(S/K) + (r + \u03c3\u00b2/2)\u00b7T) / (\u03c3\u00b7\u221aT)\n    \"\"\"\n    d1 = (math.log(S / K) + (r - sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))\n    return float(norm.cdf(d1))\n",
     "tests/test_solution.py": "\"\"\"Call-delta correctness against the Hull canonical numbers.\"\"\"\nimport pytest\n\nfrom solution import compute_delta\n\n\ndef test_atm_call_delta_is_above_half_from_drift():\n    # ATM call with r=5%, \u03c3=20%, T=1y \u2192 delta \u2248 0.6368.\n    # With the bug (- \u03c3\u00b2/2), the answer is \u2248 0.5793 \u2014 clearly below.\n    d = compute_delta(100, 100, 0.05, 0.20, 1.0)\n    assert abs(d - 0.6368) < 1e-3\n\n\ndef test_deep_itm_call_delta_approaches_one():\n    # Deep ITM call (S=200, K=100) \u2192 delta very close to 1.\n    d = compute_delta(200, 100, 0.05, 0.20, 1.0)\n    assert d > 0.99\n\n\ndef test_deep_otm_call_delta_approaches_zero():\n    d = compute_delta(50, 150, 0.05, 0.20, 1.0)\n    assert d < 0.05\n\n\ndef test_monotone_increasing_in_spot():\n    a = compute_delta(95, 100, 0.05, 0.20, 1.0)\n    b = compute_delta(100, 100, 0.05, 0.20, 1.0)\n    c = compute_delta(110, 100, 0.05, 0.20, 1.0)\n    assert a < b < c\n"
   }
 },
@@ -579,7 +579,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     }
   ],
   "inline": {
-    "solution.py": "\"\"\"Annualised Sharpe ratio and max drawdown for daily returns.\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef risk_metrics(r: pd.Series) -> dict:\n    \"\"\"Return {sharpe, max_drawdown} for a daily-return series.\n\n    - sharpe       : annualised Sharpe = (mean*252) / (std*sqrt(252))\n    - max_drawdown : worst peak-to-trough loss as a negative fraction\n    \"\"\"\n    # Bug: std isn't scaled by sqrt(252). Sharpe ends up \u221a252\u00d7 too large.\n    sharpe = (r.mean() * 252) / r.std()\n    eq = (1 + r).cumprod()\n    dd = (eq / eq.cummax() - 1).min()\n    return {\"sharpe\": float(sharpe), \"max_drawdown\": float(dd)}\n",
+    "solution.py": "\"\"\"Annualised Sharpe ratio and max drawdown for daily returns.\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef risk_metrics(r: pd.Series) -> dict:\n    \"\"\"Return {sharpe, max_drawdown} for a daily-return series.\n\n    - sharpe       : annualised Sharpe = (mean*252) / (std*sqrt(252))\n    - max_drawdown : worst peak-to-trough loss as a negative fraction\n    \"\"\"\n    sharpe = (r.mean() * 252) / r.std()\n    eq = (1 + r).cumprod()\n    dd = (eq / eq.cummax() - 1).min()\n    return {\"sharpe\": float(sharpe), \"max_drawdown\": float(dd)}\n",
     "tests/test_solution.py": "\"\"\"risk_metrics: Sharpe annualisation + drawdown direction.\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import risk_metrics\n\n\ndef test_sharpe_on_known_series():\n    # Constructed: mean = 0.001 daily, std = 0.012 daily.\n    # Expected annualised Sharpe = 0.001*252 / (0.012*sqrt(252))\n    #                            = 0.252 / 0.1904... \u2248 1.323.\n    rng = np.random.default_rng(0)\n    raw = rng.normal(0.001, 0.012, 10_000)\n    raw -= raw.mean() - 0.001\n    raw *= 0.012 / raw.std()\n    s = pd.Series(raw)\n    m = risk_metrics(s)\n    expected = (s.mean() * 252) / (s.std() * np.sqrt(252))\n    assert abs(m[\"sharpe\"] - expected) < 1e-9\n\n\ndef test_sharpe_doesnt_blow_up_by_factor_of_sqrt_252():\n    # With the bug present, Sharpe is \u221a252 (~15.87) too large.\n    # Reasonable strategies have Sharpe well under 5.\n    rng = np.random.default_rng(1)\n    s = pd.Series(rng.normal(0.0005, 0.012, 5000))\n    m = risk_metrics(s)\n    assert abs(m[\"sharpe\"]) < 5\n\n\ndef test_max_drawdown_is_negative_on_lossy_series():\n    # 30%-drop pattern \u2192 drawdown \u2248 -0.3.\n    s = pd.Series([0.0, -0.10, -0.10, -0.15])\n    m = risk_metrics(s)\n    assert m[\"max_drawdown\"] < -0.25\n\n\ndef test_max_drawdown_zero_on_monotone_up():\n    s = pd.Series([0.01] * 100)\n    m = risk_metrics(s)\n    assert abs(m[\"max_drawdown\"]) < 1e-9\n"
   }
 },
@@ -593,7 +593,7 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "predict",
   "code": "from sklearn.model_selection import train_test_split\nimport numpy as np\nX = np.arange(10).reshape(-1, 1); y = np.arange(10)\n_, X_test, _, _ = train_test_split(X, y, test_size=0.2, shuffle=False)\nprint(X_test.ravel().tolist())",
   "expected_stdout": "[8, 9]",
-  "prompt": "Type the list as Python prints it."
+  "prompt": "Predict the printed output."
 },
   "quant-36-momentum-signal-regression": {
   "mode": "pyodide",
@@ -756,12 +756,12 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "mode": "predict",
   "code": "def cy_sum(arr):\n    total = 0\n    for i in range(len(arr)):\n        total += arr[i]\n    return total\nprint(cy_sum(list(range(100))))",
   "expected_stdout": "4950",
-  "prompt": "Type the integer."
+  "prompt": "Predict the printed output."
 },
   "quant-51-cffi-preview": {
   "mode": "predict",
   "code": "def c_sum_simulated(arr, n):\n    return sum(arr[:n])\nprint(c_sum_simulated(list(range(50)), 50))",
   "expected_stdout": "1225",
-  "prompt": "Type the integer."
+  "prompt": "Predict the printed output."
 },
 };

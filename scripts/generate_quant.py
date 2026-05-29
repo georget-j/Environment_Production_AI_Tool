@@ -120,6 +120,10 @@ class Lesson:
     wasm_demo: str = ""
     prompt: str = ""
     hint: str = ""
+    # One-sentence "Why this matters" tag rendered after **Expected.**.
+    # Used selectively (finance lessons especially) to justify the technique
+    # rather than just state the mechanic.
+    why_this: str = ""
     skills: list[str] = field(default_factory=list)
     # Bundled CSV slugs the lesson reads. The worker pre-mounts each under
     # /data/quant/<slug>.csv inside Pyodide's FS before the user code runs.
@@ -196,6 +200,9 @@ class Lesson:
                     "`solution.py` to fetch what you need.",
                 )
                 lines.insert(-2, "")
+            if self.why_this:
+                lines.append("")
+                lines.append(f"**Why this?** {self.why_this.strip()}")
             return "\n".join(lines)
         lang = EXAMPLE_LANGUAGE_FOR_MODE[self.mode]
         lines = [
@@ -222,6 +229,9 @@ class Lesson:
         expected_one_line = expected.replace("\n", " · ")
         if expected_one_line:
             lines.append(f"**Expected.** `{expected_one_line}`")
+        if self.why_this:
+            lines.append("")
+            lines.append(f"**Why this?** {self.why_this.strip()}")
         return "\n".join(lines)
 
     def runner_config(self) -> dict[str, object]:
@@ -334,7 +344,7 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=1, stage=1, mode="predict",
         title="Why numpy",
-        scenario="First morning at AQR. Your manager hands you a notebook with 7 years of minute-bar SPY data — 12 million rows — and wants a 10-day momentum signal by lunch. In pure Python the iteration would take 6 minutes per run; in numpy it's 4 seconds. That gap is the whole reason quants live in numpy.",
+        scenario="numpy is C and BLAS under a Python skin. Reductions like `.sum()` run as one tight C loop instead of a million interpreted iterations — typically 50-100× faster. The example below runs both side-by-side so you can see the gap.",
         learner_goal="Measure the real speed gap between a Python sum and a numpy sum on a million numbers.",
         concept="numpy arrays store fixed-size numbers contiguously in memory. A `.sum()` runs as one C loop with no Python interpreter overhead per element — typically 50-100× faster than the equivalent Python for-loop. The work being done is identical; the dispatch cost is what disappears.",
         example_code=(
@@ -368,7 +378,7 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=2, stage=1, mode="fillblank",
         title="Creating arrays",
-        scenario="The Citadel research team's morning ritual: load yesterday's tape, slice it, line it up against a benchmark grid. Three constructors handle nearly every input you'll ever build — `np.array` for known data, `np.zeros` for pre-allocated buffers, `np.linspace` for evenly-spaced sampling grids (the canonical y-axis builder for IV surfaces).",
+        scenario="Three constructors handle nearly every input you'll build: `np.array` for known values, `np.zeros` for pre-allocated buffers, `np.linspace` for evenly-spaced sampling grids (the canonical y-axis builder for IV surfaces).",
         learner_goal="Use np.array, np.zeros, and np.linspace to build the three array shapes you'll actually use.",
         concept="`np.array([…])` lifts a Python list. `np.zeros(n)` pre-allocates `n` zeros — useful when you'll fill values in a loop. `np.linspace(start, stop, n)` returns `n` evenly spaced points including both endpoints — used for plot grids and parameter sweeps.",
         example_code=(
@@ -396,7 +406,7 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=3, stage=1, mode="predict",
         title="Broadcasting basics",
-        scenario="Your strategy holds 4 positions on each of 3 days. You want to subtract the risk-free rate (a single 3-day vector) from every row of returns. Two for-loops? No. numpy's broadcasting handles it as one expression — adds about a microsecond, regardless of how many positions you have.",
+        scenario="Broadcasting lets you apply a 1-D operation across a 2-D array without writing nested loops — numpy expands the smaller shape virtually, with no copy.",
         learner_goal="Read a broadcast subtraction and predict the resulting first row.",
         concept="When a `(3,)` vector meets a `(4, 3)` matrix, numpy implicitly stretches the vector along the missing axis — as if you'd repeated it four times. Shapes must align from the *trailing* axis. The big win is no temporary copies — the C loop just reuses the smaller buffer.",
         example_code=(
@@ -417,13 +427,13 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="Predict the first row of `excess` — the 4-position raw returns minus the 3-day risk-free vector.",
         expected_stdout="[0.0119 0.0119 0.0118]",
-        prompt="Type the row as numpy prints it.",
+        prompt="Predict the printed output.",
         skills=["quant", "numpy", "vectorisation"],
     ),
     Lesson(
         n=4, stage=1, mode="predict",
         title="Broadcasting gotchas",
-        scenario="Most numpy errors a junior research engineer raises are shape mismatches. Take 30 seconds to learn what 'can't broadcast (4,) with (4, 3)' actually means — then you'll fix it in 30 seconds instead of 30 minutes.",
+        scenario="Shape-mismatch errors are the most common numpy bug. The fix rule is shorter than the error message: align dimensions from the right, insert size-1 axes where they don't.",
         learner_goal="Recognise when shapes do not align and how to reshape to make them.",
         concept="Broadcasting aligns dimensions from the *right*. A `(4,)` vector vs a `(4, 3)` matrix doesn't align — the trailing dimensions are 4 and 3. Reshape the vector to `(4, 1)` (a column) and now the trailing dimensions are 1 and 3 — broadcastable, because size-1 axes stretch.",
         example_code=(
@@ -444,7 +454,7 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="`scaled` is shape (4, 3) with each row multiplied by its weight. Predict its first column.",
         expected_stdout="[0.01  0.005 0.02  0.015]",
-        prompt="Type the column as numpy prints it.",
+        prompt="Predict the printed output.",
         skills=["quant", "numpy", "vectorisation"],
     ),
     Lesson(
@@ -500,7 +510,6 @@ LESSONS: list[Lesson] = [
             "    mu = x.mean()\n"
             "    deviations = x - mu\n"
             "    squared = deviations ** 2\n"
-            "    # Bug lives on the next line. Read the docstring above.\n"
             "    return float(squared.sum() / len(x))\n"
         ),
         reference_solution=(
@@ -591,7 +600,6 @@ LESSONS: list[Lesson] = [
             "      3. Divide by (n - 1) for the unbiased estimator.\n"
             "    \"\"\"\n"
             "    n = X.shape[0]\n"
-            "    # Bug: step 1 missing.\n"
             "    return (X.T @ X) / (n - 1)\n"
         ),
         reference_solution=(
@@ -663,7 +671,7 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=8, stage=1, mode="fillblank",
         title="Reproducible random numbers",
-        scenario="Two Sigma's research review board will reject a backtest that can't be reproduced bit-for-bit. Every random draw in a research notebook gets a seed — usually a module-level constant, sometimes per-experiment. Reproducibility is non-negotiable.",
+        scenario="Random draws need a seed if you want the same answer twice. `np.random.default_rng(seed)` makes the result deterministic — non-negotiable for any backtest you intend to reproduce.",
         learner_goal="Seed two generators with the same value and confirm they produce identical draws.",
         concept="`np.random.default_rng(seed)` returns a Generator object. Same seed → same draws, every time. The legacy `np.random.seed(...)` global is fine for scripts but `default_rng` is the modern, thread-safe API — use it.",
         example_code=(
@@ -709,7 +717,6 @@ LESSONS: list[Lesson] = [
             "    return {\n"
             "        \"mean\": float(r.mean()),\n"
             "        \"std\": float(r.std()),\n"
-            "        # Junior wrote it like pandas .quantile — bug lives here.\n"
             "        \"p95\": float(np.percentile(r, 0.95)),\n"
             "    }\n"
         ),
@@ -787,9 +794,9 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=10, stage=1, mode="predict",
         title="Why numpy is fast",
-        scenario="numpy isn't magic. It's a thin Python skin over carefully-optimised C and BLAS libraries written over 30 years. When you call `arr.sum()`, what runs is roughly 8 lines of C with SIMD intrinsics. When you write a Python `for` loop, what runs is 1 million dispatches through the interpreter. Hence the gap.",
+        scenario="numpy stores arrays as contiguous C buffers and runs reductions as one C loop. The sum below operates over a million elements — same answer Python's `sum()` would give, in a fraction of the time.",
         learner_goal="Run a sum of one million elements and recognise the printed value.",
-        concept="numpy stores arrays as contiguous C buffers and runs ufuncs as tight C loops with no per-element Python overhead. The same loop in pure Python pays interpreter overhead per iteration — 50-100× slower. Open one of numpy's C-level source files some weekend — they're surprisingly readable.",
+        concept="numpy stores arrays as contiguous C buffers — every adjacent element is one cache line away. A `.sum()` runs as one C loop with SIMD-friendly access; the L1 cache loads 64-byte runs and the CPU never stalls on memory. A Python list stores pointers to boxed `PyObject` ints scattered across the heap — every element costs a cache miss and an interpreter dispatch. Same arithmetic, completely different access pattern.",
         example_code=(
             "import numpy as np\n"
             "x = np.arange(1_000_000)\n"
@@ -805,13 +812,13 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="Predict the printed sum of 0..999999. (Hint: n(n−1)/2 with n = 1,000,000.)",
         expected_stdout="499999500000",
-        prompt="Type the integer.",
+        prompt="Predict the printed output.",
         skills=["quant", "numpy", "performance"],
     ),
     Lesson(
         n=11, stage=1, mode="predict",
         title="The slow Python rolling-mean",
-        scenario="A junior at a prop shop writes a 30-day rolling mean as a Python double-loop. The desk's nightly batch goes from 4 minutes to 28. Senior glares. Tomorrow's lesson is `np.cumsum` — today, FEEL the slow path so you'll never write it.",
+        scenario="The naive way to compute a rolling mean is a double-loop — outer index, inner window-sum. It works, but the inner loop runs `window × len(x)` times. Read it once so you recognise the pattern before it sneaks into your code.",
         learner_goal="Read the naive Python rolling-mean loop and predict its output on a small input.",
         concept="The naive rolling mean iterates outer × window times. For 100k points and window 30: 3 million Python operations. Same answer as numpy, but ~200× slower. The fix is the cumulative-sum trick (next lesson). First, see what it replaces.",
         example_code=(
@@ -839,13 +846,13 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="Predict the printed list of rolling means.",
         expected_stdout="[2.0, 3.0, 4.0, 5.0]",
-        prompt="Type the list as Python prints it.",
+        prompt="Predict the printed output.",
         skills=["quant", "numpy", "performance"],
     ),
     Lesson(
         n=12, stage=1, mode="skeleton",
         title="Vectorising with cumsum",
-        scenario="Yesterday's double-loop ran in 28 minutes. Your manager wants the same answer in 8 seconds before tomorrow's standup. The cumulative-sum identity `c[i] − c[i−w]` is the canonical trick — every senior quant carries it in their head; pandas, vectorbt, and every market-data smoother use it internally. Today you build it from the function signature.",
+        scenario="The cumulative-sum identity turns a window sum into one subtraction of two prefix sums. Same answer as yesterday's double-loop; one numpy pass instead of `len(x) × w` Python operations. It's the canonical trick behind every rolling reduction in pandas.",
         learner_goal="Implement `rolling_mean(x, w)` using numpy's `cumsum` so it matches the naive double-loop on every input.",
         concept="If `c = cumsum(x)` (with a 0 prepended so the slice arithmetic is clean), then the sum of the window of width `w` ending at index `i` equals `c[i+1] − c[i+1-w]`. One numpy pass, no inner loop. The output has shape `(len(x) - w + 1,)` — the first `w-1` positions have no full window. Same identity drives rolling sums of drawdowns, exposures, anything cumulative.",
         # Skeleton mode doesn't render the **Example.** block; field stays empty.
@@ -1012,7 +1019,7 @@ LESSONS: list[Lesson] = [
     Lesson(
         n=15, stage=2, mode="predict",
         title="Loc versus iloc",
-        scenario="The most common bug juniors at any prop shop ship in a pandas notebook: a `.loc` where they meant `.iloc`, or vice versa. The strategy returns the wrong row, the backtest looks great, the strategy live-trades and loses money. Five seconds to learn the difference, then it's automatic for the rest of your career.",
+        scenario="`.loc` indexes by label, `.iloc` indexes by integer position. They look interchangeable when the index is the default 0..n-1, but they diverge the moment the index becomes anything else — a date, a ticker, a slice.",
         learner_goal="Predict the values returned by .iloc and .loc on a small frame.",
         concept="`.iloc[i]` is *position* — always the i-th physical row, no matter how the frame is labelled or sorted. `.loc[label]` is *label* — looks up by the index value. For an unsorted, integer-indexed frame they coincide. After a sort or filter, they diverge — and that's when wrong-row bugs ship.",
         example_code=(
@@ -1030,7 +1037,7 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="Predict what the print statement outputs.",
         expected_stdout="100 101",
-        prompt="Two space-separated numbers.",
+        prompt="Predict the printed output.",
         skills=["quant", "pandas"],
     ),
     Lesson(
@@ -1050,8 +1057,6 @@ LESSONS: list[Lesson] = [
             "    above YESTERDAY's close. `df` has columns open, close, ...\n"
             "    indexed in chronological order.\n"
             "    \"\"\"\n"
-            "    # Bug: the right-hand side should be yesterday's close, not\n"
-            "    # today's close. The shift is missing.\n"
             "    mask = df[\"open\"] > df[\"close\"]\n"
             "    return int(mask.sum())\n"
         ),
@@ -1333,10 +1338,8 @@ LESSONS: list[Lesson] = [
             "    suffixed _a / _b on the collisions.\n"
             "\n"
             "    Used to pair crypto vs equity tapes, US vs Europe, paper vs\n"
-            "    benchmark. Wrong join type here = NaNs leak into the backtest.\n"
+            "    benchmark.\n"
             "    \"\"\"\n"
-            "    # Bug lives in the how= argument: this isn't the join type the\n"
-            "    # docstring promises.\n"
             "    return pd.merge(a, b, on='date', how='outer', suffixes=('_a', '_b'))\n"
         ),
         reference_solution=(
@@ -1651,7 +1654,7 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="Predict the two booleans. The first asks 'is prices non-stationary?'; the second asks 'are returns stationary?'.",
         expected_stdout="True True",
-        prompt="Two booleans.",
+        prompt="Predict the printed output.",
         skills=["quant", "pandas", "time-series", "statistics"],
         datasets=["spy"],
     ),
@@ -1678,6 +1681,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the Python exponentiation operator.",
         expected_stdout="821.93",
         hint="Two asterisks.",
+        why_this="Every pricing model in finance — bond YTM, DCF, option pricing — is a sum of present values. Get the one-cashflow case automatic and the rest is just iteration.",
         skills=["quant", "options"],
     ),
     Lesson(
@@ -1778,6 +1782,7 @@ LESSONS: list[Lesson] = [
         ],
         your_turn="Implement `ytm`. Define the NPV closure that returns PV minus price; root-find with brentq on (0.0001, 0.5). The docstring spells out both steps.",
         hint="`brentq(npv, 0.0001, 0.5)` — your NPV closure returns 0 at the YTM.",
+        why_this="Bond markets quote in price; risk and portfolio analytics live in yield space. This function is the translation layer every fixed-income system runs millions of times a day.",
         skills=["quant", "options"],
     ),
     Lesson(
@@ -1812,6 +1817,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the elementwise max function.",
         expected_stdout="35.0",
         hint="It's `maximum`, not `max`.",
+        why_this="Sketching payoff at expiry is the first thing a vol trader does when sized a new structure. Pattern-match the shape and you can spot a structurer's misprice in seconds.",
         skills=["quant", "options", "matplotlib"],
     ),
     Lesson(
@@ -1839,7 +1845,6 @@ LESSONS: list[Lesson] = [
             "    r    : risk-free rate (annualised)\n"
             "    T    : years to expiry\n"
             "    \"\"\"\n"
-            "    # Discount factor sign is wrong. Strike's PV must use exp(-r*T).\n"
             "    return call - S + K * math.exp(r * T)\n"
         ),
         reference_solution=(
@@ -1903,6 +1908,7 @@ LESSONS: list[Lesson] = [
         ],
         your_turn="The function uses `exp(r*T)` where the no-arb formula needs `exp(-r*T)`. One character flip.",
         hint="Negative rate times time goes inside the exponent.",
+        why_this="Parity is the dealer's no-arb sanity check on every quote. If your puts and calls don't satisfy it within bid-ask, one of them is mispriced — guaranteed.",
         skills=["quant", "options"],
     ),
     Lesson(
@@ -2010,6 +2016,7 @@ LESSONS: list[Lesson] = [
         ],
         your_turn="Implement `bs_call`. The docstring has the three lines you need. The Hull example (S=K=100, r=5%, σ=20%, T=1y) → 10.4506 is your first sanity check.",
         hint="`math.log`, `math.sqrt`, `math.exp`, `norm.cdf`. Five lines total.",
+        why_this="Closed-form is the calibration anchor; every other pricer (binomial, MC, PDE) has to agree with it on the European-vanilla case before you trust it on anything harder.",
         skills=["quant", "options", "black-scholes"],
     ),
     Lesson(
@@ -2030,7 +2037,6 @@ LESSONS: list[Lesson] = [
             "\n"
             "    d1 = (ln(S/K) + (r + σ²/2)·T) / (σ·√T)\n"
             "    \"\"\"\n"
-            "    # Bug: the convexity term has the wrong sign.\n"
             "    d1 = (math.log(S / K) + (r - sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))\n"
             "    return float(norm.cdf(d1))\n"
         ),
@@ -2094,6 +2100,7 @@ LESSONS: list[Lesson] = [
         ],
         your_turn="The first test is the giveaway: ATM call delta should be ≈ 0.6368 with the given parameters, but the function returns ~0.58. The d1 numerator has the wrong sign on the σ²/2 term.",
         hint="d1's numerator carries `(r + σ²/2)·T`, not `(r − σ²/2)·T`. One character.",
+        why_this="Delta is how much spot exposure an option gives you. Hedge it daily and you isolate the vol P&L — the thing an options book is actually trying to harvest.",
         skills=["quant", "options", "greeks"],
     ),
     Lesson(
@@ -2194,6 +2201,7 @@ LESSONS: list[Lesson] = [
         ],
         your_turn="Implement `crr_call`. The docstring spells out the six steps; the cleanest code is ~10 lines.",
         hint="`S * u ** np.arange(N + 1) * d ** (N - np.arange(N + 1))` gives the terminal price vector in one line.",
+        why_this="American options need backward induction — Black-Scholes can't price early exercise. The same tree machinery prices warrants, convertibles, and most early-exercise structured products.",
         skills=["quant", "options", "black-scholes"],
     ),
     Lesson(
@@ -2231,6 +2239,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` so the running mean accumulates correctly.",
         expected_stdout="10.48",
         hint="Cumulative sum.",
+        why_this="MC handles path-dependent payoffs (Asian, barrier, autocallable) that no closed-form touches. The cost is the convergence rate — you watch the running mean stabilise as N grows.",
         skills=["quant", "options", "monte-carlo"],
     ),
     Lesson(
@@ -2266,6 +2275,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the np.cov keyword that treats each column as one variable.",
         expected_stdout="0.0079",
         hint="It's the opposite of 'rows are variables'.",
+        why_this="Every allocator quotes 'efficient frontier' even when they don't actually trade on it. Knowing the closed-form is how you tell when the pitch is hand-waving vs grounded.",
         skills=["quant", "portfolio", "linear-algebra"],
         datasets=["spy", "aapl", "tlt"],
     ),
@@ -2288,7 +2298,6 @@ LESSONS: list[Lesson] = [
             "    - sharpe       : annualised Sharpe = (mean*252) / (std*sqrt(252))\n"
             "    - max_drawdown : worst peak-to-trough loss as a negative fraction\n"
             "    \"\"\"\n"
-            "    # Bug: std isn't scaled by sqrt(252). Sharpe ends up √252× too large.\n"
             "    sharpe = (r.mean() * 252) / r.std()\n"
             "    eq = (1 + r).cumprod()\n"
             "    dd = (eq / eq.cummax() - 1).min()\n"
@@ -2369,6 +2378,7 @@ LESSONS: list[Lesson] = [
         ],
         your_turn="The Sharpe value is √252 too large. The annualisation needs to scale BOTH the numerator (by 252) and the denominator (by √252).",
         hint="`r.std() * np.sqrt(252)`.",
+        why_this="These are the two numbers fund-of-funds ask about before they read the IC ticket. Get the annualisation wrong and your IR-2 looks like an IR-30 — which gets you laughed out of the meeting, not funded.",
         skills=["quant", "pandas", "risk-metrics"],
     ),
 
@@ -2428,7 +2438,7 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="Predict what the test set looks like — last 20% of an ordered range 0..9.",
         expected_stdout="[8, 9]",
-        prompt="Type the list as Python prints it.",
+        prompt="Predict the printed output.",
         skills=["quant", "machine-learning", "backtesting"],
     ),
     Lesson(
@@ -3197,7 +3207,7 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="Predict the sum of 0..99 that the function prints.",
         expected_stdout="4950",
-        prompt="Type the integer.",
+        prompt="Predict the printed output.",
         skills=["quant", "performance", "c-language"],
     ),
     Lesson(
@@ -3221,7 +3231,7 @@ LESSONS: list[Lesson] = [
         ),
         your_turn="Predict the sum of 0..49 the (simulated) C call returns.",
         expected_stdout="1225",
-        prompt="Type the integer.",
+        prompt="Predict the printed output.",
         skills=["quant", "performance", "c-language"],
     ),
 ]
