@@ -747,7 +747,510 @@ CONCEPTS: list[Concept] = [
         ],
     ),
     # ------------------------------------------------------------------
-    # Concept 5: recursion — base case + recursive case + the stack.
+    # Concept 4: functions — args, return, side effects, pure vs impure.
+    # Uses code-stepper. The Try contrasts a mutating vs returning version
+    # of the same operation.
+    # ------------------------------------------------------------------
+    Concept(
+        n=4,
+        slug="functions",
+        layer="universal",
+        title="Functions",
+        one_line="A function takes inputs, optionally has side effects, and may return a value.",
+        order_index=400,
+        prereqs=["variables-names", "control-flow"],
+        try_prompt_md=(
+            "**Try.** Two near-identical functions. Predict what each call "
+            "prints.\n\n"
+            "```python\n"
+            "def add_in_place(xs, n):\n"
+            "    xs.append(n)        # mutates xs\n"
+            "\n"
+            "def add_returning(xs, n):\n"
+            "    return xs + [n]     # returns a new list\n"
+            "\n"
+            "a = [1, 2]\n"
+            "add_in_place(a, 3)\n"
+            "print(a)\n"
+            "\n"
+            "b = [1, 2]\n"
+            "result = add_returning(b, 3)\n"
+            "print(b, result)\n"
+            "```"
+        ),
+        try_kind="text-reasoning",
+        try_expected_attempts=[
+            {
+                "pattern": r"\[1,\s*2,\s*3\].*\[1,\s*2\].*\[1,\s*2,\s*3\]",
+                "callback_md": "Correct — mutating vs returning is a real distinction.",
+            },
+            {
+                "pattern": r"\[1,\s*2\]",
+                "callback_md": (
+                    "Partially right. The key difference is that "
+                    "`add_in_place` mutates `a`; `add_returning` leaves "
+                    "`b` alone but returns a new list."
+                ),
+            },
+        ],
+        exposition_md=(
+            "A function is a reusable block of code that takes inputs "
+            "(arguments) and may produce outputs in two ways:\n\n"
+            "1. **Return value** — what `return` sends back to the caller. "
+            "If you omit `return`, Python implicitly returns `None`.\n"
+            "2. **Side effects** — anything else visible outside the "
+            "function: mutating an argument, printing, writing a file, "
+            "modifying a global.\n\n"
+            "A function is **pure** if its return value depends only on "
+            "its arguments and it has no side effects. Pure functions "
+            "are the easiest to test (same input → same output, always) "
+            "and the easiest to reason about. Use them as the default; "
+            "fall back to side effects only when you must.\n\n"
+            "Inside a function, the parameter names become **local "
+            "bindings** — they live in a fresh scope. Reassigning them "
+            "doesn't affect the caller's bindings. *Mutating* the "
+            "object they point at does, because the binding and the "
+            "object are different things (lesson: references-values)."
+        ),
+        worked_example_md=(
+            "```python\n"
+            "def square(n):            # pure: same n → same return\n"
+            "    return n * n\n"
+            "\n"
+            "def shout(msg):           # side-effect: print is observable\n"
+            "    print(msg.upper())\n"
+            "    # no `return` → returns None\n"
+            "\n"
+            "x = square(4)             # x = 16\n"
+            "y = shout('hi')           # prints HI; y is None\n"
+            "```"
+        ),
+        play_widget_kind="code-stepper",
+        play_widget={
+            "title": "Step through a function call",
+            "code": (
+                "def square(n):\n"
+                "    return n * n\n"
+                "\n"
+                "x = square(4)\n"
+                "print(x)"
+            ),
+            "steps": [
+                {"line": 4, "bindings": {}, "caption": "Call square(4). Push a frame for square."},
+                {
+                    "line": 1,
+                    "bindings": {"n": "4"},
+                    "caption": "Inside square: parameter n is bound to 4 in the new frame.",
+                },
+                {
+                    "line": 2,
+                    "bindings": {"n": "4"},
+                    "caption": "Compute n * n = 16. Return value pops the frame.",
+                },
+                {
+                    "line": 4,
+                    "bindings": {"x": "16"},
+                    "caption": "Back in the caller. x is bound to the returned 16.",
+                },
+                {"line": 5, "bindings": {"x": "16"}, "caption": "Print x → 16."},
+            ],
+        },
+        check_mcqs=[
+            {
+                "q": (
+                    "Which of these is a **pure** function?\n\n"
+                    "```\n"
+                    "def a(xs): xs.append(1); return xs\n"
+                    "def b(xs): return xs + [1]\n"
+                    "def c(): print('hi')\n"
+                    "```"
+                ),
+                "options": ["a", "b", "c", "All three"],
+                "correct": 1,
+                "why": (
+                    "b returns a new list and mutates nothing. "
+                    "a mutates its argument; c prints (side effect)."
+                ),
+            },
+            {
+                "q": (
+                    "What does this print?\n\n"
+                    "```\n"
+                    "def f(): pass\n"
+                    "print(f())\n"
+                    "```"
+                ),
+                "options": ["nothing", "0", "None", "Error"],
+                "correct": 2,
+                "why": "No `return` → implicitly returns None.",
+            },
+        ],
+        apply_challenge_slug=None,
+        reflect_question=(
+            "In two sentences, distinguish a *pure* function from one with "
+            "*side effects* — and explain why pure functions are easier to "
+            "test."
+        ),
+        reflect_rubric={
+            "must_mention": ["pure", "side effect", "return"],
+            "must_distinguish": [["return value", "side effect"]],
+            "must_explain": [
+                "pure: same input always gives same output",
+                "pure: no observable state change outside the function",
+                "purity makes tests deterministic",
+            ],
+        },
+        recall_checks=[
+            {
+                "kind": "mcq",
+                "q": "A function with no `return` returns:",
+                "options": ["0", "None", "the last expression"],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "Reassigning a parameter inside a function affects the caller's binding?",
+                "options": ["Yes", "No", "Only for ints"],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "A pure function has:",
+                "options": [
+                    "no return value",
+                    "no side effects and a deterministic return",
+                    "no arguments",
+                ],
+                "correct": 1,
+            },
+        ],
+    ),
+    # ------------------------------------------------------------------
+    # Concept 6: complexity — Big O, N vs operations, growth families.
+    # Uses complexity-plotter. The Try is to estimate whether two algorithms
+    # match in cost on the same input.
+    # ------------------------------------------------------------------
+    Concept(
+        n=6,
+        slug="complexity",
+        layer="universal",
+        title="Complexity",
+        one_line="How the number of operations grows with the size of the input.",
+        order_index=600,
+        prereqs=["control-flow"],
+        try_prompt_md=(
+            "**Try.** Two functions, both finding the maximum of a list of "
+            "N items:\n\n"
+            "```python\n"
+            "def max_a(xs):              # one pass\n"
+            "    m = xs[0]\n"
+            "    for x in xs:\n"
+            "        if x > m: m = x\n"
+            "    return m\n"
+            "\n"
+            "def max_b(xs):              # nested loop\n"
+            "    for x in xs:\n"
+            "        if all(x >= y for y in xs):\n"
+            "            return x\n"
+            "```\n\n"
+            "Which one stays fast as N grows to 1,000,000? Sketch in one "
+            "line *how* the cost grows for each."
+        ),
+        try_kind="text-reasoning",
+        try_expected_attempts=[
+            {
+                "pattern": r"max_a|a\b",
+                "callback_md": (
+                    "Correct on which is faster. The Read explains why "
+                    "max_a is O(N) and max_b is O(N²)."
+                ),
+            },
+            {
+                "pattern": r"max_b|b\b",
+                "callback_md": (
+                    "Counter-intuitive answer — the nested `all(...)` "
+                    "inside the loop quietly makes max_b O(N²), so on "
+                    "1M elements it's about a million times slower."
+                ),
+            },
+        ],
+        exposition_md=(
+            "**Time complexity** measures how the number of operations "
+            "grows as the input size N grows. We use Big-O notation to "
+            "describe the growth *family*, not the exact count.\n\n"
+            "The families you'll meet most:\n\n"
+            "- **O(1)** — constant. Cost doesn't depend on N. Hash lookups, "
+            "array indexing.\n"
+            "- **O(log N)** — logarithmic. Cost grows very slowly. Binary "
+            "search.\n"
+            "- **O(N)** — linear. Cost scales with N. One pass over a list.\n"
+            "- **O(N log N)** — linearithmic. Efficient sorts.\n"
+            "- **O(N²)** — quadratic. Nested loops over the same list. "
+            "Doubling N quadruples cost.\n"
+            "- **O(2ⁿ)** — exponential. Avoid for any non-trivial N.\n\n"
+            "Rule of thumb: every nested loop over the same data multiplies "
+            "the exponent on N. A loop calling a function that itself loops "
+            "over the input is O(N²), even if it doesn't *look* like a "
+            "nested loop."
+        ),
+        worked_example_md=(
+            "```python\n"
+            "# O(N): one pass.\n"
+            "def has_negative(xs):\n"
+            "    for x in xs:\n"
+            "        if x < 0: return True\n"
+            "    return False\n"
+            "\n"
+            "# O(N²): hidden inner loop.\n"
+            "def has_duplicate(xs):\n"
+            "    for i, x in enumerate(xs):\n"
+            "        if x in xs[i+1:]:        # `in` walks the slice\n"
+            "            return True\n"
+            "    return False\n"
+            "\n"
+            "# O(N): set membership is O(1) each.\n"
+            "def has_duplicate_fast(xs):\n"
+            "    return len(xs) != len(set(xs))\n"
+            "```"
+        ),
+        play_widget_kind="complexity-plotter",
+        play_widget={
+            "title": "Growth families on a log/linear plot",
+            "x_label": "N (input size)",
+            "y_label": "operations",
+            "curves": [
+                {"label": "O(1)", "kind": "constant"},
+                {"label": "O(log N)", "kind": "log"},
+                {"label": "O(N)", "kind": "linear"},
+                {"label": "O(N log N)", "kind": "nlogn"},
+                {"label": "O(N²)", "kind": "quadratic"},
+            ],
+            "controls": {"max_n": {"min": 100, "max": 10000, "step": 100, "default": 1000}},
+        },
+        check_mcqs=[
+            {
+                "q": (
+                    "What's the time complexity of this?\n\n"
+                    "```\n"
+                    "def f(xs):\n"
+                    "    seen = set()\n"
+                    "    for x in xs:\n"
+                    "        seen.add(x)\n"
+                    "    return len(seen)\n"
+                    "```"
+                ),
+                "options": ["O(1)", "O(log N)", "O(N)", "O(N²)"],
+                "correct": 2,
+                "why": "Single pass through xs; set ops are O(1) on average.",
+            },
+            {
+                "q": (
+                    "If algorithm A takes 1 second on N = 1000 and is O(N²), "
+                    "how long should it take on N = 10000?"
+                ),
+                "options": ["~10 seconds", "~100 seconds", "~1000 seconds", "~1 second"],
+                "correct": 1,
+                "why": "N grew 10×; cost grows as N² → 100×.",
+            },
+        ],
+        apply_challenge_slug=None,
+        reflect_question=(
+            "In two sentences, explain what `O(N²)` means — and give one "
+            "common code shape that produces it."
+        ),
+        reflect_rubric={
+            "must_mention": ["input size", "operations", "grow"],
+            "must_distinguish": [["O(N)", "O(N²)"]],
+            "must_explain": [
+                "operations grow as the square of the input size",
+                "doubling N quadruples cost",
+                "nested loops over the same data are the canonical source",
+            ],
+        },
+        recall_checks=[
+            {
+                "kind": "mcq",
+                "q": "Doubling N in an O(N²) algorithm multiplies cost by:",
+                "options": ["2", "4", "8"],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "Hash-set membership is typically:",
+                "options": ["O(1)", "O(log N)", "O(N)"],
+                "correct": 0,
+            },
+            {
+                "kind": "mcq",
+                "q": "A single pass over a list is:",
+                "options": ["O(1)", "O(N)", "O(N²)"],
+                "correct": 1,
+            },
+        ],
+    ),
+    # ------------------------------------------------------------------
+    # Concept 7: code as a state machine — first Layer-2 concept.
+    # Uses state-machine-animator. Builds on control-flow.
+    # ------------------------------------------------------------------
+    Concept(
+        n=7,
+        slug="code-as-state-machine",
+        layer="topic",
+        topic_slug="mental-models",
+        title="Code as a state machine",
+        one_line="Many programs are finite states plus rules for transitioning between them.",
+        order_index=700,
+        prereqs=["control-flow"],
+        try_prompt_md=(
+            "**Try.** A traffic light cycles RED → GREEN → YELLOW → RED, "
+            "one tick per second. Starting from RED at tick 0, what colour "
+            "is the light at tick 5?"
+        ),
+        try_kind="text-reasoning",
+        try_expected_attempts=[
+            {
+                "pattern": r"\bGREEN\b",
+                "callback_md": (
+                    "Correct: 0→RED, 1→GREEN, 2→YELLOW, 3→RED, 4→GREEN, "
+                    "5→YELLOW. Wait — that's YELLOW. Re-check your trace; "
+                    "the Read clarifies."
+                ),
+            },
+            {
+                "pattern": r"\bYELLOW\b",
+                "callback_md": (
+                    "Correct. Each transition advances exactly one state; "
+                    "with three states the pattern repeats every 3 ticks."
+                ),
+            },
+        ],
+        exposition_md=(
+            "Many programs are **state machines**: a finite set of "
+            "named states, a starting state, and rules describing which "
+            "state-to-state transitions an event triggers. Once you see "
+            "code this way you can answer two questions reliably: 'what "
+            "state am I in?' and 'which transitions are allowed from here?'\n\n"
+            "Concrete examples in the wild:\n\n"
+            "- A TCP connection: CLOSED → LISTEN → SYN_RCVD → ESTABLISHED → ...\n"
+            "- A vending machine: IDLE → COIN_INSERTED → SELECTION_MADE → DISPENSING → IDLE\n"
+            "- A form's submission flow: empty → in_progress → submitting → submitted | error\n\n"
+            "When you draw the state diagram you stop forgetting "
+            "transitions — and you catch impossible transitions (like "
+            "DISPENSING → COIN_INSERTED) before they cause bugs.\n\n"
+            "Code that *implements* a state machine often uses an enum "
+            "for states and a dispatch dict (or `match` statement) for "
+            "transitions. The bug is usually that someone introduced a "
+            "fourth state but only updated three of the transition rules."
+        ),
+        worked_example_md=(
+            "```python\n"
+            "# Traffic light as an explicit state machine.\n"
+            "NEXT = {'RED': 'GREEN', 'GREEN': 'YELLOW', 'YELLOW': 'RED'}\n"
+            "\n"
+            "state = 'RED'\n"
+            "for tick in range(6):\n"
+            "    print(tick, state)\n"
+            "    state = NEXT[state]\n"
+            "# 0 RED / 1 GREEN / 2 YELLOW / 3 RED / 4 GREEN / 5 YELLOW\n"
+            "```\n\n"
+            "The `NEXT` dict makes the transition rules *data*, not "
+            "control-flow. Adding a state to the cycle is a one-line "
+            "change; missing a transition is a KeyError at runtime, not "
+            "a silent bug."
+        ),
+        play_widget_kind="state-machine-animator",
+        play_widget={
+            "title": "Traffic light cycle",
+            "states": ["RED", "GREEN", "YELLOW"],
+            "initial": "RED",
+            "transitions": [
+                {"from": "RED", "event": "tick", "to": "GREEN"},
+                {"from": "GREEN", "event": "tick", "to": "YELLOW"},
+                {"from": "YELLOW", "event": "tick", "to": "RED"},
+            ],
+        },
+        check_mcqs=[
+            {
+                "q": (
+                    "A vending machine has states IDLE, COIN_INSERTED, "
+                    "DISPENSING. Which transition is most suspicious in a "
+                    "real implementation?"
+                ),
+                "options": [
+                    "IDLE → COIN_INSERTED on `insert_coin`",
+                    "COIN_INSERTED → DISPENSING on `select`",
+                    "DISPENSING → COIN_INSERTED on `insert_coin`",
+                    "DISPENSING → IDLE on `done`",
+                ],
+                "correct": 2,
+                "why": (
+                    "Inserting a coin while dispensing is almost certainly "
+                    "an error path — most state machines block input "
+                    "during the busy state."
+                ),
+            },
+            {
+                "q": (
+                    "Which is the best reason to model a workflow as an "
+                    "explicit state machine in code?"
+                ),
+                "options": [
+                    "It's faster at runtime",
+                    "It makes invalid transitions visible — and catchable",
+                    "It uses less memory",
+                    "It avoids exceptions",
+                ],
+                "correct": 1,
+                "why": (
+                    "The structural win is debuggability — illegal "
+                    "transitions become explicit instead of accidental."
+                ),
+            },
+        ],
+        apply_challenge_slug=None,
+        reflect_question=(
+            "In two sentences, explain what it means to model a piece of "
+            "code as a *state machine* — and why doing so often makes "
+            "bugs easier to spot."
+        ),
+        reflect_rubric={
+            "must_mention": ["state", "transition", "explicit"],
+            "must_distinguish": [["state", "transition"]],
+            "must_explain": [
+                "a state machine is a finite set of named states plus transition rules",
+                "making transitions explicit data flags impossible transitions",
+                "current-state plus allowed-transitions answers debugging questions reliably",
+            ],
+        },
+        recall_checks=[
+            {
+                "kind": "mcq",
+                "q": "A state machine is:",
+                "options": [
+                    "a class with no methods",
+                    "a finite set of states + transition rules",
+                    "any loop with break",
+                ],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "Encoding transitions as data (e.g. a dict) helps because:",
+                "options": [
+                    "It's faster than if/elif",
+                    "Adding a state is a one-line edit",
+                    "It uses less memory",
+                ],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "TCP, vending machines, and form workflows are all examples of:",
+                "options": ["sorted data", "state machines", "pure functions"],
+                "correct": 1,
+            },
+        ],
+    ),
     # Uses the call-stack-visualiser widget. The Try is to predict a small
     # factorial result without computing it longhand.
     # ------------------------------------------------------------------
@@ -999,7 +1502,12 @@ def write_sql() -> Path:
         "delete from public.concept_prereqs where concept_id in ("
         "select id from public.concepts);"
     )
-    lines.append("delete from public.concepts where slug like '%-%';")
+    # Wipe every concept row. There is only one source for `concepts` —
+    # this generator — so a blanket DELETE is safe and avoids the
+    # hyphen-filter bug (single-word slugs like 'recursion' would not
+    # match a `slug like '%-%'` clause and would survive a partial wipe).
+    lines.append("delete from public.concept_mastery;")
+    lines.append("delete from public.concepts;")
     lines.append("delete from public.diagnostic_questions where track_slug = "
                  f"'{TRACK_SLUG}';")
     lines.append("")

@@ -17,7 +17,8 @@ on conflict (slug) do update set
   is_published = excluded.is_published;
 
 delete from public.concept_prereqs where concept_id in (select id from public.concepts);
-delete from public.concepts where slug like '%-%';
+delete from public.concept_mastery;
+delete from public.concepts;
 delete from public.diagnostic_questions where track_slug = 'mental-models';
 
 insert into public.concepts (
@@ -95,6 +96,78 @@ insert into public.concepts (
 insert into public.concepts (
   id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
 ) values (
+  '00000000-0000-0000-0000-000000000403',
+  'functions',
+  'universal',
+  null,
+  E'Functions',
+  E'A function takes inputs, optionally has side effects, and may return a value.',
+  E'**Try.** Two near-identical functions. Predict what each call prints.\n\n```python\ndef add_in_place(xs, n):\n    xs.append(n)        # mutates xs\n\ndef add_returning(xs, n):\n    return xs + [n]     # returns a new list\n\na = [1, 2]\nadd_in_place(a, 3)\nprint(a)\n\nb = [1, 2]\nresult = add_returning(b, 3)\nprint(b, result)\n```',
+  'text-reasoning',
+  E'[{"pattern":"\\\\[1,\\\\s*2,\\\\s*3\\\\].*\\\\[1,\\\\s*2\\\\].*\\\\[1,\\\\s*2,\\\\s*3\\\\]","callback_md":"Correct — mutating vs returning is a real distinction."},{"pattern":"\\\\[1,\\\\s*2\\\\]","callback_md":"Partially right. The key difference is that `add_in_place` mutates `a`; `add_returning` leaves `b` alone but returns a new list."}]'::jsonb,
+  E'A function is a reusable block of code that takes inputs (arguments) and may produce outputs in two ways:\n\n1. **Return value** — what `return` sends back to the caller. If you omit `return`, Python implicitly returns `None`.\n2. **Side effects** — anything else visible outside the function: mutating an argument, printing, writing a file, modifying a global.\n\nA function is **pure** if its return value depends only on its arguments and it has no side effects. Pure functions are the easiest to test (same input → same output, always) and the easiest to reason about. Use them as the default; fall back to side effects only when you must.\n\nInside a function, the parameter names become **local bindings** — they live in a fresh scope. Reassigning them doesn''t affect the caller''s bindings. *Mutating* the object they point at does, because the binding and the object are different things (lesson: references-values).',
+  E'```python\ndef square(n):            # pure: same n → same return\n    return n * n\n\ndef shout(msg):           # side-effect: print is observable\n    print(msg.upper())\n    # no `return` → returns None\n\nx = square(4)             # x = 16\ny = shout(''hi'')           # prints HI; y is None\n```',
+  'code-stepper',
+  E'{"title":"Step through a function call","code":"def square(n):\\n    return n * n\\n\\nx = square(4)\\nprint(x)","steps":[{"line":4,"bindings":{},"caption":"Call square(4). Push a frame for square."},{"line":1,"bindings":{"n":"4"},"caption":"Inside square: parameter n is bound to 4 in the new frame."},{"line":2,"bindings":{"n":"4"},"caption":"Compute n * n = 16. Return value pops the frame."},{"line":4,"bindings":{"x":"16"},"caption":"Back in the caller. x is bound to the returned 16."},{"line":5,"bindings":{"x":"16"},"caption":"Print x → 16."}]}'::jsonb,
+  E'[{"q":"Which of these is a **pure** function?\\n\\n```\\ndef a(xs): xs.append(1); return xs\\ndef b(xs): return xs + [1]\\ndef c(): print(''hi'')\\n```","options":["a","b","c","All three"],"correct":1,"why":"b returns a new list and mutates nothing. a mutates its argument; c prints (side effect)."},{"q":"What does this print?\\n\\n```\\ndef f(): pass\\nprint(f())\\n```","options":["nothing","0","None","Error"],"correct":2,"why":"No `return` → implicitly returns None."}]'::jsonb,
+  null,
+  E'In two sentences, distinguish a *pure* function from one with *side effects* — and explain why pure functions are easier to test.',
+  E'{"must_mention":["pure","side effect","return"],"must_distinguish":[["return value","side effect"]],"must_explain":["pure: same input always gives same output","pure: no observable state change outside the function","purity makes tests deterministic"]}'::jsonb,
+  E'[{"kind":"mcq","q":"A function with no `return` returns:","options":["0","None","the last expression"],"correct":1},{"kind":"mcq","q":"Reassigning a parameter inside a function affects the caller''s binding?","options":["Yes","No","Only for ints"],"correct":1},{"kind":"mcq","q":"A pure function has:","options":["no return value","no side effects and a deterministic return","no arguments"],"correct":1}]'::jsonb,
+  400
+);
+
+insert into public.concepts (
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+) values (
+  '00000000-0000-0000-0000-000000000405',
+  'complexity',
+  'universal',
+  null,
+  E'Complexity',
+  E'How the number of operations grows with the size of the input.',
+  E'**Try.** Two functions, both finding the maximum of a list of N items:\n\n```python\ndef max_a(xs):              # one pass\n    m = xs[0]\n    for x in xs:\n        if x > m: m = x\n    return m\n\ndef max_b(xs):              # nested loop\n    for x in xs:\n        if all(x >= y for y in xs):\n            return x\n```\n\nWhich one stays fast as N grows to 1,000,000? Sketch in one line *how* the cost grows for each.',
+  'text-reasoning',
+  E'[{"pattern":"max_a|a\\\\b","callback_md":"Correct on which is faster. The Read explains why max_a is O(N) and max_b is O(N²)."},{"pattern":"max_b|b\\\\b","callback_md":"Counter-intuitive answer — the nested `all(...)` inside the loop quietly makes max_b O(N²), so on 1M elements it''s about a million times slower."}]'::jsonb,
+  E'**Time complexity** measures how the number of operations grows as the input size N grows. We use Big-O notation to describe the growth *family*, not the exact count.\n\nThe families you''ll meet most:\n\n- **O(1)** — constant. Cost doesn''t depend on N. Hash lookups, array indexing.\n- **O(log N)** — logarithmic. Cost grows very slowly. Binary search.\n- **O(N)** — linear. Cost scales with N. One pass over a list.\n- **O(N log N)** — linearithmic. Efficient sorts.\n- **O(N²)** — quadratic. Nested loops over the same list. Doubling N quadruples cost.\n- **O(2ⁿ)** — exponential. Avoid for any non-trivial N.\n\nRule of thumb: every nested loop over the same data multiplies the exponent on N. A loop calling a function that itself loops over the input is O(N²), even if it doesn''t *look* like a nested loop.',
+  E'```python\n# O(N): one pass.\ndef has_negative(xs):\n    for x in xs:\n        if x < 0: return True\n    return False\n\n# O(N²): hidden inner loop.\ndef has_duplicate(xs):\n    for i, x in enumerate(xs):\n        if x in xs[i+1:]:        # `in` walks the slice\n            return True\n    return False\n\n# O(N): set membership is O(1) each.\ndef has_duplicate_fast(xs):\n    return len(xs) != len(set(xs))\n```',
+  'complexity-plotter',
+  E'{"title":"Growth families on a log/linear plot","x_label":"N (input size)","y_label":"operations","curves":[{"label":"O(1)","kind":"constant"},{"label":"O(log N)","kind":"log"},{"label":"O(N)","kind":"linear"},{"label":"O(N log N)","kind":"nlogn"},{"label":"O(N²)","kind":"quadratic"}],"controls":{"max_n":{"min":100,"max":10000,"step":100,"default":1000}}}'::jsonb,
+  E'[{"q":"What''s the time complexity of this?\\n\\n```\\ndef f(xs):\\n    seen = set()\\n    for x in xs:\\n        seen.add(x)\\n    return len(seen)\\n```","options":["O(1)","O(log N)","O(N)","O(N²)"],"correct":2,"why":"Single pass through xs; set ops are O(1) on average."},{"q":"If algorithm A takes 1 second on N = 1000 and is O(N²), how long should it take on N = 10000?","options":["~10 seconds","~100 seconds","~1000 seconds","~1 second"],"correct":1,"why":"N grew 10×; cost grows as N² → 100×."}]'::jsonb,
+  null,
+  E'In two sentences, explain what `O(N²)` means — and give one common code shape that produces it.',
+  E'{"must_mention":["input size","operations","grow"],"must_distinguish":[["O(N)","O(N²)"]],"must_explain":["operations grow as the square of the input size","doubling N quadruples cost","nested loops over the same data are the canonical source"]}'::jsonb,
+  E'[{"kind":"mcq","q":"Doubling N in an O(N²) algorithm multiplies cost by:","options":["2","4","8"],"correct":1},{"kind":"mcq","q":"Hash-set membership is typically:","options":["O(1)","O(log N)","O(N)"],"correct":0},{"kind":"mcq","q":"A single pass over a list is:","options":["O(1)","O(N)","O(N²)"],"correct":1}]'::jsonb,
+  600
+);
+
+insert into public.concepts (
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+) values (
+  '00000000-0000-0000-0000-000000000406',
+  'code-as-state-machine',
+  'topic',
+  'mental-models',
+  E'Code as a state machine',
+  E'Many programs are finite states plus rules for transitioning between them.',
+  E'**Try.** A traffic light cycles RED → GREEN → YELLOW → RED, one tick per second. Starting from RED at tick 0, what colour is the light at tick 5?',
+  'text-reasoning',
+  E'[{"pattern":"\\\\bGREEN\\\\b","callback_md":"Correct: 0→RED, 1→GREEN, 2→YELLOW, 3→RED, 4→GREEN, 5→YELLOW. Wait — that''s YELLOW. Re-check your trace; the Read clarifies."},{"pattern":"\\\\bYELLOW\\\\b","callback_md":"Correct. Each transition advances exactly one state; with three states the pattern repeats every 3 ticks."}]'::jsonb,
+  E'Many programs are **state machines**: a finite set of named states, a starting state, and rules describing which state-to-state transitions an event triggers. Once you see code this way you can answer two questions reliably: ''what state am I in?'' and ''which transitions are allowed from here?''\n\nConcrete examples in the wild:\n\n- A TCP connection: CLOSED → LISTEN → SYN_RCVD → ESTABLISHED → ...\n- A vending machine: IDLE → COIN_INSERTED → SELECTION_MADE → DISPENSING → IDLE\n- A form''s submission flow: empty → in_progress → submitting → submitted | error\n\nWhen you draw the state diagram you stop forgetting transitions — and you catch impossible transitions (like DISPENSING → COIN_INSERTED) before they cause bugs.\n\nCode that *implements* a state machine often uses an enum for states and a dispatch dict (or `match` statement) for transitions. The bug is usually that someone introduced a fourth state but only updated three of the transition rules.',
+  E'```python\n# Traffic light as an explicit state machine.\nNEXT = {''RED'': ''GREEN'', ''GREEN'': ''YELLOW'', ''YELLOW'': ''RED''}\n\nstate = ''RED''\nfor tick in range(6):\n    print(tick, state)\n    state = NEXT[state]\n# 0 RED / 1 GREEN / 2 YELLOW / 3 RED / 4 GREEN / 5 YELLOW\n```\n\nThe `NEXT` dict makes the transition rules *data*, not control-flow. Adding a state to the cycle is a one-line change; missing a transition is a KeyError at runtime, not a silent bug.',
+  'state-machine-animator',
+  E'{"title":"Traffic light cycle","states":["RED","GREEN","YELLOW"],"initial":"RED","transitions":[{"from":"RED","event":"tick","to":"GREEN"},{"from":"GREEN","event":"tick","to":"YELLOW"},{"from":"YELLOW","event":"tick","to":"RED"}]}'::jsonb,
+  E'[{"q":"A vending machine has states IDLE, COIN_INSERTED, DISPENSING. Which transition is most suspicious in a real implementation?","options":["IDLE → COIN_INSERTED on `insert_coin`","COIN_INSERTED → DISPENSING on `select`","DISPENSING → COIN_INSERTED on `insert_coin`","DISPENSING → IDLE on `done`"],"correct":2,"why":"Inserting a coin while dispensing is almost certainly an error path — most state machines block input during the busy state."},{"q":"Which is the best reason to model a workflow as an explicit state machine in code?","options":["It''s faster at runtime","It makes invalid transitions visible — and catchable","It uses less memory","It avoids exceptions"],"correct":1,"why":"The structural win is debuggability — illegal transitions become explicit instead of accidental."}]'::jsonb,
+  null,
+  E'In two sentences, explain what it means to model a piece of code as a *state machine* — and why doing so often makes bugs easier to spot.',
+  E'{"must_mention":["state","transition","explicit"],"must_distinguish":[["state","transition"]],"must_explain":["a state machine is a finite set of named states plus transition rules","making transitions explicit data flags impossible transitions","current-state plus allowed-transitions answers debugging questions reliably"]}'::jsonb,
+  E'[{"kind":"mcq","q":"A state machine is:","options":["a class with no methods","a finite set of states + transition rules","any loop with break"],"correct":1},{"kind":"mcq","q":"Encoding transitions as data (e.g. a dict) helps because:","options":["It''s faster than if/elif","Adding a state is a one-line edit","It uses less memory"],"correct":1},{"kind":"mcq","q":"TCP, vending machines, and form workflows are all examples of:","options":["sorted data","state machines","pure functions"],"correct":1}]'::jsonb,
+  700
+);
+
+insert into public.concepts (
+  id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
+) values (
   '00000000-0000-0000-0000-000000000404',
   'recursion',
   'universal',
@@ -118,6 +191,10 @@ insert into public.concepts (
 
 insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'references-values' and p.slug = 'variables-names' on conflict do nothing;
 insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'control-flow' and p.slug = 'variables-names' on conflict do nothing;
+insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'functions' and p.slug = 'variables-names' on conflict do nothing;
+insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'functions' and p.slug = 'control-flow' on conflict do nothing;
+insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'complexity' and p.slug = 'control-flow' on conflict do nothing;
+insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'code-as-state-machine' and p.slug = 'control-flow' on conflict do nothing;
 insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'recursion' and p.slug = 'functions' on conflict do nothing;
 
 insert into public.diagnostic_questions (
