@@ -180,6 +180,37 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "tests/test_solution.py": "\"\"\"Tests for the vectorised rolling mean.\"\"\"\nimport numpy as np\nimport pytest\n\nfrom solution import rolling_mean\n\n\ndef test_simple_input_matches_hand_calc():\n    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])\n    out = rolling_mean(x, 3)\n    assert np.allclose(out, [2.0, 3.0, 4.0, 5.0])\n\n\ndef test_window_one_returns_input():\n    x = np.array([10.0, 20.0, 30.0])\n    assert np.allclose(rolling_mean(x, 1), x)\n\n\ndef test_window_equals_length_returns_single_mean():\n    x = np.array([1.0, 2.0, 3.0, 4.0])\n    out = rolling_mean(x, 4)\n    assert out.shape == (1,)\n    assert abs(out[0] - 2.5) < 1e-12\n\n\ndef test_shape_is_n_minus_w_plus_1():\n    rng = np.random.default_rng(0)\n    x = rng.normal(size=100)\n    out = rolling_mean(x, 7)\n    assert out.shape == (100 - 7 + 1,)\n\n\ndef test_matches_naive_loop_on_random_input():\n    rng = np.random.default_rng(42)\n    x = rng.normal(size=200)\n    w = 12\n    naive = np.array([x[i : i + w].mean() for i in range(len(x) - w + 1)])\n    assert np.allclose(rolling_mean(x, w), naive)\n"
   }
 },
+  "quant-12a-refactor-for-speed": {
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_correctness_hand_calc",
+      "description": "rolling_mean([1..6], 3) is [2, 3, 4, 5] \u2014 correctness sanity."
+    },
+    {
+      "id": "tests/test_solution.py::test_correctness_window_one_returns_input",
+      "description": "Window of 1 returns the input unchanged."
+    },
+    {
+      "id": "tests/test_solution.py::test_correctness_on_random_input",
+      "description": "Matches a Python list-comprehension reference on a 500-element series."
+    },
+    {
+      "id": "tests/test_solution.py::test_performance_under_150ms",
+      "description": "200k elements, window 100, completes in < 150 ms (the naive impl can't)."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Rolling mean: correctness PLUS a wall-clock budget.\n\nThe implementation below is correct but slow. Replace it with the\ncumsum-based version from the previous lesson so the performance\ntest passes.\n\"\"\"\nimport numpy as np\n\n\ndef rolling_mean(x: np.ndarray, w: int) -> np.ndarray:\n    \"\"\"Mean of every contiguous window of width w.\n\n    Returns ndarray of shape (len(x) - w + 1,). Same contract as\n    the previous lesson's reference.\n    \"\"\"\n    n = len(x)\n    out = np.empty(n - w + 1)\n    for i in range(n - w + 1):\n        s = 0.0\n        for j in range(w):\n            s += float(x[i + j])\n        out[i] = s / w\n    return out\n",
+    "tests/test_solution.py": "\"\"\"rolling_mean: correctness + 150ms wall-clock budget.\n\nThe performance budget is sized so the naive double-loop fails\ncomfortably (~600-1200ms in CPython, ~3-6s in Pyodide) and the\ncumsum version passes with margin (~5-20ms).\n\"\"\"\nimport time\nimport numpy as np\nimport pytest\n\nfrom solution import rolling_mean\n\n\ndef test_correctness_hand_calc():\n    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])\n    assert np.allclose(rolling_mean(x, 3), [2.0, 3.0, 4.0, 5.0])\n\n\ndef test_correctness_window_one_returns_input():\n    x = np.array([10.0, 20.0, 30.0])\n    assert np.allclose(rolling_mean(x, 1), x)\n\n\ndef test_correctness_on_random_input():\n    rng = np.random.default_rng(0)\n    x = rng.normal(size=500)\n    w = 12\n    naive = np.array([x[i : i + w].mean() for i in range(len(x) - w + 1)])\n    assert np.allclose(rolling_mean(x, w), naive)\n\n\ndef test_performance_under_150ms():\n    # 200k elements, window 100 \u2192 20M ops in the naive double loop.\n    # The cumsum identity is two numpy passes; budget 150ms\n    # comfortably fits the latter and excludes the former.\n    rng = np.random.default_rng(42)\n    x = rng.normal(size=200_000)\n    # Warm any first-call JIT / caching by running once before timing.\n    rolling_mean(x, 100)\n    t0 = time.perf_counter()\n    rolling_mean(x, 100)\n    elapsed_ms = (time.perf_counter() - t0) * 1000\n    assert elapsed_ms < 150, (\n        f\"Took {elapsed_ms:.1f}ms; needs to be < 150ms \u2014 vectorise.\"\n    )\n"
+  }
+},
   "quant-13-plot-a-price-path": {
   "mode": "matplot",
   "template": "import numpy as np, matplotlib.pyplot as plt\nrng = np.random.default_rng(0)\nshocks = rng.normal(0, 0.01, 252)\nprice = 100 * np.exp(np.cumsum(shocks))\nplt.plot(___)\nplt.title('Simulated price path')\nplt.xlabel('trading day')\nplt.ylabel('price (USD)')\nprint('plotted')",
@@ -320,6 +351,37 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "datasets": [
     "spy"
   ]
+},
+  "quant-21a-refactor-returns-for-speed": {
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_correctness_small_input",
+      "description": "Hand-calculated 3-row frame: returns are +0.10 then -0.10."
+    },
+    {
+      "id": "tests/test_solution.py::test_correctness_matches_pct_change",
+      "description": "Matches df['adj_close'].pct_change().dropna() on a 1k-row GBM frame."
+    },
+    {
+      "id": "tests/test_solution.py::test_correctness_no_nan_no_leading_row",
+      "description": "No NaN in output; length is len(df) - 1."
+    },
+    {
+      "id": "tests/test_solution.py::test_performance_under_80ms_on_100k_rows",
+      "description": "100k-row frame completes in < 80 ms (the per-row Python loop can't)."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Daily returns from a price series \u2014 correct, but slow.\n\nThe contract: take a DataFrame with column 'adj_close' (chronological\norder) and return a Series of simple daily returns of length\nlen(df) - 1. Replace the body with a vectorised pandas call so the\nperf test passes.\n\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef daily_returns(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Simple daily returns of df['adj_close'].\"\"\"\n    closes = df['adj_close']\n    rets = []\n    # Slow: per-row Python dispatch through .iloc on each step.\n    for i in range(1, len(closes)):\n        prev = float(closes.iloc[i - 1])\n        cur = float(closes.iloc[i])\n        rets.append((cur - prev) / prev)\n    return pd.Series(rets, index=closes.index[1:])\n",
+    "tests/test_solution.py": "\"\"\"daily_returns: correctness + 100ms wall-clock budget on 50k rows.\n\nThe naive per-row Python loop typically takes ~500ms-1s in CPython\non 50k rows; the vectorised pct_change is ~5-15ms. Budget 100ms\ncomfortably separates them.\n\"\"\"\nimport time\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import daily_returns\n\n\ndef _gbm_frame(n: int, seed: int = 0) -> pd.DataFrame:\n    rng = np.random.default_rng(seed)\n    shocks = rng.normal(0.0, 0.01, n)\n    closes = 100.0 * np.exp(np.cumsum(shocks))\n    return pd.DataFrame({'adj_close': closes})\n\n\ndef test_correctness_small_input():\n    df = pd.DataFrame({'adj_close': [100.0, 110.0, 99.0]})\n    r = daily_returns(df)\n    assert len(r) == 2\n    assert abs(float(r.iloc[0]) - 0.10) < 1e-9\n    assert abs(float(r.iloc[1]) - (-0.10)) < 1e-9\n\n\ndef test_correctness_matches_pct_change():\n    df = _gbm_frame(1_000, seed=7)\n    expected = df['adj_close'].pct_change().dropna()\n    got = daily_returns(df)\n    assert np.allclose(got.values, expected.values)\n\n\ndef test_correctness_no_nan_no_leading_row():\n    df = _gbm_frame(100)\n    r = daily_returns(df)\n    assert r.isna().sum() == 0\n    assert len(r) == len(df) - 1\n\n\ndef test_performance_under_80ms_on_100k_rows():\n    df = _gbm_frame(100_000, seed=42)\n    # Warm-up call to take any first-time setup off the clock.\n    daily_returns(df)\n    t0 = time.perf_counter()\n    daily_returns(df)\n    elapsed_ms = (time.perf_counter() - t0) * 1000\n    assert elapsed_ms < 80, (\n        f\"Took {elapsed_ms:.1f}ms; needs to be < 80ms \u2014 drop the loop.\"\n    )\n"
+  }
 },
   "quant-22-ols-beta-of-aapl-on-spy": {
   "mode": "pyodide",

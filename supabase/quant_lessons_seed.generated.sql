@@ -417,6 +417,40 @@ insert into public.challenges (
   repo_template_url, repo_branch, validation_config_json, ai_rules_json,
   skills, is_free, order_index
 ) values (
+  '00000000-0000-0000-0000-000000000337',
+  '00000000-0000-0000-0000-000000000031',
+  'quant-12a-refactor-for-speed',
+  E'Refactor for speed',
+  E'The naive rolling mean below is correct — its tests pass. But it''s a double loop, and the senior on the desk has flagged it as too slow for the live tick feed. Same function signature, same answer, 10× faster: the cumsum identity from the previous lesson. This time the test suite includes a wall-clock budget you have to beat.',
+  E'Replace the correct-but-slow double-loop rolling_mean with the cumsum-vectorised version; pass both the correctness suite and a 150 ms wall-clock budget on a 200k-element input.',
+  E'**Concept.** Code can be correct and still be wrong. In a real trading system, anything that touches the per-tick path has a latency budget; missing the budget is a production failure even if the output is bit-exact. Vectorisation is the highest-leverage move on the Python side — push the work into a tight C loop inside numpy, eliminate the per-element interpreter dispatch from the previous lesson. Same identity as quant-12: a prefix-sum difference computes any window-sum in one numpy pass.\n\n**Implement the function.** The function is correct — three tests already pass. The fourth (performance) fails because the body is a double-loop. Replace it with the cumsum-identity vectorised version from the previous lesson.\n\n**Expected.** All tests pass.\n\n**Why this?** Correct-but-slow is a production failure on a per-tick code path. Vectorising — pushing the inner loop into C inside numpy — is the highest-leverage performance move you can make in Python before reaching for Cython, Numba, or C extensions.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'numpy', 'vectorisation', 'performance'],
+  true,
+  1210
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
   '00000000-0000-0000-0000-00000000030c',
   '00000000-0000-0000-0000-000000000031',
   'quant-13-plot-a-price-path',
@@ -703,6 +737,40 @@ insert into public.challenges (
   array['quant', 'pandas', 'statistics'],
   true,
   2100
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000338',
+  '00000000-0000-0000-0000-000000000032',
+  'quant-21a-refactor-returns-for-speed',
+  E'Refactor returns for speed',
+  E'The returns calculator below is correct but uses `df.apply(lambda)` — pandas''s slowest per-row idiom. On a 10k-row tape it''s fine; on a billion-row tick tape it''s a 30-minute job that should take 30 seconds. Same answer, vectorised pandas: drop the apply, use `pct_change` (or its log-return cousin) directly.',
+  E'Replace the apply-lambda returns calculator with vectorised pandas; pass the correctness suite AND a wall-clock budget on a 50k-row frame.',
+  E'**Concept.** `Series.apply(lambda)` invokes the Python function once per element — the same per-element interpreter cost that the previous numpy lessons tried to avoid. The vectorised pandas idiom for simple returns is `s.pct_change()`; for log returns it''s `np.log(s / s.shift(1))`. Both run as compiled numpy under the hood. The speedup over apply is typically 50-200×.\n\n**Implement the function.** Three correctness tests already pass. The fourth (performance) fails because the body uses `apply(lambda)` plus a Python loop. Replace both with a single vectorised pandas call.\n\n**Expected.** All tests pass.\n\n**Why this?** `apply(lambda)` is the pandas equivalent of a Python for-loop — same per-row interpreter dispatch. Vectorised pandas (`pct_change`, `rolling`, `groupby`-aggregations) pushes the work into compiled C and typically buys 50-200× speedup.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'pandas', 'vectorisation', 'performance'],
+  true,
+  2110
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,

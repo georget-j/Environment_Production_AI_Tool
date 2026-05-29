@@ -973,6 +973,118 @@ LESSONS: list[Lesson] = [
         skills=["quant", "numpy", "vectorisation", "performance"],
     ),
     Lesson(
+        n=56, stage=1, mode="skeleton",
+        n_label="12a",
+        order_index_override=1210,
+        title="Refactor for speed",
+        scenario="The naive rolling mean below is correct — its tests pass. But it's a double loop, and the senior on the desk has flagged it as too slow for the live tick feed. Same function signature, same answer, 10× faster: the cumsum identity from the previous lesson. This time the test suite includes a wall-clock budget you have to beat.",
+        learner_goal="Replace the correct-but-slow double-loop rolling_mean with the cumsum-vectorised version; pass both the correctness suite and a 150 ms wall-clock budget on a 200k-element input.",
+        concept="Code can be correct and still be wrong. In a real trading system, anything that touches the per-tick path has a latency budget; missing the budget is a production failure even if the output is bit-exact. Vectorisation is the highest-leverage move on the Python side — push the work into a tight C loop inside numpy, eliminate the per-element interpreter dispatch from the previous lesson. Same identity as quant-12: a prefix-sum difference computes any window-sum in one numpy pass.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Rolling mean: correctness PLUS a wall-clock budget.\n"
+            "\n"
+            "The implementation below is correct but slow. Replace it with the\n"
+            "cumsum-based version from the previous lesson so the performance\n"
+            "test passes.\n"
+            "\"\"\"\n"
+            "import numpy as np\n"
+            "\n"
+            "\n"
+            "def rolling_mean(x: np.ndarray, w: int) -> np.ndarray:\n"
+            "    \"\"\"Mean of every contiguous window of width w.\n"
+            "\n"
+            "    Returns ndarray of shape (len(x) - w + 1,). Same contract as\n"
+            "    the previous lesson's reference.\n"
+            "    \"\"\"\n"
+            "    n = len(x)\n"
+            "    out = np.empty(n - w + 1)\n"
+            "    for i in range(n - w + 1):\n"
+            "        s = 0.0\n"
+            "        for j in range(w):\n"
+            "            s += float(x[i + j])\n"
+            "        out[i] = s / w\n"
+            "    return out\n"
+        ),
+        reference_solution=(
+            "import numpy as np\n"
+            "\n"
+            "\n"
+            "def rolling_mean(x: np.ndarray, w: int) -> np.ndarray:\n"
+            "    c = np.concatenate(([0.0], np.cumsum(x)))\n"
+            "    return (c[w:] - c[:-w]) / w\n"
+        ),
+        tests_py=(
+            "\"\"\"rolling_mean: correctness + 150ms wall-clock budget.\n"
+            "\n"
+            "The performance budget is sized so the naive double-loop fails\n"
+            "comfortably (~600-1200ms in CPython, ~3-6s in Pyodide) and the\n"
+            "cumsum version passes with margin (~5-20ms).\n"
+            "\"\"\"\n"
+            "import time\n"
+            "import numpy as np\n"
+            "import pytest\n"
+            "\n"
+            "from solution import rolling_mean\n"
+            "\n"
+            "\n"
+            "def test_correctness_hand_calc():\n"
+            "    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])\n"
+            "    assert np.allclose(rolling_mean(x, 3), [2.0, 3.0, 4.0, 5.0])\n"
+            "\n"
+            "\n"
+            "def test_correctness_window_one_returns_input():\n"
+            "    x = np.array([10.0, 20.0, 30.0])\n"
+            "    assert np.allclose(rolling_mean(x, 1), x)\n"
+            "\n"
+            "\n"
+            "def test_correctness_on_random_input():\n"
+            "    rng = np.random.default_rng(0)\n"
+            "    x = rng.normal(size=500)\n"
+            "    w = 12\n"
+            "    naive = np.array([x[i : i + w].mean() for i in range(len(x) - w + 1)])\n"
+            "    assert np.allclose(rolling_mean(x, w), naive)\n"
+            "\n"
+            "\n"
+            "def test_performance_under_150ms():\n"
+            "    # 200k elements, window 100 → 20M ops in the naive double loop.\n"
+            "    # The cumsum identity is two numpy passes; budget 150ms\n"
+            "    # comfortably fits the latter and excludes the former.\n"
+            "    rng = np.random.default_rng(42)\n"
+            "    x = rng.normal(size=200_000)\n"
+            "    # Warm any first-call JIT / caching by running once before timing.\n"
+            "    rolling_mean(x, 100)\n"
+            "    t0 = time.perf_counter()\n"
+            "    rolling_mean(x, 100)\n"
+            "    elapsed_ms = (time.perf_counter() - t0) * 1000\n"
+            "    assert elapsed_ms < 150, (\n"
+            "        f\"Took {elapsed_ms:.1f}ms; needs to be < 150ms — vectorise.\"\n"
+            "    )\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_correctness_hand_calc",
+                "rolling_mean([1..6], 3) is [2, 3, 4, 5] — correctness sanity.",
+            ),
+            (
+                "tests/test_solution.py::test_correctness_window_one_returns_input",
+                "Window of 1 returns the input unchanged.",
+            ),
+            (
+                "tests/test_solution.py::test_correctness_on_random_input",
+                "Matches a Python list-comprehension reference on a 500-element series.",
+            ),
+            (
+                "tests/test_solution.py::test_performance_under_150ms",
+                "200k elements, window 100, completes in < 150 ms (the naive impl can't).",
+            ),
+        ],
+        your_turn="The function is correct — three tests already pass. The fourth (performance) fails because the body is a double-loop. Replace it with the cumsum-identity vectorised version from the previous lesson.",
+        hint="`c = np.concatenate(([0.0], np.cumsum(x)))`; then `(c[w:] - c[:-w]) / w`. Two lines, no inner loop.",
+        why_this="Correct-but-slow is a production failure on a per-tick code path. Vectorising — pushing the inner loop into C inside numpy — is the highest-leverage performance move you can make in Python before reaching for Cython, Numba, or C extensions.",
+        skills=["quant", "numpy", "vectorisation", "performance"],
+    ),
+    Lesson(
         n=13, stage=1, mode="matplot",
         title="Plot a price path",
         scenario="Every research note ships with a chart. The first one's always the same: simulate a price path, plot it, label axes, title. Get that muscle memory and the rest of matplotlib is just more of the same.",
@@ -1472,6 +1584,123 @@ LESSONS: list[Lesson] = [
         hint="Three letters.",
         skills=["quant", "pandas", "statistics"],
         datasets=["spy"],
+    ),
+    Lesson(
+        n=57, stage=2, mode="skeleton",
+        n_label="21a",
+        order_index_override=2110,
+        title="Refactor returns for speed",
+        scenario="The returns calculator below is correct but uses `df.apply(lambda)` — pandas's slowest per-row idiom. On a 10k-row tape it's fine; on a billion-row tick tape it's a 30-minute job that should take 30 seconds. Same answer, vectorised pandas: drop the apply, use `pct_change` (or its log-return cousin) directly.",
+        learner_goal="Replace the apply-lambda returns calculator with vectorised pandas; pass the correctness suite AND a wall-clock budget on a 50k-row frame.",
+        concept="`Series.apply(lambda)` invokes the Python function once per element — the same per-element interpreter cost that the previous numpy lessons tried to avoid. The vectorised pandas idiom for simple returns is `s.pct_change()`; for log returns it's `np.log(s / s.shift(1))`. Both run as compiled numpy under the hood. The speedup over apply is typically 50-200×.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Daily returns from a price series — correct, but slow.\n"
+            "\n"
+            "The contract: take a DataFrame with column 'adj_close' (chronological\n"
+            "order) and return a Series of simple daily returns of length\n"
+            "len(df) - 1. Replace the body with a vectorised pandas call so the\n"
+            "perf test passes.\n"
+            "\"\"\"\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "\n"
+            "\n"
+            "def daily_returns(df: pd.DataFrame) -> pd.Series:\n"
+            "    \"\"\"Simple daily returns of df['adj_close'].\"\"\"\n"
+            "    closes = df['adj_close']\n"
+            "    rets = []\n"
+            "    # Slow: per-row Python dispatch through .iloc on each step.\n"
+            "    for i in range(1, len(closes)):\n"
+            "        prev = float(closes.iloc[i - 1])\n"
+            "        cur = float(closes.iloc[i])\n"
+            "        rets.append((cur - prev) / prev)\n"
+            "    return pd.Series(rets, index=closes.index[1:])\n"
+        ),
+        reference_solution=(
+            "import pandas as pd\n"
+            "\n"
+            "\n"
+            "def daily_returns(df: pd.DataFrame) -> pd.Series:\n"
+            "    return df['adj_close'].pct_change().dropna()\n"
+        ),
+        tests_py=(
+            "\"\"\"daily_returns: correctness + 100ms wall-clock budget on 50k rows.\n"
+            "\n"
+            "The naive per-row Python loop typically takes ~500ms-1s in CPython\n"
+            "on 50k rows; the vectorised pct_change is ~5-15ms. Budget 100ms\n"
+            "comfortably separates them.\n"
+            "\"\"\"\n"
+            "import time\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "import pytest\n"
+            "\n"
+            "from solution import daily_returns\n"
+            "\n"
+            "\n"
+            "def _gbm_frame(n: int, seed: int = 0) -> pd.DataFrame:\n"
+            "    rng = np.random.default_rng(seed)\n"
+            "    shocks = rng.normal(0.0, 0.01, n)\n"
+            "    closes = 100.0 * np.exp(np.cumsum(shocks))\n"
+            "    return pd.DataFrame({'adj_close': closes})\n"
+            "\n"
+            "\n"
+            "def test_correctness_small_input():\n"
+            "    df = pd.DataFrame({'adj_close': [100.0, 110.0, 99.0]})\n"
+            "    r = daily_returns(df)\n"
+            "    assert len(r) == 2\n"
+            "    assert abs(float(r.iloc[0]) - 0.10) < 1e-9\n"
+            "    assert abs(float(r.iloc[1]) - (-0.10)) < 1e-9\n"
+            "\n"
+            "\n"
+            "def test_correctness_matches_pct_change():\n"
+            "    df = _gbm_frame(1_000, seed=7)\n"
+            "    expected = df['adj_close'].pct_change().dropna()\n"
+            "    got = daily_returns(df)\n"
+            "    assert np.allclose(got.values, expected.values)\n"
+            "\n"
+            "\n"
+            "def test_correctness_no_nan_no_leading_row():\n"
+            "    df = _gbm_frame(100)\n"
+            "    r = daily_returns(df)\n"
+            "    assert r.isna().sum() == 0\n"
+            "    assert len(r) == len(df) - 1\n"
+            "\n"
+            "\n"
+            "def test_performance_under_80ms_on_100k_rows():\n"
+            "    df = _gbm_frame(100_000, seed=42)\n"
+            "    # Warm-up call to take any first-time setup off the clock.\n"
+            "    daily_returns(df)\n"
+            "    t0 = time.perf_counter()\n"
+            "    daily_returns(df)\n"
+            "    elapsed_ms = (time.perf_counter() - t0) * 1000\n"
+            "    assert elapsed_ms < 80, (\n"
+            "        f\"Took {elapsed_ms:.1f}ms; needs to be < 80ms — drop the loop.\"\n"
+            "    )\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_correctness_small_input",
+                "Hand-calculated 3-row frame: returns are +0.10 then -0.10.",
+            ),
+            (
+                "tests/test_solution.py::test_correctness_matches_pct_change",
+                "Matches df['adj_close'].pct_change().dropna() on a 1k-row GBM frame.",
+            ),
+            (
+                "tests/test_solution.py::test_correctness_no_nan_no_leading_row",
+                "No NaN in output; length is len(df) - 1.",
+            ),
+            (
+                "tests/test_solution.py::test_performance_under_80ms_on_100k_rows",
+                "100k-row frame completes in < 80 ms (the per-row Python loop can't).",
+            ),
+        ],
+        your_turn="Three correctness tests already pass. The fourth (performance) fails because the body uses `apply(lambda)` plus a Python loop. Replace both with a single vectorised pandas call.",
+        hint="`df['adj_close'].pct_change().dropna()` is one line. That's the whole function body.",
+        why_this="`apply(lambda)` is the pandas equivalent of a Python for-loop — same per-row interpreter dispatch. Vectorised pandas (`pct_change`, `rolling`, `groupby`-aggregations) pushes the work into compiled C and typically buys 50-200× speedup.",
+        skills=["quant", "pandas", "vectorisation", "performance"],
     ),
     Lesson(
         n=22, stage=2, mode="apifetch",
