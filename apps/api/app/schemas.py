@@ -112,3 +112,97 @@ class TrackProgressDetail(_Base):
     completed: int
     total: int
     module_progress: dict[str, dict[str, int]]  # module_id (str) → {completed, total}
+
+
+# ----------------------------------------------------------------------------
+# Concept atoms — Mental Models for Code pilot (CC.1)
+# ----------------------------------------------------------------------------
+
+
+class ConceptStageProgress(_Base):
+    """Snapshot of one learner's progress through a concept's stages.
+
+    Each field is the completion timestamp for that stage, or null if
+    not yet completed. mastered_at flips when read..reflect are all set.
+    status is the human-readable rollup ('in_progress'|'mastered'|'needs_review').
+    """
+
+    try_attempted_at: datetime | None = None
+    try_attempt_text: str | None = None
+    read_completed_at: datetime | None = None
+    play_completed_at: datetime | None = None
+    check_completed_at: datetime | None = None
+    apply_completed_at: datetime | None = None
+    reflect_completed_at: datetime | None = None
+    mastered_at: datetime | None = None
+    next_recall_due_at: datetime | None = None
+    recall_interval_days: int = 1
+    recall_streak: int = 0
+    status: str = "in_progress"
+
+
+class ConceptSummary(_Base):
+    """Listed in the track index and the concept map."""
+
+    id: UUID
+    slug: str
+    layer: str
+    topic_slug: str | None
+    title: str
+    one_line: str
+    order_index: int
+
+
+class ConceptDetail(ConceptSummary):
+    """Full concept payload — used by the unit shell to render all 6 stages."""
+
+    try_prompt_md: str
+    try_kind: str
+    try_expected_attempts_json: list
+    exposition_md: str
+    worked_example_md: str
+    play_widget_kind: str
+    play_widget_json: dict
+    check_mcqs_json: list
+    apply_challenge_slug: str | None
+    reflect_question: str
+    reflect_rubric_json: dict
+    recall_checks_json: list
+    # Slugs of prerequisite concepts — used by the concept map + the
+    # "you may want to revisit X" recommendation in Apply.
+    prereqs: list[str] = []
+    # Current learner's per-stage progress, if signed in. Optional so an
+    # anonymous read-only client can still fetch the concept.
+    progress: ConceptStageProgress | None = None
+
+
+class StageCompleteRequest(_Base):
+    """POST body when the learner finishes a stage. Always idempotent —
+    re-completing a stage is a no-op."""
+
+    stage: str  # 'read' | 'play' | 'check' | 'apply' | 'reflect'
+
+
+class StageCompleteResponse(_Base):
+    progress: ConceptStageProgress
+
+
+class TryAttemptRequest(_Base):
+    """POST body when the learner submits a Try attempt."""
+
+    attempt_text: str
+
+
+class ReflectGradeRequest(_Base):
+    """POST body for the Reflect stage — the learner's explanation goes
+    to the mentor for rubric grading."""
+
+    explanation: str
+
+
+class ReflectGradeResponse(_Base):
+    verdict: str  # 'complete' | 'shallow'
+    follow_up: str | None = None
+    rubric_hits: dict = {}
+    # When verdict == 'complete', the server also marks reflect_completed_at.
+    progress: ConceptStageProgress

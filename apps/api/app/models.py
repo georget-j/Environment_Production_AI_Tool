@@ -1,7 +1,11 @@
-"""SQLAlchemy models mirroring supabase/migrations/0001_init.sql.
+"""SQLAlchemy models mirroring supabase/migrations/*.sql.
 
 Supabase is canonical for schema. These models exist so apps/api can issue
 typed queries against the same Postgres instance the web app reads via PostgREST.
+
+Migrations:
+- 0001_init.sql        — tracks/modules/challenges + progress/submissions/messages
+- 0002_concepts_*.sql  — concepts + mastery + diagnostics (Mental Models pilot)
 """
 
 from __future__ import annotations
@@ -114,3 +118,104 @@ class AIMessage(Base):
     prompt_sha: Mapped[str | None] = mapped_column(String, nullable=True)
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ============================================================================
+# Concept atoms — Mental Models for Code pilot (migration 0002)
+# ============================================================================
+
+
+class Concept(Base):
+    __tablename__ = "concepts"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    layer: Mapped[str] = mapped_column(String, nullable=False)
+    topic_slug: Mapped[str | None] = mapped_column(String, nullable=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    one_line: Mapped[str] = mapped_column(Text, nullable=False)
+    # Try stage
+    try_prompt_md: Mapped[str] = mapped_column(Text, nullable=False)
+    try_kind: Mapped[str] = mapped_column(String, nullable=False)
+    try_expected_attempts_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    # Read stage
+    exposition_md: Mapped[str] = mapped_column(Text, nullable=False)
+    worked_example_md: Mapped[str] = mapped_column(Text, nullable=False)
+    # Play stage
+    play_widget_kind: Mapped[str] = mapped_column(String, nullable=False)
+    play_widget_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    # Check stage
+    check_mcqs_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    # Apply stage
+    apply_challenge_slug: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Reflect stage
+    reflect_question: Mapped[str] = mapped_column(Text, nullable=False)
+    reflect_rubric_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    # Spaced-recall pool
+    recall_checks_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ConceptPrereq(Base):
+    __tablename__ = "concept_prereqs"
+
+    concept_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("concepts.id", ondelete="CASCADE"), primary_key=True
+    )
+    prereq_concept_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("concepts.id", ondelete="RESTRICT"), primary_key=True
+    )
+
+
+class ConceptMastery(Base):
+    __tablename__ = "concept_mastery"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    concept_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("concepts.id", ondelete="CASCADE"), primary_key=True
+    )
+    # Try stage (non-blocking; productive-failure record)
+    try_attempted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    try_attempt_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Main pipeline
+    read_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    play_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    check_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    apply_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reflect_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    mastered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Spaced-recall scheduling (SuperMemo-2-lite)
+    next_recall_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    recall_interval_days: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    recall_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="in_progress", nullable=False)
+
+
+class DiagnosticQuestion(Base):
+    __tablename__ = "diagnostic_questions"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    track_slug: Mapped[str] = mapped_column(String, nullable=False)
+    layer: Mapped[str] = mapped_column(String, nullable=False)
+    question_md: Mapped[str] = mapped_column(Text, nullable=False)
+    question_kind: Mapped[str] = mapped_column(String, nullable=False)
+    options_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    expected_answer: Mapped[str] = mapped_column(Text, nullable=False)
+    maps_to_concept_slugs: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DiagnosticResponse(Base):
+    __tablename__ = "diagnostic_responses"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    track_slug: Mapped[str] = mapped_column(String, nullable=False)
+    responses_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    inferred_mastery_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    recommended_start_slug: Mapped[str] = mapped_column(String, nullable=False)
+    taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
