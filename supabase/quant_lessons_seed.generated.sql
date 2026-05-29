@@ -1539,6 +1539,40 @@ insert into public.challenges (
   repo_template_url, repo_branch, validation_config_json, ai_rules_json,
   skills, is_free, order_index
 ) values (
+  '00000000-0000-0000-0000-00000000033b',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-38a-build-a-momentum-strategy',
+  E'Build a momentum strategy',
+  E'The previous three lessons built signal, model, and validation. None of them produced a P&L. This is where they connect: read bars from a mock data feed, decide a position from a momentum signal, hold for one day, repeat. The tests include the same lookahead-bias check the senior risk officer runs on every new strategy.',
+  E'Implement a momentum signal + a one-day-hold backtest that passes correctness, no-lookahead, and basic monotonicity tests.',
+  E'**Concept.** A trading algorithm is a function from (history of bars) → (sequence of positions). This lesson factors it into two pieces: `signal_at(closes, t)` returns the desired position at time t (using only past data), and `backtest(symbol)` runs the signal across history and aggregates the P&L. The lookahead-bias test is the structural check that catches most junior bugs: if you can replace future bars with garbage and the signal at t doesn''t change, your function is honest.\n\n**Implement the function.** Implement `signal_at` (4-5 lines of branching) and `backtest` (a loop over closes, accumulate signal × next-day return, compute Sharpe + max drawdown). The lookahead-bias test is the structural check most junior bugs trip.\n\n**Expected.** All tests pass.\n\n**Why this?** This loop is the smallest end-to-end backtest you can build — signal → position → return → metrics. The same shape underlies vectorbt, zipline, and every fund''s in-house backtester. Get this honest (no lookahead) and the rest is just feature engineering.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning', 'backtesting'],
+  true,
+  3810
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
   '00000000-0000-0000-0000-000000000326',
   '00000000-0000-0000-0000-000000000034',
   'quant-39-the-p-hacked-sharpe-trap',

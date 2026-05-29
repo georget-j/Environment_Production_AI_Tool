@@ -73,6 +73,10 @@ def verify_pytest_lesson(lesson) -> tuple[bool, str]:
             (d / "mock_api.py").write_text(
                 lesson.mock_api_py, encoding="utf-8"
             )
+        for filename, content in lesson.extra_readonly.items():
+            full_path = d / filename
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path.write_text(content, encoding="utf-8")
 
         def run() -> int:
             res = subprocess.run(

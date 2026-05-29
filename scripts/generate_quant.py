@@ -158,6 +158,12 @@ class Lesson:
     # to discover the available endpoints, then writes the client code
     # in solution.py.
     mock_api_py: str = ""
+    # Generic multi-file extension. Map of filename → content for additional
+    # readonly files mounted alongside tests/test_solution.py — used by
+    # multi-file capstones (e.g. mock_market.py for the trading-algorithm
+    # lessons). Distinct from `mock_api_py` to keep the apifetch contract
+    # uncluttered.
+    extra_readonly: dict[str, str] = field(default_factory=dict)
     # List of (pytest_id, description) pairs for the TestCase[] array in
     # the generated TS config. Description shown in the runner's tests
     # panel before the learner clicks Run.
@@ -313,6 +319,11 @@ class Lesson:
             if self.mode == "apifetch":
                 readonly_files.insert(0, "mock_api.py")
                 inline_map["mock_api.py"] = self.mock_api_py
+            for filename, content in self.extra_readonly.items():
+                # Multi-file capstones mount additional readonly modules
+                # (e.g. mock_market.py) alongside the tests.
+                readonly_files.insert(0, filename)
+                inline_map[filename] = content
             payload = {
                 "mode": "pyodide",
                 "editable": ["solution.py"],
@@ -3752,6 +3763,279 @@ LESSONS: list[Lesson] = [
         ],
         your_turn="Swap `KFold` for `TimeSeriesSplit` (already imported). Same `cross_val_score` call works — the only thing that changes is the splitter you pass in.",
         hint="`TimeSeriesSplit(n_splits=5)` — no shuffle argument, no random_state, it's expanding-window by design.",
+        skills=["quant", "machine-learning", "backtesting"],
+    ),
+    Lesson(
+        n=60, stage=4, mode="skeleton",
+        n_label="38a",
+        order_index_override=3810,
+        title="Build a momentum strategy",
+        scenario="The previous three lessons built signal, model, and validation. None of them produced a P&L. This is where they connect: read bars from a mock data feed, decide a position from a momentum signal, hold for one day, repeat. The tests include the same lookahead-bias check the senior risk officer runs on every new strategy.",
+        learner_goal="Implement a momentum signal + a one-day-hold backtest that passes correctness, no-lookahead, and basic monotonicity tests.",
+        concept="A trading algorithm is a function from (history of bars) → (sequence of positions). This lesson factors it into two pieces: `signal_at(closes, t)` returns the desired position at time t (using only past data), and `backtest(symbol)` runs the signal across history and aggregates the P&L. The lookahead-bias test is the structural check that catches most junior bugs: if you can replace future bars with garbage and the signal at t doesn't change, your function is honest.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Momentum strategy — read bars, emit positions, accumulate P&L.\n"
+            "\n"
+            "Use the Market class from mock_market to fetch history:\n"
+            "\n"
+            "    from mock_market import Market\n"
+            "    bars = Market().history('SPY')\n"
+            "\n"
+            "Each Bar has .date, .open, .high, .low, .close, .volume.\n"
+            "\n"
+            "Implement two functions:\n"
+            "\n"
+            "    signal_at(closes, t, lookback=20) -> int\n"
+            "        Returns -1, 0, or +1 based on the lookback-period return:\n"
+            "            (closes[t] - closes[t-lookback]) / closes[t-lookback]\n"
+            "        > 0 → +1, < 0 → -1, t < lookback or 0 → 0.\n"
+            "        ⚠ Must use ONLY closes[:t+1]. Lookahead is forbidden.\n"
+            "\n"
+            "    backtest(symbol='SPY', lookback=20) -> dict\n"
+            "        Apply signal_at across the full history; hold each signal\n"
+            "        for ONE day (signal at t controls return at t+1).\n"
+            "        Return: {'sharpe': float, 'max_drawdown': float, 'trades': int}\n"
+            "        - sharpe: annualised, 252 days/year ((mean*252) / (std*sqrt(252))).\n"
+            "        - max_drawdown: worst peak-to-trough as a NEGATIVE fraction.\n"
+            "        - trades: count of position CHANGES (signal[t] != signal[t-1]).\n"
+            "\"\"\"\n"
+            "from mock_market import Market\n"
+            "\n"
+            "\n"
+            "def signal_at(closes, t, lookback=20):\n"
+            "    raise NotImplementedError(\"Implement signal_at\")\n"
+            "\n"
+            "\n"
+            "def backtest(symbol='SPY', lookback=20):\n"
+            "    raise NotImplementedError(\"Implement backtest\")\n"
+        ),
+        reference_solution=(
+            "import math\n"
+            "from mock_market import Market\n"
+            "\n"
+            "\n"
+            "def signal_at(closes, t, lookback=20):\n"
+            "    if t < lookback:\n"
+            "        return 0\n"
+            "    base = closes[t - lookback]\n"
+            "    if base == 0:\n"
+            "        return 0\n"
+            "    ret = (closes[t] - base) / base\n"
+            "    if ret > 0:\n"
+            "        return 1\n"
+            "    elif ret < 0:\n"
+            "        return -1\n"
+            "    return 0\n"
+            "\n"
+            "\n"
+            "def backtest(symbol='SPY', lookback=20):\n"
+            "    bars = Market().history(symbol)\n"
+            "    closes = [b.close for b in bars]\n"
+            "    n = len(closes)\n"
+            "    signals = [signal_at(closes, t, lookback) for t in range(n)]\n"
+            "    rets = []\n"
+            "    trades = 0\n"
+            "    prev = 0\n"
+            "    for t in range(n - 1):\n"
+            "        next_ret = (closes[t + 1] - closes[t]) / closes[t]\n"
+            "        rets.append(signals[t] * next_ret)\n"
+            "        if signals[t] != prev:\n"
+            "            trades += 1\n"
+            "        prev = signals[t]\n"
+            "    if not rets:\n"
+            "        return {'sharpe': 0.0, 'max_drawdown': 0.0, 'trades': 0}\n"
+            "    m = sum(rets) / len(rets)\n"
+            "    var = sum((r - m) ** 2 for r in rets) / (len(rets) - 1)\n"
+            "    s = math.sqrt(var)\n"
+            "    sharpe = 0.0 if s == 0 else (m * 252) / (s * math.sqrt(252))\n"
+            "    # Max drawdown from running equity curve.\n"
+            "    eq = 1.0\n"
+            "    peak = 1.0\n"
+            "    max_dd = 0.0\n"
+            "    for r in rets:\n"
+            "        eq *= 1 + r\n"
+            "        peak = max(peak, eq)\n"
+            "        dd = eq / peak - 1\n"
+            "        if dd < max_dd:\n"
+            "            max_dd = dd\n"
+            "    return {\n"
+            "        'sharpe': float(sharpe),\n"
+            "        'max_drawdown': float(max_dd),\n"
+            "        'trades': int(trades),\n"
+            "    }\n"
+        ),
+        tests_py=(
+            "\"\"\"Momentum strategy: correctness, no-lookahead, P&L structure.\"\"\"\n"
+            "import math\n"
+            "import pytest\n"
+            "\n"
+            "from solution import signal_at, backtest\n"
+            "from mock_market import Market\n"
+            "\n"
+            "\n"
+            "def _closes():\n"
+            "    return [b.close for b in Market().history('SPY')]\n"
+            "\n"
+            "\n"
+            "def test_signal_returns_one_of_three_values():\n"
+            "    closes = _closes()\n"
+            "    for t in [30, 100, 500]:\n"
+            "        s = signal_at(closes, t, lookback=20)\n"
+            "        assert s in (-1, 0, 1), f\"unexpected signal {s} at t={t}\"\n"
+            "\n"
+            "\n"
+            "def test_signal_is_zero_when_t_under_lookback():\n"
+            "    closes = _closes()\n"
+            "    for t in [0, 5, 19]:\n"
+            "        assert signal_at(closes, t, lookback=20) == 0\n"
+            "\n"
+            "\n"
+            "def test_signal_is_long_on_monotone_up():\n"
+            "    closes = [float(i) for i in range(1, 100)]\n"
+            "    assert signal_at(closes, 50, lookback=20) == 1\n"
+            "\n"
+            "\n"
+            "def test_signal_is_short_on_monotone_down():\n"
+            "    closes = [float(i) for i in range(100, 1, -1)]\n"
+            "    assert signal_at(closes, 50, lookback=20) == -1\n"
+            "\n"
+            "\n"
+            "def test_signal_no_lookahead_bias():\n"
+            "    # Replace closes[t+1:] with nonsense — signal at t must not change.\n"
+            "    closes = _closes()\n"
+            "    t = 200\n"
+            "    truth = signal_at(closes, t, lookback=20)\n"
+            "    poisoned = closes[: t + 1] + [-1e9] * (len(closes) - t - 1)\n"
+            "    assert signal_at(poisoned, t, lookback=20) == truth\n"
+            "\n"
+            "\n"
+            "def test_backtest_returns_dict_with_required_keys():\n"
+            "    result = backtest('SPY', lookback=20)\n"
+            "    assert isinstance(result, dict)\n"
+            "    for k in ('sharpe', 'max_drawdown', 'trades'):\n"
+            "        assert k in result, f\"missing key: {k}\"\n"
+            "\n"
+            "\n"
+            "def test_backtest_sharpe_is_finite_float():\n"
+            "    result = backtest('SPY', lookback=20)\n"
+            "    assert isinstance(result['sharpe'], float)\n"
+            "    assert math.isfinite(result['sharpe'])\n"
+            "\n"
+            "\n"
+            "def test_backtest_max_drawdown_in_valid_range():\n"
+            "    result = backtest('SPY', lookback=20)\n"
+            "    assert isinstance(result['max_drawdown'], float)\n"
+            "    assert -1.0 <= result['max_drawdown'] <= 0.0\n"
+            "\n"
+            "\n"
+            "def test_backtest_trades_is_nonnegative_int():\n"
+            "    result = backtest('SPY', lookback=20)\n"
+            "    assert isinstance(result['trades'], int)\n"
+            "    assert result['trades'] >= 0\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_signal_returns_one_of_three_values",
+                "signal_at returns only -1, 0, or +1.",
+            ),
+            (
+                "tests/test_solution.py::test_signal_is_zero_when_t_under_lookback",
+                "signal_at returns 0 before enough lookback history is available.",
+            ),
+            (
+                "tests/test_solution.py::test_signal_is_long_on_monotone_up",
+                "Monotonically rising prices give +1 (long).",
+            ),
+            (
+                "tests/test_solution.py::test_signal_is_short_on_monotone_down",
+                "Monotonically falling prices give -1 (short).",
+            ),
+            (
+                "tests/test_solution.py::test_signal_no_lookahead_bias",
+                "Poisoning closes[t+1:] does not change the signal at t — the lookahead-bias check.",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_returns_dict_with_required_keys",
+                "backtest returns a dict with 'sharpe', 'max_drawdown', 'trades'.",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_sharpe_is_finite_float",
+                "Sharpe is a finite float (no NaN, no inf).",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_max_drawdown_in_valid_range",
+                "Max drawdown is a float in [-1, 0].",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_trades_is_nonnegative_int",
+                "Trade count is a non-negative integer.",
+            ),
+        ],
+        extra_readonly={
+            "mock_market.py": (
+                "\"\"\"Read-only synthetic market data feed.\n"
+                "\n"
+                "Deterministic daily bars built from a numpy GBM. Same bars\n"
+                "every call — no external CSV, no Pyodide path issues.\n"
+                "\"\"\"\n"
+                "from dataclasses import dataclass\n"
+                "import numpy as np\n"
+                "\n"
+                "\n"
+                "@dataclass(frozen=True)\n"
+                "class Bar:\n"
+                "    date: str\n"
+                "    open: float\n"
+                "    high: float\n"
+                "    low: float\n"
+                "    close: float\n"
+                "    volume: int\n"
+                "\n"
+                "\n"
+                "def _build_bars(seed: int = 42, n_days: int = 750):\n"
+                "    rng = np.random.default_rng(seed)\n"
+                "    shocks = rng.normal(0.0003, 0.012, n_days)\n"
+                "    closes = 100.0 * np.exp(np.cumsum(shocks))\n"
+                "    opens = np.empty(n_days)\n"
+                "    opens[0] = 100.0\n"
+                "    opens[1:] = closes[:-1] * (1 + rng.normal(0, 0.001, n_days - 1))\n"
+                "    highs = np.maximum(opens, closes) * (\n"
+                "        1 + np.abs(rng.normal(0, 0.005, n_days))\n"
+                "    )\n"
+                "    lows = np.minimum(opens, closes) * (\n"
+                "        1 - np.abs(rng.normal(0, 0.005, n_days))\n"
+                "    )\n"
+                "    volumes = (50_000_000 + rng.normal(0, 5_000_000, n_days)).astype(int)\n"
+                "    volumes = np.maximum(volumes, 1_000_000)\n"
+                "    bars = []\n"
+                "    for i in range(n_days):\n"
+                "        bars.append(Bar(\n"
+                "            date=f'2023-day-{i:03d}',\n"
+                "            open=float(opens[i]),\n"
+                "            high=float(highs[i]),\n"
+                "            low=float(lows[i]),\n"
+                "            close=float(closes[i]),\n"
+                "            volume=int(volumes[i]),\n"
+                "        ))\n"
+                "    return bars\n"
+                "\n"
+                "\n"
+                "_BARS = {'SPY': _build_bars()}\n"
+                "\n"
+                "\n"
+                "class Market:\n"
+                "    \"\"\"Single-symbol historical data with a deterministic synthetic feed.\"\"\"\n"
+                "\n"
+                "    def history(self, symbol: str = 'SPY'):\n"
+                "        if symbol not in _BARS:\n"
+                "            raise ValueError(f'Unknown symbol: {symbol}')\n"
+                "        return list(_BARS[symbol])\n"
+            ),
+        },
+        your_turn="Implement `signal_at` (4-5 lines of branching) and `backtest` (a loop over closes, accumulate signal × next-day return, compute Sharpe + max drawdown). The lookahead-bias test is the structural check most junior bugs trip.",
+        hint="signal_at: guard t < lookback, then compute the lookback-period return and return its sign. backtest: loop t in range(n-1), append signals[t] * (closes[t+1]/closes[t] - 1) to the return series, count position changes.",
+        why_this="This loop is the smallest end-to-end backtest you can build — signal → position → return → metrics. The same shape underlies vectorbt, zipline, and every fund's in-house backtester. Get this honest (no lookahead) and the rest is just feature engineering.",
         skills=["quant", "machine-learning", "backtesting"],
     ),
     Lesson(

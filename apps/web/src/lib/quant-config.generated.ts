@@ -912,6 +912,59 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "tests/test_solution.py": "\"\"\"CV-splitter selection check via deterministic fingerprint.\n\nBoth KFold(shuffle=True, random_state=0) and TimeSeriesSplit give\nDETERMINISTIC outputs for a fixed input \u2014 but different ones. We\nfingerprint the TimeSeriesSplit answer and assert the function\nmatches; the leaky KFold answer is meaningfully off, so the\nbuggy editable fails.\n\"\"\"\nimport numpy as np\nimport pandas as pd\nimport pytest\n\nfrom solution import mean_cv_score\n\n\ndef _noise(n: int = 3000, seed: int = 0) -> pd.Series:\n    rng = np.random.default_rng(seed)\n    return pd.Series(rng.normal(0, 0.01, n))\n\n\nEXPECTED_SEED_1 = -0.005549\nEXPECTED_SEED_7 = -0.006750\n\n\ndef test_seed_1_matches_timeseries_split_fingerprint():\n    score = mean_cv_score(_noise(seed=1))\n    assert abs(score - EXPECTED_SEED_1) < 5e-5\n\n\ndef test_seed_7_matches_timeseries_split_fingerprint():\n    score = mean_cv_score(_noise(seed=7))\n    assert abs(score - EXPECTED_SEED_7) < 5e-5\n\n\ndef test_function_is_deterministic_across_calls():\n    a = mean_cv_score(_noise(seed=2))\n    b = mean_cv_score(_noise(seed=2))\n    assert abs(a - b) < 1e-12\n\n\ndef test_returns_a_float():\n    assert isinstance(mean_cv_score(_noise()), float)\n"
   }
 },
+  "quant-38a-build-a-momentum-strategy": {
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "mock_market.py",
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_signal_returns_one_of_three_values",
+      "description": "signal_at returns only -1, 0, or +1."
+    },
+    {
+      "id": "tests/test_solution.py::test_signal_is_zero_when_t_under_lookback",
+      "description": "signal_at returns 0 before enough lookback history is available."
+    },
+    {
+      "id": "tests/test_solution.py::test_signal_is_long_on_monotone_up",
+      "description": "Monotonically rising prices give +1 (long)."
+    },
+    {
+      "id": "tests/test_solution.py::test_signal_is_short_on_monotone_down",
+      "description": "Monotonically falling prices give -1 (short)."
+    },
+    {
+      "id": "tests/test_solution.py::test_signal_no_lookahead_bias",
+      "description": "Poisoning closes[t+1:] does not change the signal at t \u2014 the lookahead-bias check."
+    },
+    {
+      "id": "tests/test_solution.py::test_backtest_returns_dict_with_required_keys",
+      "description": "backtest returns a dict with 'sharpe', 'max_drawdown', 'trades'."
+    },
+    {
+      "id": "tests/test_solution.py::test_backtest_sharpe_is_finite_float",
+      "description": "Sharpe is a finite float (no NaN, no inf)."
+    },
+    {
+      "id": "tests/test_solution.py::test_backtest_max_drawdown_in_valid_range",
+      "description": "Max drawdown is a float in [-1, 0]."
+    },
+    {
+      "id": "tests/test_solution.py::test_backtest_trades_is_nonnegative_int",
+      "description": "Trade count is a non-negative integer."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"Momentum strategy \u2014 read bars, emit positions, accumulate P&L.\n\nUse the Market class from mock_market to fetch history:\n\n    from mock_market import Market\n    bars = Market().history('SPY')\n\nEach Bar has .date, .open, .high, .low, .close, .volume.\n\nImplement two functions:\n\n    signal_at(closes, t, lookback=20) -> int\n        Returns -1, 0, or +1 based on the lookback-period return:\n            (closes[t] - closes[t-lookback]) / closes[t-lookback]\n        > 0 \u2192 +1, < 0 \u2192 -1, t < lookback or 0 \u2192 0.\n        \u26a0 Must use ONLY closes[:t+1]. Lookahead is forbidden.\n\n    backtest(symbol='SPY', lookback=20) -> dict\n        Apply signal_at across the full history; hold each signal\n        for ONE day (signal at t controls return at t+1).\n        Return: {'sharpe': float, 'max_drawdown': float, 'trades': int}\n        - sharpe: annualised, 252 days/year ((mean*252) / (std*sqrt(252))).\n        - max_drawdown: worst peak-to-trough as a NEGATIVE fraction.\n        - trades: count of position CHANGES (signal[t] != signal[t-1]).\n\"\"\"\nfrom mock_market import Market\n\n\ndef signal_at(closes, t, lookback=20):\n    raise NotImplementedError(\"Implement signal_at\")\n\n\ndef backtest(symbol='SPY', lookback=20):\n    raise NotImplementedError(\"Implement backtest\")\n",
+    "tests/test_solution.py": "\"\"\"Momentum strategy: correctness, no-lookahead, P&L structure.\"\"\"\nimport math\nimport pytest\n\nfrom solution import signal_at, backtest\nfrom mock_market import Market\n\n\ndef _closes():\n    return [b.close for b in Market().history('SPY')]\n\n\ndef test_signal_returns_one_of_three_values():\n    closes = _closes()\n    for t in [30, 100, 500]:\n        s = signal_at(closes, t, lookback=20)\n        assert s in (-1, 0, 1), f\"unexpected signal {s} at t={t}\"\n\n\ndef test_signal_is_zero_when_t_under_lookback():\n    closes = _closes()\n    for t in [0, 5, 19]:\n        assert signal_at(closes, t, lookback=20) == 0\n\n\ndef test_signal_is_long_on_monotone_up():\n    closes = [float(i) for i in range(1, 100)]\n    assert signal_at(closes, 50, lookback=20) == 1\n\n\ndef test_signal_is_short_on_monotone_down():\n    closes = [float(i) for i in range(100, 1, -1)]\n    assert signal_at(closes, 50, lookback=20) == -1\n\n\ndef test_signal_no_lookahead_bias():\n    # Replace closes[t+1:] with nonsense \u2014 signal at t must not change.\n    closes = _closes()\n    t = 200\n    truth = signal_at(closes, t, lookback=20)\n    poisoned = closes[: t + 1] + [-1e9] * (len(closes) - t - 1)\n    assert signal_at(poisoned, t, lookback=20) == truth\n\n\ndef test_backtest_returns_dict_with_required_keys():\n    result = backtest('SPY', lookback=20)\n    assert isinstance(result, dict)\n    for k in ('sharpe', 'max_drawdown', 'trades'):\n        assert k in result, f\"missing key: {k}\"\n\n\ndef test_backtest_sharpe_is_finite_float():\n    result = backtest('SPY', lookback=20)\n    assert isinstance(result['sharpe'], float)\n    assert math.isfinite(result['sharpe'])\n\n\ndef test_backtest_max_drawdown_in_valid_range():\n    result = backtest('SPY', lookback=20)\n    assert isinstance(result['max_drawdown'], float)\n    assert -1.0 <= result['max_drawdown'] <= 0.0\n\n\ndef test_backtest_trades_is_nonnegative_int():\n    result = backtest('SPY', lookback=20)\n    assert isinstance(result['trades'], int)\n    assert result['trades'] >= 0\n",
+    "mock_market.py": "\"\"\"Read-only synthetic market data feed.\n\nDeterministic daily bars built from a numpy GBM. Same bars\nevery call \u2014 no external CSV, no Pyodide path issues.\n\"\"\"\nfrom dataclasses import dataclass\nimport numpy as np\n\n\n@dataclass(frozen=True)\nclass Bar:\n    date: str\n    open: float\n    high: float\n    low: float\n    close: float\n    volume: int\n\n\ndef _build_bars(seed: int = 42, n_days: int = 750):\n    rng = np.random.default_rng(seed)\n    shocks = rng.normal(0.0003, 0.012, n_days)\n    closes = 100.0 * np.exp(np.cumsum(shocks))\n    opens = np.empty(n_days)\n    opens[0] = 100.0\n    opens[1:] = closes[:-1] * (1 + rng.normal(0, 0.001, n_days - 1))\n    highs = np.maximum(opens, closes) * (\n        1 + np.abs(rng.normal(0, 0.005, n_days))\n    )\n    lows = np.minimum(opens, closes) * (\n        1 - np.abs(rng.normal(0, 0.005, n_days))\n    )\n    volumes = (50_000_000 + rng.normal(0, 5_000_000, n_days)).astype(int)\n    volumes = np.maximum(volumes, 1_000_000)\n    bars = []\n    for i in range(n_days):\n        bars.append(Bar(\n            date=f'2023-day-{i:03d}',\n            open=float(opens[i]),\n            high=float(highs[i]),\n            low=float(lows[i]),\n            close=float(closes[i]),\n            volume=int(volumes[i]),\n        ))\n    return bars\n\n\n_BARS = {'SPY': _build_bars()}\n\n\nclass Market:\n    \"\"\"Single-symbol historical data with a deterministic synthetic feed.\"\"\"\n\n    def history(self, symbol: str = 'SPY'):\n        if symbol not in _BARS:\n            raise ValueError(f'Unknown symbol: {symbol}')\n        return list(_BARS[symbol])\n"
+  }
+},
   "quant-39-the-p-hacked-sharpe-trap": {
   "mode": "predict",
   "code": "import numpy as np\nrng = np.random.default_rng(42)\nR = rng.normal(0, 0.01, size=(1000, 1000))\nsharpe = R.mean(axis=1) / R.std(axis=1) * np.sqrt(252)\nprint(round(sharpe.max(), 2) > 1.5)",
