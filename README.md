@@ -1,80 +1,131 @@
 # ProdReady AI
 
-AI-powered production coding simulator. Learners complete realistic engineering tickets in real repos, get guided by an AI senior engineer, pass automated checks, and graduate with portfolio evidence.
+AI-mentored, in-browser Python coding platform. Learners edit Python in Monaco, run pytest entirely client-side via Pyodide, and get Socratic guidance from an AI senior engineer at every step.
 
 > The missing bridge between coding tutorials and a first production software engineering job.
 
-See [plans/00_PRODUCT_SUMMARY.md](plans/00_PRODUCT_SUMMARY.md) for the full product summary.
+- **Web:** https://prodready-ai.vercel.app
+- **API:** https://prodready-api.fly.dev
 
 ## Status
 
-Pre-MVP. Building the first paid-testable slice: the **Backend Production Developer** track (Python / FastAPI / PostgreSQL / Docker / pytest / Git / GitHub Actions).
+In production with paid-validation pending. Four tracks live:
 
-The execution plan lives at [.claude/plans/i-have-created-a-mutable-rain.md](../.claude/plans/i-have-created-a-mutable-rain.md) (outside the repo) — the canonical reading order for contributors is [CLAUDE.md](CLAUDE.md), then [plans/](plans/) numerically.
+| Track                  | Slug                        | Shape                                                                                                                                                                            |
+| ---------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend Production     | `backend-production-python` | Working-looking FastAPI services with subtle bugs; pytest + AI PR review.                                                                                                        |
+| Quant Programmer       | `quant-programmer`          | numpy / pandas / finance from first principles; 56 lessons across 5 stages, then C for speed.                                                                                    |
+| Python Basics          | `python-basics`             | First 25 lessons — variables, conditionals, loops, functions, classes.                                                                                                           |
+| Mental Models for Code | `mental-models`             | Concept-by-concept atoms following a six-stage UNIT (Try → Read → Play → Check → Apply → Reflect). Research-backed pilot of a new pedagogical framework. 7 of 10 atoms authored. |
+
+> **History note:** The repo originally planned a GitHub-first MVP (template repos, Codespaces, GitHub Actions). It pivoted in the May 2026 build to **in-browser Pyodide** — learners never touch Git. Files under [`plans/`](plans/) describe the original MVP; they're kept for history but are NOT authoritative. The canonical project guide is [CLAUDE.md](CLAUDE.md).
+
+## Stack
+
+| Layer              | Choice                                                                                                                |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Web                | Next.js 15 (App Router, TypeScript) + Tailwind + shadcn-style components                                              |
+| API                | FastAPI 0.115 + SQLAlchemy 2 + Pydantic 2, Python 3.12                                                                |
+| DB / Auth          | Supabase (Postgres + Auth + Storage), region `eu-west-2`                                                              |
+| In-browser runtime | Pyodide 0.26.4 from jsdelivr; pytest installed via micropip on first run                                              |
+| AI                 | OpenAI — `gpt-4o-mini` for chat/explainer/Socratic teaching, `gpt-4o` for PR review, Reflect grading, and show-answer |
+| Payments           | Stripe in **emulated mode** (`STRIPE_EMULATED=true` on Fly); real code paths gated until paid validation              |
+| Hosting            | Vercel (web, auto-deploys on push to `main`) + Fly.io (api, manual deploy)                                            |
+
+Auth on the API uses Supabase user JWTs verified via JWKS (ES256), with an HS256 fallback for tests via `SUPABASE_JWT_SECRET`.
 
 ## Monorepo layout
 
 ```text
 apps/
-  web/                  Next.js 15 + App Router (TypeScript, Tailwind, shadcn/ui)
-  api/                  FastAPI + SQLAlchemy + Alembic
-packages/
-  shared/               TS types shared between web and api contracts
+  web/                Next.js — challenge page, mentor sidebar, Monaco editor, Pyodide runner, concept UNIT shell
+  api/                FastAPI — auth, tracks, challenges, submissions, concepts, AI endpoints, billing
 challenge-templates/
-  fastapi-commerce/     First learner template repo (pushed to GitHub separately)
+  fastapi-commerce/   Source repo for the 3 seeded Backend Production challenges (mirrored to its own GitHub repo; learners never see it)
 supabase/
-  migrations/           SQL migrations (Supabase Postgres is canonical)
-  seed.sql              Track + module + challenges seed
-scripts/                Dev + content-import scripts
-plans/                  Product + technical planning docs
-prompts/                AI mentor system prompts (git-SHA-versioned at runtime)
-templates/              Authoring templates (challenge.yaml, db_schema.sql, GH Actions)
+  migrations/         0001_init.sql + 0002_concepts_and_mastery.sql (canonical schema)
+  seed.sql            Backend Production Developer track + Module 1 + 3 challenges
+  mental_models_seed.generated.sql   Generated by scripts/generate_mental_models.py
+packages/
+  shared/             Zod schema for the AI PR review (referenced once, may be inlined)
+scripts/              Dev convenience + content generators (generate_quant, generate_python_basics, generate_mental_models, smoke, dev)
+docs/
+  launch.md           Operational playbook (env vars, deploy commands)
+  cost-guards.md      OpenAI cost ceiling logic
+  quant-roadmap.md    Quant track roadmap (learner-facing)
+plans/                ORIGINAL pre-pivot MVP plans (historical — do not implement against)
+prompts/              ORIGINAL prompt templates (historical — runtime prompts live in apps/api/app/ai/system_prompts.md)
 ```
-
-## Stack
-
-| Layer | Choice |
-|---|---|
-| Frontend | Next.js 15 + TypeScript + Tailwind + shadcn/ui |
-| Backend | FastAPI (Python 3.12) |
-| Auth + DB + Storage | Supabase |
-| LLM | OpenAI (chat: `gpt-4o-mini`, PR review: `gpt-4o`) |
-| Payments | Stripe (test mode for MVP) |
-| Validation | GitHub Actions in template repos |
-| Hosting | Vercel (web) + Fly.io or Render (api) + Supabase (db) |
 
 ## Quickstart
 
-Prereqs: Node 20+, pnpm 9+, Python 3.12+, Supabase CLI, Docker.
+Prereqs: Node 20+, pnpm 9+, Python 3.12+, a Supabase project (or use the linked dev project).
 
 ```bash
 # Install deps
 pnpm install
-python3 -m venv apps/api/.venv && source apps/api/.venv/bin/activate
-pip install -r apps/api/requirements.txt
+python3.12 -m venv apps/api/.venv && source apps/api/.venv/bin/activate
+pip install -r apps/api/requirements-dev.txt
 
-# Env
+# Env (copy + fill in keys; see docs/launch.md)
 cp .env.example .env.local
 cp .env.example apps/api/.env
 
-# DB
-supabase start
-supabase db reset    # applies migrations + seed
-
-# Dev
-pnpm dev:web         # http://localhost:3000
-uvicorn app.main:app --reload --app-dir apps/api  # http://localhost:8000
+# Dev servers (two terminals — or scripts/dev.sh which boots both with the venv active)
+pnpm --filter web dev                                     # web on http://localhost:3000
+uvicorn app.main:app --reload --app-dir apps/api          # api on http://localhost:8000
 ```
 
-## Non-negotiable MVP constraints
+## Common commands
+
+```bash
+# Tests
+cd apps/api && python -m pytest -q                                  # api suite (~52 tests)
+cd apps/api && python -m pytest tests/test_mentor.py                # single file
+cd apps/api && python -m pytest tests/test_mentor.py::test_xxx      # single test
+pnpm --filter web typecheck                                         # web type-check (no unit tests yet)
+
+# Lint
+cd apps/api && ruff check .                                         # ruff for api + scripts
+cd apps/api && ruff check --fix .                                   # auto-fix
+pnpm --filter web lint                                              # next lint
+
+# Database (Supabase, linked project)
+supabase db push --password '<db-pass>'                             # apply migrations
+psql "postgresql://postgres@db.<ref>.supabase.co:5432/postgres" -f supabase/seed.sql
+
+# Mental Models content
+python scripts/generate_mental_models.py                            # regenerates the seed SQL + TS config
+
+# Deploy
+vercel --prod --yes                                                 # web (from repo root; rootDirectory = apps/web)
+flyctl deploy --remote-only                                         # api (from apps/api). App name: prodready-api
+# Vercel auto-deploys on every push to main; Fly is manual.
+
+# Prod smoke
+API_BASE=https://prodready-api.fly.dev WEB_BASE=https://prodready-ai.vercel.app bash scripts/smoke.sh
+```
+
+## Non-negotiable constraints
 
 From [CLAUDE.md](CLAUDE.md):
 
-1. No custom cloud IDE in the MVP.
-2. No arbitrary untrusted user code on our own infrastructure.
-3. GitHub template repos + devcontainers/Codespaces + GitHub Actions for validation first.
-4. First track is narrow: Python FastAPI backend production workflow.
-5. AI mentor guides and reviews; automated checks are the source of truth for pass/fail.
+1. Pytest output → `submissions.passed` is the source of truth. The AI never decides pass/fail.
+2. No code execution server-side — Pyodide in the browser. Arbitrary learner Python never runs on our infrastructure.
+3. The mentor is Socratic at Hint 1, specific at Hint 2, sketches pseudocode at Hint 3. "Show me the answer" is the explicit escape hatch, persisted as an `AIMessage` row tagged `metadata_json.source = "show_answer"`.
+4. Auth is centralised in `apps/api/app/auth.py`; routes use `user = Depends(get_current_user)`. Owner-only data (progress, submissions, ai_messages, concept_mastery) is RLS-enforced; the API uses the service-role key but funnels every read through `user.id`.
+5. Stripe webhook handling honours `STRIPE_EMULATED`; flipping to live = swap env vars on Fly, no code change.
+6. Don't reintroduce Git-based workflow steps in challenge instructions ("fork the repo", "run `docker compose up`"). Instructions are spatially neutral — no "scenario above", "workspace below".
+7. **Mental Models pilot only:** each concept atom runs the six-stage UNIT (Try → Read → Play → Check → Apply → Reflect). The mentor receives `concepts_mastered: list[str]` and may not reference concepts the learner hasn't completed (Exercism's no-forward-reference rule, enforced by a post-generation sanitiser). Reflect grading is gated on length (≥ 80 chars), not LLM verdict — any genuine attempt advances the learner.
+
+## Out of scope until paid validation
+
+- Custom browser IDE beyond Monaco.
+- Server-side code execution (sandbox infra).
+- Multi-language tracks (Python only).
+- Cohort / enterprise features.
+- Real Stripe live keys (emulation is intentional).
+- Mobile-first design (md+ is primary; mobile is supported but not optimised).
 
 ## License
 
