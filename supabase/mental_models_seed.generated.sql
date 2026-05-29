@@ -16,9 +16,7 @@ on conflict (slug) do update set
   difficulty = excluded.difficulty,
   is_published = excluded.is_published;
 
-delete from public.concept_prereqs where concept_id in (select id from public.concepts);
-delete from public.concept_mastery;
-delete from public.concepts;
+delete from public.concept_prereqs where concept_id in (select id from public.concepts where slug in ('variables-names', 'references-values', 'control-flow', 'functions', 'complexity', 'code-as-state-machine', 'recursion'));
 delete from public.diagnostic_questions where track_slug = 'mental-models';
 
 insert into public.concepts (
@@ -43,7 +41,25 @@ insert into public.concepts (
   E'{"must_mention":["name","value"],"must_distinguish":[["mutable","immutable"]],"must_explain":["two names can point at the same value; mutating it is visible through both"]}'::jsonb,
   E'[{"kind":"mcq","q":"Given `xs = [1]; ys = xs; ys.append(2)`, what is `xs`?","options":["[1]","[1, 2]","TypeError"],"correct":1},{"kind":"mcq","q":"If `s = ''a''; t = s; t = ''b''`, what is `s`?","options":["''a''","''b''","None"],"correct":0},{"kind":"mcq","q":"What does `b = a` do when `a` is a list?","options":["Copies the list","Creates a second name for the same list","Raises an exception"],"correct":1}]'::jsonb,
   100
-);
+)
+on conflict (slug) do update set
+  layer = excluded.layer,
+  topic_slug = excluded.topic_slug,
+  title = excluded.title,
+  one_line = excluded.one_line,
+  try_prompt_md = excluded.try_prompt_md,
+  try_kind = excluded.try_kind,
+  try_expected_attempts_json = excluded.try_expected_attempts_json,
+  exposition_md = excluded.exposition_md,
+  worked_example_md = excluded.worked_example_md,
+  play_widget_kind = excluded.play_widget_kind,
+  play_widget_json = excluded.play_widget_json,
+  check_mcqs_json = excluded.check_mcqs_json,
+  apply_challenge_slug = excluded.apply_challenge_slug,
+  reflect_question = excluded.reflect_question,
+  reflect_rubric_json = excluded.reflect_rubric_json,
+  recall_checks_json = excluded.recall_checks_json,
+  order_index = excluded.order_index;
 
 insert into public.concepts (
   id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
@@ -67,7 +83,25 @@ insert into public.concepts (
   E'{"must_mention":["default","mutable","shared"],"must_distinguish":[["evaluation at definition","evaluation per call"]],"must_explain":["the default object is created once","every call without the argument reuses that same object","use None as the sentinel and create a fresh object inside"]}'::jsonb,
   E'[{"kind":"mcq","q":"Calling `f()` twice when `f` has `xs=[]` as default and appends 1 produces what after the second call?","options":["[1]","[1, 1]","[]"],"correct":1},{"kind":"mcq","q":"The Pythonic safe-default pattern is:","options":["`xs=[]`","`xs=None` + check inside","`xs=list()`"],"correct":1},{"kind":"mcq","q":"Default arguments in Python are evaluated…","options":["once, at definition","every call","lazily, on first use"],"correct":0}]'::jsonb,
   200
-);
+)
+on conflict (slug) do update set
+  layer = excluded.layer,
+  topic_slug = excluded.topic_slug,
+  title = excluded.title,
+  one_line = excluded.one_line,
+  try_prompt_md = excluded.try_prompt_md,
+  try_kind = excluded.try_kind,
+  try_expected_attempts_json = excluded.try_expected_attempts_json,
+  exposition_md = excluded.exposition_md,
+  worked_example_md = excluded.worked_example_md,
+  play_widget_kind = excluded.play_widget_kind,
+  play_widget_json = excluded.play_widget_json,
+  check_mcqs_json = excluded.check_mcqs_json,
+  apply_challenge_slug = excluded.apply_challenge_slug,
+  reflect_question = excluded.reflect_question,
+  reflect_rubric_json = excluded.reflect_rubric_json,
+  recall_checks_json = excluded.recall_checks_json,
+  order_index = excluded.order_index;
 
 insert into public.concepts (
   id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
@@ -91,7 +125,25 @@ insert into public.concepts (
   E'{"must_mention":["break","continue","loop"],"must_distinguish":[["exit the loop","skip the iteration"]],"must_explain":["break exits the enclosing loop entirely","continue jumps to the next iteration of the same loop","both are early-exit shortcuts inside the loop body"]}'::jsonb,
   E'[{"kind":"mcq","q":"`break` inside a `for` loop:","options":["skips one iteration","exits the loop","restarts the loop"],"correct":1},{"kind":"mcq","q":"`continue` inside a `for` loop:","options":["skips to next iteration","exits the loop","raises an exception"],"correct":0},{"kind":"mcq","q":"If an `if` condition is False, the matching block:","options":["runs","is skipped","raises TypeError"],"correct":1}]'::jsonb,
   300
-);
+)
+on conflict (slug) do update set
+  layer = excluded.layer,
+  topic_slug = excluded.topic_slug,
+  title = excluded.title,
+  one_line = excluded.one_line,
+  try_prompt_md = excluded.try_prompt_md,
+  try_kind = excluded.try_kind,
+  try_expected_attempts_json = excluded.try_expected_attempts_json,
+  exposition_md = excluded.exposition_md,
+  worked_example_md = excluded.worked_example_md,
+  play_widget_kind = excluded.play_widget_kind,
+  play_widget_json = excluded.play_widget_json,
+  check_mcqs_json = excluded.check_mcqs_json,
+  apply_challenge_slug = excluded.apply_challenge_slug,
+  reflect_question = excluded.reflect_question,
+  reflect_rubric_json = excluded.reflect_rubric_json,
+  recall_checks_json = excluded.recall_checks_json,
+  order_index = excluded.order_index;
 
 insert into public.concepts (
   id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
@@ -115,7 +167,25 @@ insert into public.concepts (
   E'{"must_mention":["pure","side effect","return"],"must_distinguish":[["return value","side effect"]],"must_explain":["pure: same input always gives same output","pure: no observable state change outside the function","purity makes tests deterministic"]}'::jsonb,
   E'[{"kind":"mcq","q":"A function with no `return` returns:","options":["0","None","the last expression"],"correct":1},{"kind":"mcq","q":"Reassigning a parameter inside a function affects the caller''s binding?","options":["Yes","No","Only for ints"],"correct":1},{"kind":"mcq","q":"A pure function has:","options":["no return value","no side effects and a deterministic return","no arguments"],"correct":1}]'::jsonb,
   400
-);
+)
+on conflict (slug) do update set
+  layer = excluded.layer,
+  topic_slug = excluded.topic_slug,
+  title = excluded.title,
+  one_line = excluded.one_line,
+  try_prompt_md = excluded.try_prompt_md,
+  try_kind = excluded.try_kind,
+  try_expected_attempts_json = excluded.try_expected_attempts_json,
+  exposition_md = excluded.exposition_md,
+  worked_example_md = excluded.worked_example_md,
+  play_widget_kind = excluded.play_widget_kind,
+  play_widget_json = excluded.play_widget_json,
+  check_mcqs_json = excluded.check_mcqs_json,
+  apply_challenge_slug = excluded.apply_challenge_slug,
+  reflect_question = excluded.reflect_question,
+  reflect_rubric_json = excluded.reflect_rubric_json,
+  recall_checks_json = excluded.recall_checks_json,
+  order_index = excluded.order_index;
 
 insert into public.concepts (
   id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
@@ -139,7 +209,25 @@ insert into public.concepts (
   E'{"must_mention":["input size","operations","grow"],"must_distinguish":[["O(N)","O(N²)"]],"must_explain":["operations grow as the square of the input size","doubling N quadruples cost","nested loops over the same data are the canonical source"]}'::jsonb,
   E'[{"kind":"mcq","q":"Doubling N in an O(N²) algorithm multiplies cost by:","options":["2","4","8"],"correct":1},{"kind":"mcq","q":"Hash-set membership is typically:","options":["O(1)","O(log N)","O(N)"],"correct":0},{"kind":"mcq","q":"A single pass over a list is:","options":["O(1)","O(N)","O(N²)"],"correct":1}]'::jsonb,
   600
-);
+)
+on conflict (slug) do update set
+  layer = excluded.layer,
+  topic_slug = excluded.topic_slug,
+  title = excluded.title,
+  one_line = excluded.one_line,
+  try_prompt_md = excluded.try_prompt_md,
+  try_kind = excluded.try_kind,
+  try_expected_attempts_json = excluded.try_expected_attempts_json,
+  exposition_md = excluded.exposition_md,
+  worked_example_md = excluded.worked_example_md,
+  play_widget_kind = excluded.play_widget_kind,
+  play_widget_json = excluded.play_widget_json,
+  check_mcqs_json = excluded.check_mcqs_json,
+  apply_challenge_slug = excluded.apply_challenge_slug,
+  reflect_question = excluded.reflect_question,
+  reflect_rubric_json = excluded.reflect_rubric_json,
+  recall_checks_json = excluded.recall_checks_json,
+  order_index = excluded.order_index;
 
 insert into public.concepts (
   id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
@@ -163,7 +251,25 @@ insert into public.concepts (
   E'{"must_mention":["state","transition","explicit"],"must_distinguish":[["state","transition"]],"must_explain":["a state machine is a finite set of named states plus transition rules","making transitions explicit data flags impossible transitions","current-state plus allowed-transitions answers debugging questions reliably"]}'::jsonb,
   E'[{"kind":"mcq","q":"A state machine is:","options":["a class with no methods","a finite set of states + transition rules","any loop with break"],"correct":1},{"kind":"mcq","q":"Encoding transitions as data (e.g. a dict) helps because:","options":["It''s faster than if/elif","Adding a state is a one-line edit","It uses less memory"],"correct":1},{"kind":"mcq","q":"TCP, vending machines, and form workflows are all examples of:","options":["sorted data","state machines","pure functions"],"correct":1}]'::jsonb,
   700
-);
+)
+on conflict (slug) do update set
+  layer = excluded.layer,
+  topic_slug = excluded.topic_slug,
+  title = excluded.title,
+  one_line = excluded.one_line,
+  try_prompt_md = excluded.try_prompt_md,
+  try_kind = excluded.try_kind,
+  try_expected_attempts_json = excluded.try_expected_attempts_json,
+  exposition_md = excluded.exposition_md,
+  worked_example_md = excluded.worked_example_md,
+  play_widget_kind = excluded.play_widget_kind,
+  play_widget_json = excluded.play_widget_json,
+  check_mcqs_json = excluded.check_mcqs_json,
+  apply_challenge_slug = excluded.apply_challenge_slug,
+  reflect_question = excluded.reflect_question,
+  reflect_rubric_json = excluded.reflect_rubric_json,
+  recall_checks_json = excluded.recall_checks_json,
+  order_index = excluded.order_index;
 
 insert into public.concepts (
   id, slug, layer, topic_slug, title, one_line, try_prompt_md, try_kind, try_expected_attempts_json, exposition_md, worked_example_md, play_widget_kind, play_widget_json, check_mcqs_json, apply_challenge_slug, reflect_question, reflect_rubric_json, recall_checks_json, order_index
@@ -187,7 +293,25 @@ insert into public.concepts (
   E'{"must_mention":["base case","stack","recursive"],"must_distinguish":[["recursive case","base case"]],"must_explain":["the base case is the input the function can answer without recursing","without it the stack grows until RecursionError","each call adds a frame; the base case starts the unwinding"]}'::jsonb,
   E'[{"kind":"mcq","q":"A recursive function with no base case will:","options":["return None","raise RecursionError","loop forever"],"correct":1},{"kind":"mcq","q":"Each recursive call adds:","options":["a CPU register","a stack frame","a global variable"],"correct":1},{"kind":"mcq","q":"fact(3) calls how many functions before the first return?","options":["1","3","9"],"correct":1}]'::jsonb,
   500
-);
+)
+on conflict (slug) do update set
+  layer = excluded.layer,
+  topic_slug = excluded.topic_slug,
+  title = excluded.title,
+  one_line = excluded.one_line,
+  try_prompt_md = excluded.try_prompt_md,
+  try_kind = excluded.try_kind,
+  try_expected_attempts_json = excluded.try_expected_attempts_json,
+  exposition_md = excluded.exposition_md,
+  worked_example_md = excluded.worked_example_md,
+  play_widget_kind = excluded.play_widget_kind,
+  play_widget_json = excluded.play_widget_json,
+  check_mcqs_json = excluded.check_mcqs_json,
+  apply_challenge_slug = excluded.apply_challenge_slug,
+  reflect_question = excluded.reflect_question,
+  reflect_rubric_json = excluded.reflect_rubric_json,
+  recall_checks_json = excluded.recall_checks_json,
+  order_index = excluded.order_index;
 
 insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'references-values' and p.slug = 'variables-names' on conflict do nothing;
 insert into public.concept_prereqs (concept_id, prereq_concept_id) select c.id, p.id from public.concepts c, public.concepts p where c.slug = 'control-flow' and p.slug = 'variables-names' on conflict do nothing;

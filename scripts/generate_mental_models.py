@@ -1510,22 +1510,49 @@ def write_sql() -> Path:
     lines.append("  is_published = excluded.is_published;")
     lines.append("")
 
-    # Wipe + reinsert concept rows so renames / renumbering don't leave
-    # orphans. Safe while the framework has no live learner data; revisit
-    # before opening it to real users.
+    # M0 (non-destructive seed):
+    #   - concept rows are UPSERTed by slug. No wipe.
+    #   - concept_prereqs is replaced ONLY for the concept slugs we ship.
+    #   - concept_mastery is NEVER touched. Re-running this seed preserves
+    #     every learner's progress.
+    #   - diagnostic_questions is wiped + reinserted for this track only;
+    #     no foreign key references it, so this stays safe.
+    #
+    # The order matters: clear prereqs BEFORE upserting concepts (so removed
+    # edges don't linger), then upsert, then insert the new edges.
+    concept_slug_list = ", ".join(f"'{c.slug}'" for c in CONCEPTS)
     lines.append(
         "delete from public.concept_prereqs where concept_id in ("
-        "select id from public.concepts);"
+        f"select id from public.concepts where slug in ({concept_slug_list}));"
     )
-    # Wipe every concept row. There is only one source for `concepts` —
-    # this generator — so a blanket DELETE is safe and avoids the
-    # hyphen-filter bug (single-word slugs like 'recursion' would not
-    # match a `slug like '%-%'` clause and would survive a partial wipe).
-    lines.append("delete from public.concept_mastery;")
-    lines.append("delete from public.concepts;")
-    lines.append("delete from public.diagnostic_questions where track_slug = "
-                 f"'{TRACK_SLUG}';")
+    lines.append(
+        "delete from public.diagnostic_questions where track_slug = "
+        f"'{TRACK_SLUG}';"
+    )
     lines.append("")
+
+    # Columns updated on conflict — everything except the natural key (slug)
+    # and the surrogate id (which is also derived from the generator). Kept
+    # in one constant so additions don't drift between insert + update.
+    upsert_columns = (
+        "layer",
+        "topic_slug",
+        "title",
+        "one_line",
+        "try_prompt_md",
+        "try_kind",
+        "try_expected_attempts_json",
+        "exposition_md",
+        "worked_example_md",
+        "play_widget_kind",
+        "play_widget_json",
+        "check_mcqs_json",
+        "apply_challenge_slug",
+        "reflect_question",
+        "reflect_rubric_json",
+        "recall_checks_json",
+        "order_index",
+    )
 
     for concept in CONCEPTS:
         lines.append("insert into public.concepts (")
@@ -1563,7 +1590,11 @@ def write_sql() -> Path:
         lines.append(f"  {jsonb_lit(concept.reflect_rubric)},")
         lines.append(f"  {jsonb_lit(concept.recall_checks)},")
         lines.append(f"  {concept.order_index}")
-        lines.append(");")
+        lines.append(")")
+        lines.append("on conflict (slug) do update set")
+        for i, col in enumerate(upsert_columns):
+            suffix = "," if i < len(upsert_columns) - 1 else ";"
+            lines.append(f"  {col} = excluded.{col}{suffix}")
         lines.append("")
 
     # Prereq edges — done in a second pass since concepts must exist first.
