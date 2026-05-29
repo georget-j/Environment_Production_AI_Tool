@@ -352,9 +352,574 @@ CONCEPTS: list[Concept] = [
             },
         ],
     ),
-    # Concepts 2..10 will be authored in Phase CC.5 (variables/references,
-    # control-flow, functions, recursion, complexity, state-machine, memory,
-    # call-stack-tree, causality).
+    # ------------------------------------------------------------------
+    # Concept 2: references vs values — what mutation actually does.
+    # Builds on variables-names; the Try here is the canonical "mutate a
+    # list-default-argument" classic novice trap.
+    # ------------------------------------------------------------------
+    Concept(
+        n=2,
+        slug="references-values",
+        layer="universal",
+        title="References and values",
+        one_line="Mutating an object is visible through every name bound to it.",
+        order_index=200,
+        prereqs=["variables-names"],
+        try_prompt_md=(
+            "**Try.** Predict the output of this snippet — without running it. "
+            "It's a famous Python gotcha.\n\n"
+            "```python\n"
+            "def add_one(xs=[]):\n"
+            "    xs.append(1)\n"
+            "    return xs\n"
+            "\n"
+            "print(add_one())\n"
+            "print(add_one())\n"
+            "```"
+        ),
+        try_kind="text-reasoning",
+        try_expected_attempts=[
+            {
+                "pattern": r"\[1\]\s*\[1\]",
+                "callback_md": (
+                    "You predicted two `[1]`s — that's what you'd get if "
+                    "Python re-created the default list each call. It doesn't."
+                ),
+            },
+            {
+                "pattern": r"\[1\]\s*\[1,\s*1\]",
+                "callback_md": (
+                    "Correct. The default value is evaluated *once* at "
+                    "function-definition time; every call without an "
+                    "explicit `xs` shares that same list."
+                ),
+            },
+        ],
+        exposition_md=(
+            "Python evaluates default arguments **once**, at function "
+            "definition time. The resulting object is then shared across "
+            "every call that doesn't pass that argument explicitly. If "
+            "the default is a mutable object — a list, dict, set — every "
+            "call's mutations accumulate on the same instance.\n\n"
+            "The fix is the **None-sentinel** pattern: default to `None`, "
+            "then check inside the function and create a fresh object per "
+            "call. This is so common it's a 30-second answer in every "
+            "senior Python interview.\n\n"
+            "More broadly: when a function receives a mutable argument, "
+            "decide explicitly whether you want to mutate it (visible to "
+            "the caller, like `list.sort()`) or return a new object "
+            "(no caller side effects, like `sorted()`). Either is fine; "
+            "mixing them is what causes bugs."
+        ),
+        worked_example_md=(
+            "```python\n"
+            "# The bug:\n"
+            "def add_one(xs=[]):\n"
+            "    xs.append(1)        # mutates the shared default\n"
+            "    return xs\n"
+            "\n"
+            "print(add_one())        # [1]\n"
+            "print(add_one())        # [1, 1] — same list!\n"
+            "\n"
+            "# The fix:\n"
+            "def add_one_safe(xs=None):\n"
+            "    if xs is None:\n"
+            "        xs = []         # fresh list per call\n"
+            "    xs.append(1)\n"
+            "    return xs\n"
+            "\n"
+            "print(add_one_safe())   # [1]\n"
+            "print(add_one_safe())   # [1] — independent\n"
+            "```"
+        ),
+        # Memory-model-viewer would render an arrow-and-box diagram here.
+        # CC.2's host renders a stub; the config is authored for the eventual
+        # widget implementation.
+        play_widget_kind="memory-model-viewer",
+        play_widget={
+            "title": "The shared default list",
+            "frames": [
+                {
+                    "caption": "At function definition: Python builds the default list once.",
+                    "stack": [{"name": "(module)", "vars": {}}],
+                    "heap": [
+                        {"id": "list#1", "value": "[]", "labels": ["add_one.__defaults__[0]"]}
+                    ],
+                },
+                {
+                    "caption": "Call 1: xs binds to list#1 → append(1) mutates it.",
+                    "stack": [
+                        {"name": "(module)", "vars": {}},
+                        {"name": "add_one", "vars": {"xs": "→ list#1"}},
+                    ],
+                    "heap": [
+                        {"id": "list#1", "value": "[1]", "labels": ["add_one.__defaults__[0]", "xs"]}
+                    ],
+                },
+                {
+                    "caption": "Call 2: xs binds to the SAME list#1 → another mutation.",
+                    "stack": [
+                        {"name": "(module)", "vars": {}},
+                        {"name": "add_one", "vars": {"xs": "→ list#1"}},
+                    ],
+                    "heap": [
+                        {"id": "list#1", "value": "[1, 1]", "labels": ["add_one.__defaults__[0]", "xs"]}
+                    ],
+                },
+            ],
+        },
+        check_mcqs=[
+            {
+                "q": (
+                    "What does this print?\n\n"
+                    "```\n"
+                    "def f(d={}):\n"
+                    "    d['n'] = d.get('n', 0) + 1\n"
+                    "    return d\n"
+                    "\n"
+                    "print(f()); print(f())\n"
+                    "```"
+                ),
+                "options": [
+                    "{'n': 1} {'n': 1}",
+                    "{'n': 1} {'n': 2}",
+                    "{'n': 0} {'n': 1}",
+                    "TypeError",
+                ],
+                "correct": 1,
+                "why": (
+                    "Same trap as lists. The dict default is built once "
+                    "and reused across calls."
+                ),
+            },
+            {
+                "q": (
+                    "Which is the safe default for a list-typed argument "
+                    "in Python?"
+                ),
+                "options": [
+                    "`def f(xs=[]):`",
+                    "`def f(xs=list()):`",
+                    "`def f(xs=None):` and create the list inside",
+                    "`def f(xs):` and document that the caller must pass one",
+                ],
+                "correct": 2,
+                "why": (
+                    "The None-sentinel pattern is the canonical fix — a "
+                    "fresh list per call, no shared state."
+                ),
+            },
+        ],
+        apply_challenge_slug=None,
+        reflect_question=(
+            "In two sentences, explain why mutating a default argument "
+            "value in Python can leak state across calls — and how to "
+            "fix it."
+        ),
+        reflect_rubric={
+            "must_mention": ["default", "mutable", "shared"],
+            "must_distinguish": [
+                ["evaluation at definition", "evaluation per call"],
+            ],
+            "must_explain": [
+                "the default object is created once",
+                "every call without the argument reuses that same object",
+                "use None as the sentinel and create a fresh object inside",
+            ],
+        },
+        recall_checks=[
+            {
+                "kind": "mcq",
+                "q": "Calling `f()` twice when `f` has `xs=[]` as default and appends 1 produces what after the second call?",
+                "options": ["[1]", "[1, 1]", "[]"],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "The Pythonic safe-default pattern is:",
+                "options": ["`xs=[]`", "`xs=None` + check inside", "`xs=list()`"],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "Default arguments in Python are evaluated…",
+                "options": ["once, at definition", "every call", "lazily, on first use"],
+                "correct": 0,
+            },
+        ],
+    ),
+    # ------------------------------------------------------------------
+    # Concept 3: control flow — sequencing, branching, looping as causality.
+    # Uses the code-stepper widget; the Try is a "predict the output of a
+    # short imperative snippet" classic.
+    # ------------------------------------------------------------------
+    Concept(
+        n=3,
+        slug="control-flow",
+        layer="universal",
+        title="Control flow",
+        one_line="Code runs top-to-bottom unless an if, loop, or function call diverts it.",
+        order_index=300,
+        prereqs=["variables-names"],
+        try_prompt_md=(
+            "**Try.** Predict what this prints — and how many times the "
+            "body of the loop runs.\n\n"
+            "```python\n"
+            "n = 0\n"
+            "for i in range(3):\n"
+            "    if i == 1:\n"
+            "        continue\n"
+            "    n += i\n"
+            "print(n)\n"
+            "```"
+        ),
+        try_kind="text-reasoning",
+        try_expected_attempts=[
+            {
+                "pattern": r"\b3\b",
+                "callback_md": (
+                    "You predicted 3 — that's the answer if all three "
+                    "iterations contributed. `continue` skipped one."
+                ),
+            },
+            {
+                "pattern": r"\b2\b",
+                "callback_md": (
+                    "Correct. i=0 adds 0, i=1 hits `continue` so skips the "
+                    "addition, i=2 adds 2 — total 2."
+                ),
+            },
+        ],
+        exposition_md=(
+            "Code is **causal** — earlier statements set up the state that "
+            "later statements depend on. Reading code is therefore a form "
+            "of mental simulation: hold the current values of the live "
+            "variables in your head, then step forward.\n\n"
+            "Control-flow primitives are the three ways execution diverges "
+            "from straight-line:\n\n"
+            "1. **Branching** (`if` / `elif` / `else`): exactly one block "
+            "runs based on a condition. Track which.\n"
+            "2. **Looping** (`for` / `while`): a block runs multiple times. "
+            "Track the loop variable and the accumulator.\n"
+            "3. **Function calls**: execution jumps to the function body, "
+            "runs to a `return` (or implicit None), and resumes one line "
+            "after the call. Track which frame you're in.\n\n"
+            "`break` exits the nearest loop. `continue` skips to the next "
+            "iteration. Both are early-exit shortcuts — easy to misread."
+        ),
+        worked_example_md=(
+            "```python\n"
+            "# Sum the even numbers under 6.\n"
+            "total = 0\n"
+            "for i in range(6):\n"
+            "    if i % 2 != 0:\n"
+            "        continue        # skip odd i's\n"
+            "    total += i          # only runs for i in {0, 2, 4}\n"
+            "print(total)            # 6\n"
+            "```"
+        ),
+        play_widget_kind="code-stepper",
+        play_widget={
+            "title": "Step through a continue-in-a-loop",
+            "code": (
+                "total = 0\n"
+                "for i in range(6):\n"
+                "    if i % 2 != 0:\n"
+                "        continue\n"
+                "    total += i\n"
+                "print(total)"
+            ),
+            "steps": [
+                {"line": 1, "bindings": {"total": "0"}, "caption": "`total` starts at 0."},
+                {
+                    "line": 2,
+                    "bindings": {"total": "0", "i": "0"},
+                    "caption": "First iteration: i=0 (even).",
+                },
+                {
+                    "line": 5,
+                    "bindings": {"total": "0", "i": "0"},
+                    "caption": "0 % 2 == 0, so we skip continue and reach the add.",
+                },
+                {
+                    "line": 5,
+                    "bindings": {"total": "0", "i": "1"},
+                    "caption": "Second iteration: i=1 (odd). Condition triggers.",
+                },
+                {
+                    "line": 4,
+                    "bindings": {"total": "0", "i": "1"},
+                    "caption": "`continue` — jump straight back to the loop header. `total` unchanged.",
+                },
+                {
+                    "line": 5,
+                    "bindings": {"total": "2", "i": "2"},
+                    "caption": "i=2 (even). 0 + 2 = 2.",
+                },
+                {
+                    "line": 5,
+                    "bindings": {"total": "2", "i": "3"},
+                    "caption": "i=3 (odd). continue again. No change.",
+                },
+                {
+                    "line": 5,
+                    "bindings": {"total": "6", "i": "4"},
+                    "caption": "i=4 (even). 2 + 4 = 6.",
+                },
+                {
+                    "line": 5,
+                    "bindings": {"total": "6", "i": "5"},
+                    "caption": "i=5 (odd). continue. Final total 6.",
+                },
+                {
+                    "line": 6,
+                    "bindings": {"total": "6"},
+                    "caption": "Print 6 — the sum of even numbers 0..4.",
+                },
+            ],
+        },
+        check_mcqs=[
+            {
+                "q": (
+                    "How many times does the body of `for i in range(4): "
+                    "if i == 2: break; print(i)` actually print?"
+                ),
+                "options": ["1", "2", "3", "4"],
+                "correct": 1,
+                "why": (
+                    "`break` exits the loop entirely at i=2 — only i=0 and "
+                    "i=1 reach the print, so 2 lines."
+                ),
+            },
+            {
+                "q": (
+                    "What does `continue` do inside a `for` loop?"
+                ),
+                "options": [
+                    "Exits the loop entirely",
+                    "Skips the rest of the current iteration and starts the next",
+                    "Restarts the loop from the beginning",
+                    "Pauses execution",
+                ],
+                "correct": 1,
+                "why": (
+                    "`continue` is a per-iteration shortcut, not a "
+                    "per-loop shortcut. The loop header runs again "
+                    "immediately."
+                ),
+            },
+        ],
+        apply_challenge_slug=None,
+        reflect_question=(
+            "In two sentences, describe how `break` and `continue` differ "
+            "— and why someone reading code at a glance might confuse them."
+        ),
+        reflect_rubric={
+            "must_mention": ["break", "continue", "loop"],
+            "must_distinguish": [
+                ["exit the loop", "skip the iteration"],
+            ],
+            "must_explain": [
+                "break exits the enclosing loop entirely",
+                "continue jumps to the next iteration of the same loop",
+                "both are early-exit shortcuts inside the loop body",
+            ],
+        },
+        recall_checks=[
+            {
+                "kind": "mcq",
+                "q": "`break` inside a `for` loop:",
+                "options": ["skips one iteration", "exits the loop", "restarts the loop"],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "`continue` inside a `for` loop:",
+                "options": ["skips to next iteration", "exits the loop", "raises an exception"],
+                "correct": 0,
+            },
+            {
+                "kind": "mcq",
+                "q": "If an `if` condition is False, the matching block:",
+                "options": ["runs", "is skipped", "raises TypeError"],
+                "correct": 1,
+            },
+        ],
+    ),
+    # ------------------------------------------------------------------
+    # Concept 5: recursion — base case + recursive case + the stack.
+    # Uses the call-stack-visualiser widget. The Try is to predict a small
+    # factorial result without computing it longhand.
+    # ------------------------------------------------------------------
+    Concept(
+        n=5,
+        slug="recursion",
+        layer="universal",
+        title="Recursion",
+        one_line="A function that calls itself — with a base case and a smaller subproblem.",
+        order_index=500,
+        prereqs=["functions"],
+        try_prompt_md=(
+            "**Try.** This is a classic recursive factorial:\n\n"
+            "```python\n"
+            "def fact(n):\n"
+            "    if n <= 1:\n"
+            "        return 1\n"
+            "    return n * fact(n - 1)\n"
+            "\n"
+            "print(fact(4))\n"
+            "```\n\n"
+            "Predict what `fact(4)` returns — and how many times `fact` is "
+            "called in total."
+        ),
+        try_kind="text-reasoning",
+        try_expected_attempts=[
+            {
+                "pattern": r"\b24\b.*[3-5]",
+                "callback_md": (
+                    "You got the value (24) and an attempt at the call "
+                    "count. The exact number of calls is 4 — fact(4), "
+                    "fact(3), fact(2), fact(1). The Read covers why."
+                ),
+            },
+            {
+                "pattern": r"\b24\b",
+                "callback_md": (
+                    "Value correct (24 = 4 × 3 × 2 × 1). The call count "
+                    "matters for the next stage — keep that in mind."
+                ),
+            },
+        ],
+        exposition_md=(
+            "A recursive function calls itself. To not loop forever, every "
+            "recursion needs:\n\n"
+            "1. A **base case** — an input the function can answer without "
+            "calling itself (here: `n <= 1` returns 1).\n"
+            "2. A **recursive case** — a step that reduces the input "
+            "toward the base case (here: `n - 1`) and combines the "
+            "subresult (here: multiplies by `n`).\n\n"
+            "Each call pushes a new **stack frame** holding the call's "
+            "local variables. The frame stays on the stack until its "
+            "function returns. For `fact(4)`, the stack grows: fact(4) → "
+            "fact(3) → fact(2) → fact(1). fact(1) returns 1, then each "
+            "outer frame collapses, multiplying as it goes: 1, 2, 6, 24.\n\n"
+            "Forget the base case and the stack grows forever — you get "
+            "`RecursionError: maximum recursion depth exceeded`. Forget "
+            "to reduce toward the base case and the same."
+        ),
+        worked_example_md=(
+            "```python\n"
+            "def fact(n):\n"
+            "    if n <= 1:                # base case\n"
+            "        return 1\n"
+            "    return n * fact(n - 1)    # recursive case\n"
+            "\n"
+            "print(fact(4))                # 24\n"
+            "```\n\n"
+            "Call trace:\n"
+            "  fact(4) → 4 * fact(3) → 4 * (3 * fact(2)) → 4 * (3 * (2 * fact(1)))\n"
+            "  fact(1) returns 1, then we unwind: 2*1=2, 3*2=6, 4*6=24."
+        ),
+        play_widget_kind="call-stack-visualiser",
+        play_widget={
+            "title": "Watch the call stack of fact(4)",
+            "function_name": "fact",
+            "frames": [
+                {"caption": "Initial call.", "stack": ["fact(4)"]},
+                {"caption": "fact(4) calls fact(3).", "stack": ["fact(4)", "fact(3)"]},
+                {"caption": "fact(3) calls fact(2).", "stack": ["fact(4)", "fact(3)", "fact(2)"]},
+                {
+                    "caption": "fact(2) calls fact(1).",
+                    "stack": ["fact(4)", "fact(3)", "fact(2)", "fact(1)"],
+                },
+                {
+                    "caption": "fact(1) hits the base case and returns 1. The frame pops.",
+                    "stack": ["fact(4)", "fact(3)", "fact(2) ← 1"],
+                },
+                {
+                    "caption": "fact(2) computes 2 * 1 = 2 and returns. Pop.",
+                    "stack": ["fact(4)", "fact(3) ← 2"],
+                },
+                {
+                    "caption": "fact(3) computes 3 * 2 = 6 and returns. Pop.",
+                    "stack": ["fact(4) ← 6"],
+                },
+                {"caption": "fact(4) computes 4 * 6 = 24 and returns. Stack empty.", "stack": []},
+            ],
+        },
+        check_mcqs=[
+            {
+                "q": (
+                    "What's missing from this recursive function?\n\n"
+                    "```\n"
+                    "def count_down(n):\n"
+                    "    print(n)\n"
+                    "    count_down(n - 1)\n"
+                    "```"
+                ),
+                "options": [
+                    "Nothing — it works",
+                    "A base case",
+                    "A return statement",
+                    "A loop",
+                ],
+                "correct": 1,
+                "why": (
+                    "No base case → infinite recursion → "
+                    "RecursionError. Add `if n <= 0: return` at the top."
+                ),
+            },
+            {
+                "q": (
+                    "How many stack frames are live (not yet returned) at the "
+                    "moment `fact(1)` is about to compute its return value, "
+                    "when called as `fact(5)`?"
+                ),
+                "options": ["1", "3", "5", "Infinite"],
+                "correct": 2,
+                "why": (
+                    "fact(5), fact(4), fact(3), fact(2), fact(1) — five "
+                    "frames all live until the base case starts unwinding."
+                ),
+            },
+        ],
+        apply_challenge_slug=None,
+        reflect_question=(
+            "In two sentences, explain why a recursive function needs a "
+            "base case — and what happens at runtime if you forget it."
+        ),
+        reflect_rubric={
+            "must_mention": ["base case", "stack", "recursive"],
+            "must_distinguish": [
+                ["recursive case", "base case"],
+            ],
+            "must_explain": [
+                "the base case is the input the function can answer without recursing",
+                "without it the stack grows until RecursionError",
+                "each call adds a frame; the base case starts the unwinding",
+            ],
+        },
+        recall_checks=[
+            {
+                "kind": "mcq",
+                "q": "A recursive function with no base case will:",
+                "options": ["return None", "raise RecursionError", "loop forever"],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "Each recursive call adds:",
+                "options": ["a CPU register", "a stack frame", "a global variable"],
+                "correct": 1,
+            },
+            {
+                "kind": "mcq",
+                "q": "fact(3) calls how many functions before the first return?",
+                "options": ["1", "3", "9"],
+                "correct": 1,
+            },
+        ],
+    ),
 ]
 
 
