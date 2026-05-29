@@ -11,6 +11,7 @@
  * Apply hand-off to existing skeleton/fillblank lessons lands in CC.5.
  */
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
@@ -71,11 +72,17 @@ export function ConceptUnit({ concept }: { concept: ConceptDetail }) {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {concept.layer === "universal"
-            ? "Universal CS foundation"
-            : "Mental Models"}
-        </p>
+        <Link
+          href="/tracks/mental-models"
+          className="inline-flex w-fit items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
+        >
+          <span aria-hidden="true">←</span>
+          <span>
+            {concept.layer === "universal"
+              ? "Universal CS foundation"
+              : "Mental Models"}
+          </span>
+        </Link>
         <h1 className="text-2xl font-semibold leading-tight">
           {concept.title}
         </h1>
@@ -702,12 +709,20 @@ function ReflectStage({
       )}
       {verdict && verdict.verdict === "complete" && (
         <div className="flex flex-col gap-2">
-          <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900">
-            <p className="font-semibold">✓ Concept mastered.</p>
-            <p className="mt-1">
-              You&apos;ll see this concept again in your spaced-recall queue in
-              about a day.
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900">
+            <div>
+              <p className="font-semibold">✓ Concept mastered.</p>
+              <p className="mt-1">
+                You&apos;ll see this concept again in your spaced-recall queue
+                in about a day.
+              </p>
+            </div>
+            <Link
+              href="/tracks/mental-models"
+              className="shrink-0 rounded-md border border-green-700 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-100"
+            >
+              Pick the next concept →
+            </Link>
           </div>
           {verdict.follow_up && (
             <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">

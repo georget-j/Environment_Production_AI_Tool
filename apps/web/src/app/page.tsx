@@ -26,7 +26,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid gap-4 md:grid-cols-3">
+        <TrackCard
+          title="Mental Models for Code"
+          tagline="Learn to think about code, not just write it."
+          body="Concept-by-concept atoms — variables, references, control flow, recursion, state machines. Each follows a six-stage UNIT (Try, Read, Play, Check, Apply, Reflect) grounded in cognitive-load and productive-failure research."
+          href="/tracks/mental-models"
+          cta="Start with foundations →"
+        />
         <TrackCard
           title="Backend Production"
           tagline="Build real FastAPI services."
