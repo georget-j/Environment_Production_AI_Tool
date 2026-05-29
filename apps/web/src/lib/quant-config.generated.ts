@@ -770,6 +770,12 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
   "expected_stdout": "True",
   "prompt": "True or False?"
 },
+  "quant-40b-python-hits-a-wall": {
+  "mode": "predict",
+  "code": "import time\n\ndef backtest(prices, window):\n    rolling_sum = 0.0\n    rolling_window = []\n    signals = []\n    for px in prices:\n        rolling_window.append(px)\n        rolling_sum += px\n        if len(rolling_window) > window:\n            rolling_sum -= rolling_window.pop(0)\n        if len(rolling_window) == window:\n            mean = rolling_sum / window\n            signals.append(1 if px > mean else 0)\n    return signals\n\nprices = [100.0 + i*0.001 for i in range(100_000)]\nsignals = backtest(prices, 20)\nprint('interpreter')",
+  "expected_stdout": "interpreter",
+  "prompt": "Predict the printed output."
+},
   "quant-40-why-c": {
   "mode": "cwasm",
   "source": "#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct Order {\n    int order_id;\n    double price;\n    int qty;\n    struct Order *next;\n} Order;\n\n/* Insert sorted descending by price (best bid at head). */\nstatic Order *insert_bid(Order *head, int id, double price, int qty) {\n    Order *n = malloc(sizeof *n);\n    n->order_id = id; n->price = price; n->qty = qty; n->next = NULL;\n    if (head == NULL || price > head->price) {\n        n->next = head;\n        return n;\n    }\n    Order *cur = head;\n    while (cur->next != NULL && cur->next->price >= price) cur = cur->next;\n    n->next = cur->next;\n    cur->next = n;\n    return head;\n}\n\nint main(void) {\n    Order *bids = NULL;\n    bids = insert_bid(bids, 1, 100.05, 5);\n    bids = insert_bid(bids, 2, 100.10, 3);\n    bids = insert_bid(bids, 3, 99.95, 8);\n    bids = insert_bid(bids, 4, 100.10, 2);\n    bids = insert_bid(bids, 5, 100.07, 1);\n    printf(\"bids: \"); for (Order *c = bids; c; c = c->next)\n        printf(\"[#%d %.2f x %d] \", c->order_id, c->price, c->qty);\n    printf(\"\\nbest bid: %.2f (qty %d)\\n\", bids->price, bids->qty);\n    return 0;\n}\n",

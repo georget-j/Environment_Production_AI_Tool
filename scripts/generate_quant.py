@@ -3204,6 +3204,70 @@ LESSONS: list[Lesson] = [
         skills=["quant", "machine-learning", "backtesting", "risk-metrics"],
     ),
 
+    # ============ Stage 5 — Performance & C (13 lessons incl. 40b) ============
+    Lesson(
+        n=55, stage=5, mode="predict",
+        n_label="40b",
+        order_index_override=3950,
+        title="Python hits a wall",
+        scenario="You've built three strategies in Python. They work. Now imagine the same loop running at the exchange — every tick, every order book update, 24 hours a day. The bookkeeping that took milliseconds in your backtest needs microseconds in production. This is the lesson where Python's interpreter overhead matters.",
+        learner_goal="Read a simple Python backtest loop and identify what's dominating the per-tick cost.",
+        concept="The CPython interpreter dispatches each bytecode instruction via a giant `switch` statement; each step typically costs 50-100ns of pure overhead beyond the actual work. For the loop below, that's ~8 dispatched ops per tick. At a million ticks per second (a busy quote feed), the interpreter alone consumes ~500ns/tick — already half the entire 10µs end-to-end budget on a US equity option quote. The actual *arithmetic* is single-digit nanoseconds. The dispatch is the wall — and it's why the inner loops of every low-latency system are written in C.",
+        example_code=(
+            "# A momentum-signal backtester: read tick, update rolling mean, emit signal.\n"
+            "# Annotated with the dominant bottleneck per line.\n"
+            "import time\n"
+            "\n"
+            "def backtest(prices, window):\n"
+            "    rolling_sum = 0.0\n"
+            "    rolling_window = []\n"
+            "    signals = []\n"
+            "    for px in prices:                       # bytecode dispatch + box\n"
+            "        rolling_window.append(px)            # list grow + ref-bump\n"
+            "        rolling_sum += px                    # float add + box-rewrap\n"
+            "        if len(rolling_window) > window:     # builtin call dispatch\n"
+            "            rolling_sum -= rolling_window.pop(0)  # memcpy + ref-bump\n"
+            "        if len(rolling_window) == window:    # builtin call dispatch\n"
+            "            mean = rolling_sum / window      # float divide + box\n"
+            "            signals.append(1 if px > mean else 0)  # compare + dispatch\n"
+            "    return signals\n"
+            "\n"
+            "# 100k ticks of 'data'.\n"
+            "prices = [100.0 + i*0.001 for i in range(100_000)]\n"
+            "signals = backtest(prices, 20)\n"
+            "# Which axis of cost dominates?\n"
+            "#   interpreter — bytecode dispatch + boxing (∼500ns/tick total).\n"
+            "#   memory      — heap-alloc / cache-miss costs (~100ns each, occasional).\n"
+            "#   io          — print, network, syscall (not in this loop).\n"
+            "print('interpreter')"
+        ),
+        code=(
+            "import time\n"
+            "\n"
+            "def backtest(prices, window):\n"
+            "    rolling_sum = 0.0\n"
+            "    rolling_window = []\n"
+            "    signals = []\n"
+            "    for px in prices:\n"
+            "        rolling_window.append(px)\n"
+            "        rolling_sum += px\n"
+            "        if len(rolling_window) > window:\n"
+            "            rolling_sum -= rolling_window.pop(0)\n"
+            "        if len(rolling_window) == window:\n"
+            "            mean = rolling_sum / window\n"
+            "            signals.append(1 if px > mean else 0)\n"
+            "    return signals\n"
+            "\n"
+            "prices = [100.0 + i*0.001 for i in range(100_000)]\n"
+            "signals = backtest(prices, 20)\n"
+            "print('interpreter')"
+        ),
+        your_turn="Read the loop's per-line cost annotation (in the Example), then predict which cost class dominates: `interpreter`, `memory`, or `io`.",
+        expected_stdout="interpreter",
+        prompt="Predict the printed output.",
+        why_this="This is the answer to 'why do quants use C': not because the arithmetic is faster, but because the interpreter dispatch in the hot path doesn't exist. Lessons 41-49 build the muscle to write that hot path.",
+        skills=["quant", "performance", "c-language"],
+    ),
     # ============ Stage 5 — Performance & C (12 lessons) ============
     Lesson(
         n=40, stage=5, mode="cwasm",
@@ -3284,6 +3348,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the exact string `hello, C!`.",
         expected_stdout="hello, C!",
         hint="No quotes — those come from the surrounding code.",
+        why_this="The literal program that runs in every kernel and most exchange matching engines. Building muscle memory for the boilerplate frees you to think about the algorithm.",
         skills=["quant", "c-language"],
     ),
     Lesson(
@@ -3309,6 +3374,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the literal that keeps the second division floating-point.",
         expected_stdout="3 3.5",
         hint="A single digit.",
+        why_this="Fixed-width integers and IEEE doubles are how wire-format protocols encode prices and quantities. Get the type right and your parsing matches the exchange byte-for-byte.",
         skills=["quant", "c-language"],
     ),
     Lesson(
@@ -3340,6 +3406,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the increment that advances i by 1 each iteration.",
         expected_stdout="1 4 9 16 25",
         hint="Two characters.",
+        why_this="Tight `for` loops the compiler can unroll and vectorise are how numpy, BLAS, and every hot path in a low-latency system actually run their arithmetic.",
         skills=["quant", "c-language"],
     ),
     Lesson(
@@ -3369,6 +3436,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the offset that gives you the third element.",
         expected_stdout="30",
         hint="Arrays are zero-indexed.",
+        why_this="Pointer arithmetic plus cache-line-aware layouts are how you write a market-data ring buffer that doesn't allocate per tick. lesson 48 is the canonical example.",
         skills=["quant", "c-language", "memory"],
     ),
     Lesson(
@@ -3408,6 +3476,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the field name we set above.",
         expected_stdout="face=1000.00 years=5",
         hint="It's right above — five letters.",
+        why_this="Byte-exact struct layouts are what wire-format protocols (FIX, ITCH, MDP3) compile down to. The struct declaration is the contract.",
         skills=["quant", "c-language", "memory"],
     ),
     Lesson(
@@ -3437,6 +3506,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the function name to pass as a function pointer.",
         expected_stdout="49",
         hint="It's the function defined above main.",
+        why_this="Strategy dispatch tables in C use function pointers — what a Python `dict[str, Callable]` becomes when you cross the JIT boundary into the hot path.",
         skills=["quant", "c-language"],
     ),
     Lesson(
@@ -3470,6 +3540,7 @@ LESSONS: list[Lesson] = [
         your_turn="Replace `___` with the function that returns memory to the heap.",
         expected_stdout="7 8 9",
         hint="Opposite of malloc — four letters.",
+        why_this="Production low-latency code pre-allocates everything at boot precisely to never call malloc on the hot path — the kernel might decide to give you a slow allocation right before a market open.",
         skills=["quant", "c-language", "memory"],
     ),
     Lesson(
