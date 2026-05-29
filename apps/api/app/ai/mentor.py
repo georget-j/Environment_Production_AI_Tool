@@ -292,16 +292,57 @@ class ReflectGrade:
     raw: str  # the original model output, for debugging
 
 
+# Reflect is a self-explanation exercise (research basis: self-explanation
+# effect). The cognitive work happens in WRITING the answer; precise rubric
+# match is not the point. A deterministic length-gate ensures any genuine
+# attempt passes the stage — the LLM's text becomes optional context, not a
+# gate. Anything shorter than this is too short to count as reflection.
+_REFLECT_MIN_CHARS = 80
+
+
 def reflect_grade(
     context: ConceptContext,
     rubric: dict,
     learner_explanation: str,
 ) -> tuple[ReflectGrade, dict]:
-    """Grade a Reflect-stage answer against a rubric.
+    """Grade a Reflect-stage answer.
 
-    Returns (grade, metadata). On parse error the grade defaults to
-    verdict='shallow' with a generic follow-up; never raises out.
+    Pass policy: a non-trivial attempt (≥ 80 chars) passes the stage
+    deterministically. The LLM is consulted for praise / one optional
+    probing question (shown to the learner as feedback), but it never
+    gates progression. Trivially short answers ("hi", "idk") get an
+    immediate 'shallow' verdict without an LLM call.
+
+    Returns (grade, metadata). On any LLM error the grade falls back to
+    'complete' with no follow-up — Reflect must not block the learner.
     """
+    # Deterministic short-circuit: trivially short = shallow with a nudge.
+    # This path runs without an API key — it costs nothing and shouldn't
+    # depend on OpenAI configuration.
+    cleaned = (learner_explanation or "").strip()
+    if len(cleaned) < _REFLECT_MIN_CHARS:
+        return (
+            ReflectGrade(
+                verdict="shallow",
+                follow_up=(
+                    "That feels too short to be a real reflection — give it "
+                    "two full sentences in your own words. What's the "
+                    "mechanism, and why does it matter?"
+                ),
+                rubric_hits={},
+                raw="(length-gate: too short)",
+            ),
+            {
+                "model": "deterministic",
+                "usage": None,
+                "prompt_sha": get_prompt_sha(),
+                "mode": "reflect_grade",
+                "concept_slug": context.slug,
+                "length_gate": "too_short",
+            },
+        )
+
+    # Past the length gate — we'll call OpenAI for feedback. Verify the key.
     settings = get_settings()
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
@@ -335,11 +376,7 @@ def reflect_grade(
     raw = completion.choices[0].message.content or "{}"
     try:
         parsed = json.loads(raw)
-        verdict = parsed.get("verdict", "shallow")
-        if verdict not in ("complete", "shallow"):
-            verdict = "shallow"
         follow_up_raw = parsed.get("follow_up")
-        # Sanitise the follow-up too — it's the part shown to the learner.
         if follow_up_raw:
             follow_up_sanitised, _ = _strip_forward_refs(
                 follow_up_raw,
@@ -348,20 +385,21 @@ def reflect_grade(
             )
         else:
             follow_up_sanitised = None
+        # The length gate has already decided: this is a pass. The LLM's
+        # opinion is treated as optional feedback. Verdict is fixed to
+        # 'complete' so the stage actually advances.
         grade = ReflectGrade(
-            verdict=verdict,
+            verdict="complete",
             follow_up=follow_up_sanitised,
             rubric_hits=parsed.get("rubric_hits", {}),
             raw=raw,
         )
     except (json.JSONDecodeError, AttributeError):
-        # Defensive fallback: never crash the Reflect stage on a parse error.
+        # Never block the learner on an LLM parse error — they wrote ≥ 80
+        # chars, they pass.
         grade = ReflectGrade(
-            verdict="shallow",
-            follow_up=(
-                "I couldn't parse the grading output — could you try "
-                "restating your explanation in two complete sentences?"
-            ),
+            verdict="complete",
+            follow_up=None,
             rubric_hits={},
             raw=raw,
         )

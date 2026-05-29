@@ -269,6 +269,60 @@ function TryStage({
   );
 }
 
+/** Block in a parsed Read-stage exposition. The parser breaks markdown
+ * into discrete visual blocks so each idea gets its own card, instead of
+ * one prose blob the eye slides off. */
+type ReadBlock =
+  | { kind: "paragraph"; text: string }
+  | { kind: "bullets"; items: string[] }
+  | { kind: "code"; body: string };
+
+/** Lightweight markdown segmenter for the Read stage. Splits on blank
+ * lines, then classifies each segment. Each bullet becomes its own block
+ * (rendered as a separate card). Fenced ```code``` blocks are kept whole.
+ *
+ * We're not building a real markdown parser — just enough segmentation
+ * to drive a clean visual layout. ReactMarkdown still handles inline
+ * formatting (bold, inline code, links) within each block. */
+function parseExposition(md: string): ReadBlock[] {
+  const blocks: ReadBlock[] = [];
+  const text = md.replace(/\r\n/g, "\n").trim();
+  let i = 0;
+  while (i < text.length) {
+    // Code fence — preserve verbatim.
+    if (text.startsWith("```", i)) {
+      const end = text.indexOf("```", i + 3);
+      if (end === -1) {
+        blocks.push({ kind: "paragraph", text: text.slice(i) });
+        break;
+      }
+      const fence = text.slice(i, end + 3);
+      const body = fence.replace(/^```\w*\n?/, "").replace(/```$/, "");
+      blocks.push({ kind: "code", body });
+      i = end + 3;
+      while (i < text.length && text[i] === "\n") i++;
+      continue;
+    }
+    // Take until the next blank line.
+    const blank = text.indexOf("\n\n", i);
+    const next = blank === -1 ? text.length : blank;
+    const segment = text.slice(i, next).trim();
+    if (segment) {
+      if (/^[-*]\s/.test(segment)) {
+        const items = segment
+          .split("\n")
+          .filter((l) => /^[-*]\s/.test(l.trim()))
+          .map((l) => l.trim().replace(/^[-*]\s+/, ""));
+        blocks.push({ kind: "bullets", items });
+      } else {
+        blocks.push({ kind: "paragraph", text: segment });
+      }
+    }
+    i = next + 2;
+  }
+  return blocks;
+}
+
 function ReadStage({
   concept,
   progress,
@@ -277,10 +331,11 @@ function ReadStage({
 }: StageProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Surface the learner's Try attempt inline if they recorded one — that
-  // turns the Read into a personalised "you tried X, here's why" moment
-  // (the productive-failure dividend).
   const tryAttempt = progress?.try_attempt_text?.trim() ?? "";
+  const blocks = useMemo(
+    () => parseExposition(concept.exposition_md ?? ""),
+    [concept.exposition_md],
+  );
 
   async function advance() {
     setBusy(true);
@@ -298,6 +353,11 @@ function ReadStage({
     }
   }
 
+  // Tight prose token reused inside cards — keeps paragraph margins flat
+  // so the card padding does the spacing.
+  const proseInline =
+    "prose prose-base max-w-none prose-p:my-0 prose-strong:font-semibold prose-em:italic prose-code:rounded prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.88em] prose-code:before:content-none prose-code:after:content-none";
+
   return (
     <div className="flex flex-col gap-5">
       {tryAttempt && (
@@ -306,19 +366,68 @@ function ReadStage({
           <p className="mt-1 whitespace-pre-wrap font-mono">{tryAttempt}</p>
         </div>
       )}
-      <div className="rounded-md border border-border bg-muted/30 p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          The idea, in one line
+
+      <div className="rounded-lg border-2 border-foreground/15 bg-gradient-to-br from-muted/40 to-muted/10 p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          The idea
         </p>
-        <p className="mt-1 text-sm font-medium">{concept.one_line}</p>
+        <p className="mt-1.5 text-base font-medium leading-snug">
+          {concept.one_line}
+        </p>
       </div>
-      <article className="prose prose-sm max-w-none prose-headings:mt-4 prose-headings:mb-1 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-pre:my-2">
-        <ReactMarkdown>{concept.exposition_md}</ReactMarkdown>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Worked example
-        </p>
-        <ReactMarkdown>{concept.worked_example_md}</ReactMarkdown>
-      </article>
+
+      <div className="flex flex-col gap-3">
+        {blocks.map((b, i) => {
+          if (b.kind === "paragraph") {
+            return (
+              <div key={i} className={proseInline}>
+                <ReactMarkdown>{b.text}</ReactMarkdown>
+              </div>
+            );
+          }
+          if (b.kind === "bullets") {
+            return (
+              <ul key={i} className="flex flex-col gap-2">
+                {b.items.map((item, j) => (
+                  <li
+                    key={j}
+                    className="flex gap-3 rounded-md border border-border bg-background p-3"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/50"
+                    />
+                    <div className={proseInline}>
+                      <ReactMarkdown>{item}</ReactMarkdown>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            );
+          }
+          // code block in the exposition (rare — most concepts keep code in worked_example_md)
+          return (
+            <pre
+              key={i}
+              className="overflow-x-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-sm"
+            >
+              {b.body}
+            </pre>
+          );
+        })}
+      </div>
+
+      {concept.worked_example_md?.trim() && (
+        <div className="rounded-md border border-border bg-muted/20">
+          <p className="border-b border-border px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Worked example
+          </p>
+          <div className="prose prose-base max-w-none p-3 prose-pre:my-0 prose-pre:overflow-x-auto prose-pre:bg-foreground prose-pre:p-3 prose-pre:text-background prose-pre:text-sm prose-code:font-mono prose-code:text-[0.95em]">
+            <ReactMarkdown>{concept.worked_example_md}</ReactMarkdown>
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-xs text-red-700">{error}</p>}
       <div className="flex justify-end">
         <Button onClick={advance} disabled={busy}>
@@ -587,17 +696,25 @@ function ReflectStage({
       {error && <p className="text-xs text-red-700">{error}</p>}
       {verdict && verdict.verdict === "shallow" && (
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <p className="font-semibold">Almost.</p>
+          <p className="font-semibold">A bit too short.</p>
           {verdict.follow_up && <p className="mt-1">{verdict.follow_up}</p>}
         </div>
       )}
       {verdict && verdict.verdict === "complete" && (
-        <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900">
-          <p className="font-semibold">✓ Concept mastered.</p>
-          <p className="mt-1">
-            You&apos;ll see this concept again in your spaced-recall queue in
-            about a day.
-          </p>
+        <div className="flex flex-col gap-2">
+          <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900">
+            <p className="font-semibold">✓ Concept mastered.</p>
+            <p className="mt-1">
+              You&apos;ll see this concept again in your spaced-recall queue in
+              about a day.
+            </p>
+          </div>
+          {verdict.follow_up && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="font-semibold">One thing to think about:</p>
+              <p className="mt-1">{verdict.follow_up}</p>
+            </div>
+          )}
         </div>
       )}
       {!isMastered && (

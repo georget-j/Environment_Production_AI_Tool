@@ -6,7 +6,7 @@ purely in-process: the forward-reference sanitiser, which is the Exercism
 constraint applied as a hard post-generation guard.
 """
 
-from app.ai.mentor import _strip_forward_refs
+from app.ai.mentor import ConceptContext, _strip_forward_refs, reflect_grade
 
 
 ALL_CONCEPTS = (
@@ -79,3 +79,38 @@ def test_word_that_happens_to_share_letters_is_not_mangled() -> None:
     out, removed = _strip_forward_refs(text, (), ALL_CONCEPTS)
     assert removed == []
     assert out == text
+
+
+# ----------------------------------------------------------------------------
+# Reflect length-gate — trivially short explanations must short-circuit to
+# 'shallow' WITHOUT calling OpenAI. This test exercises that path; the
+# OpenAI-pass path requires real credentials and lives outside CI.
+# ----------------------------------------------------------------------------
+
+
+def _ctx() -> ConceptContext:
+    return ConceptContext(
+        slug="variables-names",
+        title="Variables and names",
+        one_line="A variable is a name bound to a value.",
+        exposition_md="(omitted)",
+        worked_example_md="(omitted)",
+        try_attempt_text=None,
+        concepts_mastered=(),
+        all_concept_slugs=ALL_CONCEPTS,
+    )
+
+
+def test_reflect_short_circuits_for_trivial_explanation() -> None:
+    # Trivially short — should NOT hit OpenAI and should return 'shallow'.
+    grade, meta = reflect_grade(_ctx(), {}, "idk")
+    assert grade.verdict == "shallow"
+    assert grade.follow_up is not None
+    assert meta["length_gate"] == "too_short"
+    assert meta["model"] == "deterministic"
+
+
+def test_reflect_short_circuits_on_empty_explanation() -> None:
+    grade, meta = reflect_grade(_ctx(), {}, "")
+    assert grade.verdict == "shallow"
+    assert meta["length_gate"] == "too_short"
