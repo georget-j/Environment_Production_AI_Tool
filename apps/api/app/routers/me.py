@@ -8,7 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.auth import AuthUser, get_current_user
 from app.db import get_db
-from app.models import Challenge, Module, Track, UserChallengeProgress
+from app.models import (
+    Challenge,
+    Concept,
+    ConceptMastery,
+    Module,
+    Track,
+    UserChallengeProgress,
+)
 from app.schemas import (
     ContinueRef,
     MeProgressOut,
@@ -87,6 +94,68 @@ def get_my_progress(
     )
     progress_by_challenge = {p.challenge_id: p for p in progress_rows}
 
+    # M5 — concept-mastery rollup per concept-based track. Today only the
+    # Mental Models track has concepts; the per-track topic_slug column ties
+    # a concept to a track (topic == track-shape mental-models).
+    concept_total_by_track: dict[str, int] = {}
+    concept_done_by_track: dict[str, int] = {}
+    concept_in_progress_by_track: dict[str, str | None] = {}
+    concept_rows = list(
+        db.scalars(
+            select(Concept).order_by(Concept.layer, Concept.order_index)
+        ).all()
+    )
+    # Map topic_slug → track slug. Universal-layer concepts are shared so
+    # they're attributed to every concept-based track. For the pilot, only
+    # Mental Models is concept-based; the universal concepts also count
+    # toward its progress.
+    concept_track_slugs: set[str] = {
+        t.slug for t in tracks if t.slug == "mental-models"
+    }
+    for slug in concept_track_slugs:
+        concept_total_by_track[slug] = 0
+        concept_done_by_track[slug] = 0
+        concept_in_progress_by_track[slug] = None
+    # Build per-track concept index. A concept counts toward a track if
+    # its topic_slug == track slug OR layer == universal (foundation concepts
+    # belong to every concept-based track for now).
+    concepts_by_track: dict[str, list[Concept]] = {
+        slug: [] for slug in concept_track_slugs
+    }
+    for c in concept_rows:
+        for slug in concept_track_slugs:
+            if c.topic_slug == slug or c.layer == "universal":
+                concepts_by_track[slug].append(c)
+
+    if concept_track_slugs and concept_rows:
+        mastery_rows = list(
+            db.scalars(
+                select(ConceptMastery).where(ConceptMastery.user_id == user.id)
+            ).all()
+        )
+        mastery_by_concept_id = {m.concept_id: m for m in mastery_rows}
+        for slug, slugs_concepts in concepts_by_track.items():
+            done = 0
+            latest_in_progress: tuple = ()
+            for c in slugs_concepts:
+                concept_total_by_track[slug] += 1
+                m = mastery_by_concept_id.get(c.id)
+                if m is None:
+                    continue
+                if m.mastered_at is not None:
+                    done += 1
+                else:
+                    # Treat any started-but-not-mastered concept as in-progress.
+                    started = m.try_attempted_at or m.read_completed_at
+                    if started is not None and (
+                        not latest_in_progress or started > latest_in_progress[0]
+                    ):
+                        latest_in_progress = (started, c.slug)
+            concept_done_by_track[slug] = done
+            concept_in_progress_by_track[slug] = (
+                latest_in_progress[1] if latest_in_progress else None
+            )
+
     # Walk each track and tally.
     track_out: list[TrackProgressOut] = []
     overall_best: tuple = ()  # (started_at, track_slug, challenge_slug) — most recent in-progress
@@ -110,15 +179,31 @@ def get_my_progress(
                 ):
                     latest_in_progress = c
                     latest_in_progress_started = started
+        # For concept-based tracks (no challenges), surface concept-mastery
+        # counts via the standard completed/total so the existing dashboard
+        # progress bar renders without bespoke wiring.
+        challenge_total = len(track_challenges)
+        if challenge_total == 0 and t.slug in concept_total_by_track:
+            display_total = concept_total_by_track[t.slug]
+            display_completed = concept_done_by_track[t.slug]
+            display_in_progress = concept_in_progress_by_track[t.slug]
+        else:
+            display_total = challenge_total
+            display_completed = completed
+            display_in_progress = (
+                latest_in_progress.slug if latest_in_progress else None
+            )
         track_out.append(
             TrackProgressOut(
                 slug=t.slug,
                 title=t.title,
                 description=t.description,
                 difficulty=t.difficulty,
-                completed=completed,
-                total=len(track_challenges),
-                latest_in_progress_slug=latest_in_progress.slug if latest_in_progress else None,
+                completed=display_completed,
+                total=display_total,
+                latest_in_progress_slug=display_in_progress,
+                concept_completed=concept_done_by_track.get(t.slug, 0),
+                concept_total=concept_total_by_track.get(t.slug, 0),
             )
         )
         if latest_in_progress is not None and latest_in_progress_started is not None:

@@ -82,6 +82,12 @@ class TrackProgressOut(_Base):
     completed: int
     total: int
     latest_in_progress_slug: str | None = None
+    # M5 — concept-mastery rollup for concept-based tracks (Mental Models
+    # today). For challenge-based tracks both are 0. When non-zero AND the
+    # track has no challenges, completed/total above mirror these so the
+    # dashboard progress bar Just Works.
+    concept_completed: int = 0
+    concept_total: int = 0
 
 
 class ContinueRef(_Base):

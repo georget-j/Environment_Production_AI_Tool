@@ -77,8 +77,14 @@ export default async function DashboardPage() {
                 ? Math.round((tp.completed / tp.total) * 100)
                 : 0;
             const hasInProgress = !!tp?.latest_in_progress_slug;
+            // Concept-based tracks (M5) deep-link to /concepts/<slug>,
+            // not /challenges/<slug>, when resuming.
+            const isConceptTrack = (tp?.concept_total ?? 0) > 0;
+            const inProgressHref = isConceptTrack
+              ? `/concepts/${tp!.latest_in_progress_slug}`
+              : `/challenges/${tp!.latest_in_progress_slug}`;
             const ctaHref = hasInProgress
-              ? `/challenges/${tp!.latest_in_progress_slug}`
+              ? inProgressHref
               : `/tracks/${t.slug}`;
             const ctaLabel = hasInProgress
               ? "Continue track →"

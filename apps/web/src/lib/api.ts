@@ -121,6 +121,11 @@ export type TrackProgressOut = {
   completed: number;
   total: number;
   latest_in_progress_slug: string | null;
+  // M5 — concept-mastery rollup. Non-zero for concept-based tracks
+  // (Mental Models). The dashboard uses `concept_total > 0` as the
+  // "this is a concept track" flag for routing decisions.
+  concept_completed?: number;
+  concept_total?: number;
 };
 
 export type ContinueRef = {
