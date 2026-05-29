@@ -17,6 +17,7 @@ the helpers in app.ai.mentor and inherit its forward-reference sanitiser.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -26,9 +27,11 @@ from sqlalchemy.orm import Session
 from app.ai.mentor import ConceptContext, reflect_grade, socratic_teach
 from app.auth import AuthUser, get_current_user
 from app.db import get_db
-from app.models import Concept, ConceptMastery, ConceptPrereq
+from app.models import Concept, ConceptFeedback, ConceptMastery, ConceptPrereq
 from app.schemas import (
     ConceptDetail,
+    ConceptFeedbackRequest,
+    ConceptFeedbackResponse,
     ConceptMentorRequest,
     ConceptMentorResponse,
     ConceptStageProgress,
@@ -107,6 +110,32 @@ def _maybe_mark_mastered(row: ConceptMastery) -> None:
     )  # placeholder; CC.4 wires the real scheduling
 
 
+def _match_try_callback(
+    attempt_text: str | None, expected: list | None
+) -> str | None:
+    """M4 — find the first matching try_expected_attempts entry.
+
+    Each entry is `{"pattern": <regex>, "callback_md": <md>}`. We try them
+    in author-order; first hit wins. Malformed regexes are skipped (we
+    never let an author typo blow up Read).
+    """
+    if not attempt_text or not expected:
+        return None
+    for entry in expected:
+        if not isinstance(entry, dict):
+            continue
+        pattern = entry.get("pattern")
+        callback = entry.get("callback_md")
+        if not pattern or not callback:
+            continue
+        try:
+            if re.search(pattern, attempt_text):
+                return callback
+        except re.error:
+            continue
+    return None
+
+
 def _load_concept_or_404(db: Session, slug: str) -> Concept:
     concept = db.scalar(select(Concept).where(Concept.slug == slug))
     if concept is None:
@@ -165,6 +194,11 @@ def get_concept(
     )
     progress = _progress_from_row(row)
 
+    matched_callback = _match_try_callback(
+        progress.try_attempt_text,
+        concept.try_expected_attempts_json or [],
+    )
+
     return ConceptDetail(
         id=concept.id,
         slug=concept.slug,
@@ -183,6 +217,7 @@ def get_concept(
         check_mcqs_json=concept.check_mcqs_json or [],
         apply_challenge_slug=concept.apply_challenge_slug,
         apply_skeleton_json=concept.apply_skeleton_json,
+        try_attempt_matched_callback_md=matched_callback,
         reflect_question=concept.reflect_question,
         reflect_rubric_json=concept.reflect_rubric_json or {},
         recall_checks_json=concept.recall_checks_json or [],
@@ -361,3 +396,40 @@ def concept_mentor(
         reply=reply,
         removed_forward_refs=list(meta.get("removed_forward_refs") or []),
     )
+
+
+# ----------------------------------------------------------------------------
+# Feedback — M8. Collect 👍 / 👎 / other signal per concept. No author-facing
+# dashboard yet — the SELECT side is queried via direct SQL when needed.
+# ----------------------------------------------------------------------------
+
+
+_FEEDBACK_KINDS = frozenset({"helpful", "confusing", "other"})
+
+
+@router.post("/{slug}/feedback", response_model=ConceptFeedbackResponse)
+def submit_concept_feedback(
+    slug: str,
+    body: ConceptFeedbackRequest,
+    db: Session = Depends(get_db),
+    user: AuthUser = Depends(get_current_user),
+) -> ConceptFeedbackResponse:
+    if body.kind not in _FEEDBACK_KINDS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Unknown feedback kind {body.kind!r}. Valid: {sorted(_FEEDBACK_KINDS)}",
+        )
+    # Ensure the concept exists (cheap guard against typos in client calls).
+    _load_concept_or_404(db, slug)
+
+    db.add(
+        ConceptFeedback(
+            user_id=user.id,
+            concept_slug=slug,
+            stage=body.stage,
+            kind=body.kind,
+            free_text=(body.free_text or None),
+        )
+    )
+    db.commit()
+    return ConceptFeedbackResponse(ok=True)

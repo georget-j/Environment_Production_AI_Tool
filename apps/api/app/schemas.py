@@ -168,6 +168,11 @@ class ConceptDetail(ConceptSummary):
     # M2 — inline Pyodide skeleton for Apply.
     # Shape: {instructions_md, starter_code, hidden_test} or None.
     apply_skeleton_json: dict | None = None
+    # M4 — Try→Read personalisation. When the learner has recorded a Try
+    # attempt that matches one of try_expected_attempts[].pattern, this
+    # holds the matched callback_md so the Read stage can surface "you
+    # tried X — here's why" inline.
+    try_attempt_matched_callback_md: str | None = None
     reflect_question: str
     reflect_rubric_json: dict
     recall_checks_json: list
@@ -233,3 +238,15 @@ class ConceptMentorResponse(_Base):
     # Slugs of concepts the mentor mentioned that were stripped by the
     # forward-reference sanitiser; surfaced for debugging only.
     removed_forward_refs: list[str] = []
+
+
+class ConceptFeedbackRequest(_Base):
+    """M8 — learner feedback on a concept atom."""
+
+    kind: str  # 'helpful' | 'confusing' | 'other'
+    stage: str | None = None
+    free_text: str | None = None
+
+
+class ConceptFeedbackResponse(_Base):
+    ok: bool = True

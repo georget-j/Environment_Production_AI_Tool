@@ -17,12 +17,14 @@ import ReactMarkdown from "react-markdown";
 
 import {
   type ConceptDetail,
+  type ConceptFeedbackKind,
   type ConceptMCQ,
   type ConceptStageProgress,
   type ReflectGradeResponse,
   gradeReflect,
   markStageComplete,
   recordTryAttempt,
+  submitConceptFeedback,
 } from "@/lib/concepts";
 import { Button } from "@/components/ui/button";
 import { ConceptApplyRunner } from "@/components/concept-apply-runner";
@@ -414,7 +416,19 @@ function ReadStage({
 
   return (
     <div className="flex flex-col gap-5">
-      {tryAttempt && (
+      {concept.try_attempt_matched_callback_md && (
+        <div className="rounded-md border-2 border-blue-300 bg-blue-50 p-3 text-sm text-blue-950">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+            About your attempt
+          </p>
+          <div className="prose prose-sm mt-1 max-w-none prose-p:my-1 prose-code:rounded prose-code:bg-white/80 prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.88em] prose-code:before:content-none prose-code:after:content-none">
+            <ReactMarkdown>
+              {concept.try_attempt_matched_callback_md}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
+      {tryAttempt && !concept.try_attempt_matched_callback_md && (
         <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
           <p className="font-semibold">You tried:</p>
           <p className="mt-1 whitespace-pre-wrap font-mono">{tryAttempt}</p>
@@ -511,15 +525,19 @@ function PlayStage({ concept, onProgressChange, onAdvance }: StageProps) {
 }
 
 function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
-  // 2-3 MCQs. All must be correct on a single attempt. Wrong answers
-  // surface the relevant Read section (CC.1 simplification: just show a
-  // 'review the Read' tooltip rather than scrolling to a section).
+  // M7 — per-question retry. Once a question has been answered correctly,
+  // it stays locked + green; a wrong answer on the other questions only
+  // resets those, not the correct ones. Stage advances when every
+  // question is settled correct.
   const mcqs = useMemo(
     () => concept.check_mcqs_json ?? [],
     [concept.check_mcqs_json],
   );
   const total = mcqs.length;
   const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [settledCorrect, setSettledCorrect] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -527,15 +545,28 @@ function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
     if (!submitted) return [];
     return mcqs
       .map((m: ConceptMCQ, i: number) => ({ idx: i, mcq: m }))
-      .filter(({ idx, mcq }) => answers[idx] !== mcq.correct);
-  }, [submitted, mcqs, answers]);
+      .filter(
+        ({ idx, mcq }) =>
+          !settledCorrect.has(idx) && answers[idx] !== mcq.correct,
+      );
+  }, [submitted, mcqs, answers, settledCorrect]);
+
+  const allSettled = settledCorrect.size === total;
+  // The submit button is enabled when every UNSETTLED question has an
+  // answer; settled ones don't need to be picked again.
+  const allUnsettledAnswered = mcqs.every(
+    (_, i: number) => settledCorrect.has(i) || answers[i] != null,
+  );
 
   async function submit() {
     setSubmitted(true);
-    const allCorrect =
-      mcqs.length > 0 &&
-      mcqs.every((m: ConceptMCQ, i: number) => answers[i] === m.correct);
-    if (!allCorrect) return;
+    // Promote any newly-correct answers into the settled set.
+    const next = new Set(settledCorrect);
+    mcqs.forEach((m: ConceptMCQ, i: number) => {
+      if (answers[i] === m.correct) next.add(i);
+    });
+    setSettledCorrect(next);
+    if (next.size !== total) return;
     setBusy(true);
     try {
       const token = await getAccessToken();
@@ -549,24 +580,39 @@ function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
   }
 
   function retake() {
+    // Clear ONLY the wrong / unsettled answers. Correct ones stay locked.
     setSubmitted(false);
-    setAnswers({});
+    setAnswers((prev) => {
+      const next: Record<number, number> = {};
+      for (const i of settledCorrect) {
+        if (prev[i] != null) next[i] = prev[i];
+      }
+      return next;
+    });
   }
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        {total} quick check{total === 1 ? "" : "s"}. Pick all the right answers
-        in a single attempt — wrong ones bounce you back to the Read.
+        {total} quick check{total === 1 ? "" : "s"}. Each correct answer locks
+        in; you can re-attempt the ones you miss without losing the others.
       </p>
       <ol className="flex flex-col gap-4">
         {mcqs.map((mcq: ConceptMCQ, qi: number) => {
           const chosen = answers[qi];
           const correct = mcq.correct;
-          const isCorrect = submitted && chosen === correct;
-          const isWrong = submitted && chosen !== correct;
+          const settled = settledCorrect.has(qi);
+          const isCorrect = settled || (submitted && chosen === correct);
+          const isWrong = submitted && !settled && chosen !== correct;
           return (
-            <li key={qi} className="rounded-md border border-border p-3">
+            <li
+              key={qi}
+              className={
+                settled
+                  ? "rounded-md border border-green-300 bg-green-50/40 p-3"
+                  : "rounded-md border border-border p-3"
+              }
+            >
               <div className="flex gap-2 text-sm font-medium">
                 <span className="shrink-0">{qi + 1}.</span>
                 <div className="prose prose-sm max-w-none prose-p:my-0 prose-pre:my-2 prose-pre:bg-muted prose-pre:text-foreground prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none">
@@ -597,7 +643,7 @@ function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
                           onChange={() =>
                             setAnswers((a) => ({ ...a, [qi]: oi }))
                           }
-                          disabled={submitted}
+                          disabled={settled || (submitted && isCorrect)}
                           className="mt-1 shrink-0"
                         />
                         <div className="prose prose-sm max-w-none prose-p:my-0 prose-code:rounded prose-code:bg-background/60 prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none">
@@ -625,17 +671,14 @@ function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
         })}
       </ol>
 
-      {!submitted && (
+      {!allSettled && (!submitted || wrong.length === 0) && (
         <div className="flex justify-end">
-          <Button
-            onClick={submit}
-            disabled={Object.keys(answers).length < total}
-          >
+          <Button onClick={submit} disabled={!allUnsettledAnswered}>
             Check answers
           </Button>
         </div>
       )}
-      {submitted && wrong.length === 0 && (
+      {allSettled && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900">
           <span>✓ All correct.</span>
           <Button onClick={() => onAdvance()} disabled={busy}>
@@ -643,19 +686,20 @@ function CheckStage({ concept, onProgressChange, onAdvance }: StageProps) {
           </Button>
         </div>
       )}
-      {submitted && wrong.length > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+      {submitted && !allSettled && wrong.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           <span>
-            {wrong.length} answer{wrong.length === 1 ? "" : "s"} need
-            revisiting. Go back to the Read for the relevant section, then try
-            again.
+            {settledCorrect.size > 0
+              ? `${settledCorrect.size} of ${total} locked in. ${wrong.length} still to nail.`
+              : `${wrong.length} answer${wrong.length === 1 ? "" : "s"} need another look.`}{" "}
+            Glance back at the Read, then re-attempt just the ones in amber.
           </span>
           <button
             type="button"
             onClick={retake}
-            className="text-sm underline underline-offset-4"
+            className="rounded-md border border-amber-700 bg-white px-3 py-1.5 text-sm font-medium hover:bg-amber-100"
           >
-            Try again
+            Re-attempt the wrong ones
           </button>
         </div>
       )}
@@ -804,6 +848,7 @@ function ReflectStage({
               <p className="mt-1">{verdict.follow_up}</p>
             </div>
           )}
+          <ConceptFeedbackRow conceptSlug={concept.slug} />
         </div>
       )}
       {!isMastered && (
@@ -815,6 +860,97 @@ function ReflectStage({
                 ? "Try again"
                 : "Submit"}
           </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * M8 feedback row — small inline "How was this concept?" prompt that fires
+ * a single 👍 / 👎 / other ping into concept_feedback. No author dashboard
+ * yet; just collect.
+ */
+function ConceptFeedbackRow({ conceptSlug }: { conceptSlug: string }) {
+  const [sent, setSent] = useState<ConceptFeedbackKind | null>(null);
+  const [showNote, setShowNote] = useState(false);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function send(kind: ConceptFeedbackKind, freeText?: string) {
+    if (busy || sent) return;
+    setBusy(true);
+    try {
+      const token = await getAccessToken();
+      if (!token) return;
+      await submitConceptFeedback(token, conceptSlug, kind, freeText);
+      setSent(kind);
+      setShowNote(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sent && !showNote) {
+    return (
+      <div className="rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+        Thanks — feedback noted.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-border bg-muted/20 p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          How was this concept?
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => send("helpful")}
+            disabled={busy}
+            className="rounded-md border border-border bg-background px-2 py-1 text-sm hover:bg-muted"
+            aria-label="Helpful"
+          >
+            👍 Helpful
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowNote(true)}
+            disabled={busy}
+            className="rounded-md border border-border bg-background px-2 py-1 text-sm hover:bg-muted"
+            aria-label="Confusing"
+          >
+            👎 Confusing
+          </button>
+        </div>
+      </div>
+      {showNote && (
+        <div className="mt-2 flex flex-col gap-2">
+          <textarea
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional — what was confusing?"
+            className="rounded-md border border-border bg-background p-2 text-sm focus:border-foreground focus:outline-none"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowNote(false)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <Button
+              size="sm"
+              onClick={() => send("confusing", note.trim() || undefined)}
+              disabled={busy}
+            >
+              Send
+            </Button>
+          </div>
         </div>
       )}
     </div>

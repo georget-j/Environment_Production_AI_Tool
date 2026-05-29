@@ -114,3 +114,44 @@ def test_reflect_short_circuits_on_empty_explanation() -> None:
     grade, meta = reflect_grade(_ctx(), {}, "")
     assert grade.verdict == "shallow"
     assert meta["length_gate"] == "too_short"
+
+
+# ----------------------------------------------------------------------------
+# M4 — Try→Read personalisation. The route helper that matches the
+# learner's attempt against authored patterns.
+# ----------------------------------------------------------------------------
+
+
+from app.routers.concepts import _match_try_callback
+
+
+_EXPECTED = [
+    {"pattern": r"\[1,\s*2,\s*3\]", "callback_md": "you predicted a copy"},
+    {"pattern": r"\[1,\s*2,\s*3,\s*4\]", "callback_md": "you predicted correctly"},
+]
+
+
+def test_match_try_callback_first_pattern_hit() -> None:
+    out = _match_try_callback("I think it's [1, 2, 3] because b copies a.", _EXPECTED)
+    assert out == "you predicted a copy"
+
+
+def test_match_try_callback_second_pattern_hit() -> None:
+    out = _match_try_callback("[1, 2, 3, 4] — the mutation is shared.", _EXPECTED)
+    assert out == "you predicted correctly"
+
+
+def test_match_try_callback_no_match_returns_none() -> None:
+    out = _match_try_callback("dunno", _EXPECTED)
+    assert out is None
+
+
+def test_match_try_callback_no_attempt_returns_none() -> None:
+    assert _match_try_callback(None, _EXPECTED) is None
+    assert _match_try_callback("", _EXPECTED) is None
+
+
+def test_match_try_callback_handles_bad_regex_silently() -> None:
+    # Author typo shouldn't crash Read.
+    bad = [{"pattern": "[unterminated", "callback_md": "x"}]
+    assert _match_try_callback("anything", bad) is None

@@ -61,6 +61,10 @@ export type ConceptDetail = ConceptSummary & {
   check_mcqs_json: ConceptMCQ[];
   apply_challenge_slug: string | null;
   apply_skeleton_json: ApplySkeleton | null;
+  /** M4 — when the learner's recorded Try matches one of the authored
+   *  patterns, this is the rendered callback markdown to show inline
+   *  at the top of Read ("you tried X — here's why"). Null otherwise. */
+  try_attempt_matched_callback_md: string | null;
   reflect_question: string;
   reflect_rubric_json: Record<string, unknown>;
   recall_checks_json: Array<Record<string, unknown>>;
@@ -166,6 +170,26 @@ export async function askConceptMentor(
   return authedPost(accessToken, `/api/concepts/${slug}/mentor`, {
     message,
     history,
+    stage: stage ?? null,
+  });
+}
+
+// ----------------------------------------------------------------------------
+// Feedback (M8) — 👍 / 👎 / other signal per concept.
+// ----------------------------------------------------------------------------
+
+export type ConceptFeedbackKind = "helpful" | "confusing" | "other";
+
+export async function submitConceptFeedback(
+  accessToken: string,
+  slug: string,
+  kind: ConceptFeedbackKind,
+  freeText?: string,
+  stage?: string,
+): Promise<{ ok: boolean }> {
+  return authedPost(accessToken, `/api/concepts/${slug}/feedback`, {
+    kind,
+    free_text: freeText ?? null,
     stage: stage ?? null,
   });
 }
