@@ -1573,6 +1573,40 @@ insert into public.challenges (
   repo_template_url, repo_branch, validation_config_json, ai_rules_json,
   skills, is_free, order_index
 ) values (
+  '00000000-0000-0000-0000-00000000033c',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-38b-build-a-pairs-trade',
+  E'Build a pairs trade',
+  E'The momentum strategy traded directional moves in one symbol. A pairs trade is the opposite bet: when two correlated symbols drift apart, expect them to converge — short the rich one, long the cheap one, profit on the mean-reversion. The mock market gives you SPY and AAPL (AAPL has β ≈ 1.3 to SPY plus idiosyncratic noise) — the exact shape pairs traders look for.',
+  E'Implement a rolling z-score on the SPY-AAPL log spread, then a mean-reversion strategy that enters on |z| > entry threshold and exits inside the band.',
+  E'**Concept.** The spread `s_t = log(P_SPY) - log(P_AAPL)` is approximately mean-reverting when the two symbols share a common factor (here: market beta). A rolling z-score `(s_t - μ) / σ` measured over a backward window flags extremes. Mean-reversion rules: when z exceeds the entry threshold the spread is *rich* — short it (short SPY, long AAPL); when z falls below the exit threshold the bet''s been collected — flatten. Lookahead bias is the same trap as the momentum strategy: rolling_zscore at t must depend on s[:t+1] only.\n\n**Implement the function.** Implement `rolling_zscore` (mean + sample std over the trailing window) and `backtest` (compute spread, walk forward, apply entry/exit rules, accumulate P&L). The lookahead-bias test and the constant-window guard are the structural checks; the sharpe/dd tests just verify the output shape.\n\n**Expected.** All tests pass.\n\n**Why this?** Pairs trades are the canonical statistical-arbitrage shape — the same z-score-of-spread structure underlies every cointegration-based strategy. The lesson''s no-lookahead test is the screen every cointegration ticket is gated on at a real fund.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning', 'backtesting'],
+  true,
+  3820
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
   '00000000-0000-0000-0000-000000000326',
   '00000000-0000-0000-0000-000000000034',
   'quant-39-the-p-hacked-sharpe-trap',

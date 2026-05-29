@@ -340,6 +340,86 @@ class Lesson:
         raise ValueError(f"unhandled mode {self.mode}")
 
 
+# ---- Shared fixtures for multi-file trading-algorithm capstones ----
+#
+# `mock_market.py` is mounted as a readonly module alongside each capstone's
+# tests. It exposes two symbols (SPY synthetic GBM, AAPL synthetic but
+# correlated with SPY) so pair-trading lessons can reach for both without
+# touching the real disk or shipping a CSV.
+MOCK_MARKET_PY = (
+    "\"\"\"Read-only synthetic market data feed.\n"
+    "\n"
+    "Deterministic daily bars for SPY and AAPL. SPY is a GBM with drift\n"
+    "and 1.2% daily vol; AAPL is the SPY return path scaled by beta=1.3\n"
+    "plus an idiosyncratic noise term. Reproducible across runs.\n"
+    "\"\"\"\n"
+    "from dataclasses import dataclass\n"
+    "import numpy as np\n"
+    "\n"
+    "\n"
+    "@dataclass(frozen=True)\n"
+    "class Bar:\n"
+    "    date: str\n"
+    "    open: float\n"
+    "    high: float\n"
+    "    low: float\n"
+    "    close: float\n"
+    "    volume: int\n"
+    "\n"
+    "\n"
+    "def _build_bars(symbol: str, seed: int, n_days: int = 750):\n"
+    "    rng = np.random.default_rng(seed)\n"
+    "    if symbol == 'SPY':\n"
+    "        shocks = rng.normal(0.0003, 0.012, n_days)\n"
+    "    elif symbol == 'AAPL':\n"
+    "        spy_rng = np.random.default_rng(42)\n"
+    "        spy_shocks = spy_rng.normal(0.0003, 0.012, n_days)\n"
+    "        # AAPL ≈ 1.3 × SPY + idiosyncratic noise.\n"
+    "        idio = rng.normal(0.0005, 0.009, n_days)\n"
+    "        shocks = 1.3 * spy_shocks + idio\n"
+    "    else:\n"
+    "        raise ValueError(f'Unknown symbol seed for: {symbol}')\n"
+    "    closes = 100.0 * np.exp(np.cumsum(shocks))\n"
+    "    opens = np.empty(n_days)\n"
+    "    opens[0] = 100.0\n"
+    "    opens[1:] = closes[:-1] * (1 + rng.normal(0, 0.001, n_days - 1))\n"
+    "    highs = np.maximum(opens, closes) * (\n"
+    "        1 + np.abs(rng.normal(0, 0.005, n_days))\n"
+    "    )\n"
+    "    lows = np.minimum(opens, closes) * (\n"
+    "        1 - np.abs(rng.normal(0, 0.005, n_days))\n"
+    "    )\n"
+    "    volumes = (50_000_000 + rng.normal(0, 5_000_000, n_days)).astype(int)\n"
+    "    volumes = np.maximum(volumes, 1_000_000)\n"
+    "    bars = []\n"
+    "    for i in range(n_days):\n"
+    "        bars.append(Bar(\n"
+    "            date=f'2023-day-{i:03d}',\n"
+    "            open=float(opens[i]),\n"
+    "            high=float(highs[i]),\n"
+    "            low=float(lows[i]),\n"
+    "            close=float(closes[i]),\n"
+    "            volume=int(volumes[i]),\n"
+    "        ))\n"
+    "    return bars\n"
+    "\n"
+    "\n"
+    "_BARS = {\n"
+    "    'SPY': _build_bars('SPY', seed=42),\n"
+    "    'AAPL': _build_bars('AAPL', seed=137),\n"
+    "}\n"
+    "\n"
+    "\n"
+    "class Market:\n"
+    "    \"\"\"Historical data feed; supports SPY and AAPL.\"\"\"\n"
+    "\n"
+    "    def history(self, symbol: str = 'SPY'):\n"
+    "        if symbol not in _BARS:\n"
+    "            raise ValueError(f'Unknown symbol: {symbol}')\n"
+    "        return list(_BARS[symbol])\n"
+)
+
+
 # Skill catalogue used by the quant track. Keep slugs short and lowercase.
 SKILL_TITLES: dict[str, str] = {
     "quant": "Quantitative finance",
@@ -3972,70 +4052,251 @@ LESSONS: list[Lesson] = [
                 "Trade count is a non-negative integer.",
             ),
         ],
-        extra_readonly={
-            "mock_market.py": (
-                "\"\"\"Read-only synthetic market data feed.\n"
-                "\n"
-                "Deterministic daily bars built from a numpy GBM. Same bars\n"
-                "every call — no external CSV, no Pyodide path issues.\n"
-                "\"\"\"\n"
-                "from dataclasses import dataclass\n"
-                "import numpy as np\n"
-                "\n"
-                "\n"
-                "@dataclass(frozen=True)\n"
-                "class Bar:\n"
-                "    date: str\n"
-                "    open: float\n"
-                "    high: float\n"
-                "    low: float\n"
-                "    close: float\n"
-                "    volume: int\n"
-                "\n"
-                "\n"
-                "def _build_bars(seed: int = 42, n_days: int = 750):\n"
-                "    rng = np.random.default_rng(seed)\n"
-                "    shocks = rng.normal(0.0003, 0.012, n_days)\n"
-                "    closes = 100.0 * np.exp(np.cumsum(shocks))\n"
-                "    opens = np.empty(n_days)\n"
-                "    opens[0] = 100.0\n"
-                "    opens[1:] = closes[:-1] * (1 + rng.normal(0, 0.001, n_days - 1))\n"
-                "    highs = np.maximum(opens, closes) * (\n"
-                "        1 + np.abs(rng.normal(0, 0.005, n_days))\n"
-                "    )\n"
-                "    lows = np.minimum(opens, closes) * (\n"
-                "        1 - np.abs(rng.normal(0, 0.005, n_days))\n"
-                "    )\n"
-                "    volumes = (50_000_000 + rng.normal(0, 5_000_000, n_days)).astype(int)\n"
-                "    volumes = np.maximum(volumes, 1_000_000)\n"
-                "    bars = []\n"
-                "    for i in range(n_days):\n"
-                "        bars.append(Bar(\n"
-                "            date=f'2023-day-{i:03d}',\n"
-                "            open=float(opens[i]),\n"
-                "            high=float(highs[i]),\n"
-                "            low=float(lows[i]),\n"
-                "            close=float(closes[i]),\n"
-                "            volume=int(volumes[i]),\n"
-                "        ))\n"
-                "    return bars\n"
-                "\n"
-                "\n"
-                "_BARS = {'SPY': _build_bars()}\n"
-                "\n"
-                "\n"
-                "class Market:\n"
-                "    \"\"\"Single-symbol historical data with a deterministic synthetic feed.\"\"\"\n"
-                "\n"
-                "    def history(self, symbol: str = 'SPY'):\n"
-                "        if symbol not in _BARS:\n"
-                "            raise ValueError(f'Unknown symbol: {symbol}')\n"
-                "        return list(_BARS[symbol])\n"
-            ),
-        },
+        extra_readonly={"mock_market.py": MOCK_MARKET_PY},
         your_turn="Implement `signal_at` (4-5 lines of branching) and `backtest` (a loop over closes, accumulate signal × next-day return, compute Sharpe + max drawdown). The lookahead-bias test is the structural check most junior bugs trip.",
         hint="signal_at: guard t < lookback, then compute the lookback-period return and return its sign. backtest: loop t in range(n-1), append signals[t] * (closes[t+1]/closes[t] - 1) to the return series, count position changes.",
         why_this="This loop is the smallest end-to-end backtest you can build — signal → position → return → metrics. The same shape underlies vectorbt, zipline, and every fund's in-house backtester. Get this honest (no lookahead) and the rest is just feature engineering.",
+        skills=["quant", "machine-learning", "backtesting"],
+    ),
+    Lesson(
+        n=61, stage=4, mode="skeleton",
+        n_label="38b",
+        order_index_override=3820,
+        title="Build a pairs trade",
+        scenario="The momentum strategy traded directional moves in one symbol. A pairs trade is the opposite bet: when two correlated symbols drift apart, expect them to converge — short the rich one, long the cheap one, profit on the mean-reversion. The mock market gives you SPY and AAPL (AAPL has β ≈ 1.3 to SPY plus idiosyncratic noise) — the exact shape pairs traders look for.",
+        learner_goal="Implement a rolling z-score on the SPY-AAPL log spread, then a mean-reversion strategy that enters on |z| > entry threshold and exits inside the band.",
+        concept="The spread `s_t = log(P_SPY) - log(P_AAPL)` is approximately mean-reverting when the two symbols share a common factor (here: market beta). A rolling z-score `(s_t - μ) / σ` measured over a backward window flags extremes. Mean-reversion rules: when z exceeds the entry threshold the spread is *rich* — short it (short SPY, long AAPL); when z falls below the exit threshold the bet's been collected — flatten. Lookahead bias is the same trap as the momentum strategy: rolling_zscore at t must depend on s[:t+1] only.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Pairs trade — z-score of the SPY-AAPL log spread.\n"
+            "\n"
+            "Use the Market class to fetch both symbols' bars:\n"
+            "\n"
+            "    from mock_market import Market\n"
+            "    spy = Market().history('SPY')\n"
+            "    aapl = Market().history('AAPL')\n"
+            "\n"
+            "Implement:\n"
+            "\n"
+            "    rolling_zscore(spread, t, window=60) -> float\n"
+            "        Z-score of spread[t] against the mean and std of\n"
+            "        the previous `window` observations: spread[t-window+1 : t+1].\n"
+            "        Return float('nan') for t < window - 1.\n"
+            "        ⚠ Must use ONLY spread[:t+1].\n"
+            "\n"
+            "    backtest(window=60, entry=2.0, exit=0.5) -> dict\n"
+            "        Compute the spread as math.log(spy_close) - math.log(aapl_close).\n"
+            "        Compute rolling_zscore[t] for every t.\n"
+            "        Position rules (start flat at t=0):\n"
+            "          - If flat and z[t] >  entry: position = -1 (short spread).\n"
+            "          - If flat and z[t] < -entry: position = +1 (long spread).\n"
+            "          - If in position and |z[t]| < exit: flatten.\n"
+            "          - Else hold previous position.\n"
+            "          - When z[t] is NaN: hold previous position.\n"
+            "        Strategy P&L at t = position[t] * (spread[t+1] - spread[t]).\n"
+            "        Return: {'sharpe': float, 'max_drawdown': float, 'trades': int}.\n"
+            "          - sharpe: annualised, 252-day convention.\n"
+            "          - max_drawdown: negative fraction of running equity.\n"
+            "          - trades: count of position CHANGES.\n"
+            "\"\"\"\n"
+            "import math\n"
+            "from mock_market import Market\n"
+            "\n"
+            "\n"
+            "def rolling_zscore(spread, t, window=60):\n"
+            "    raise NotImplementedError(\"Implement rolling_zscore\")\n"
+            "\n"
+            "\n"
+            "def backtest(window=60, entry=2.0, exit=0.5):\n"
+            "    raise NotImplementedError(\"Implement backtest\")\n"
+        ),
+        reference_solution=(
+            "import math\n"
+            "from mock_market import Market\n"
+            "\n"
+            "\n"
+            "def rolling_zscore(spread, t, window=60):\n"
+            "    if t < window - 1:\n"
+            "        return float('nan')\n"
+            "    chunk = spread[t - window + 1 : t + 1]\n"
+            "    m = sum(chunk) / window\n"
+            "    var = sum((c - m) ** 2 for c in chunk) / (window - 1)\n"
+            "    s = math.sqrt(var)\n"
+            "    if s == 0:\n"
+            "        return 0.0\n"
+            "    return (spread[t] - m) / s\n"
+            "\n"
+            "\n"
+            "def backtest(window=60, entry=2.0, exit=0.5):\n"
+            "    spy_bars = Market().history('SPY')\n"
+            "    aapl_bars = Market().history('AAPL')\n"
+            "    n = min(len(spy_bars), len(aapl_bars))\n"
+            "    spread = [\n"
+            "        math.log(spy_bars[i].close) - math.log(aapl_bars[i].close)\n"
+            "        for i in range(n)\n"
+            "    ]\n"
+            "    positions = [0] * n\n"
+            "    current = 0\n"
+            "    trades = 0\n"
+            "    for t in range(n):\n"
+            "        z = rolling_zscore(spread, t, window)\n"
+            "        if math.isnan(z):\n"
+            "            positions[t] = current\n"
+            "            continue\n"
+            "        if current == 0:\n"
+            "            if z > entry:\n"
+            "                current = -1\n"
+            "            elif z < -entry:\n"
+            "                current = 1\n"
+            "        else:\n"
+            "            if abs(z) < exit:\n"
+            "                current = 0\n"
+            "        positions[t] = current\n"
+            "        if t > 0 and positions[t] != positions[t - 1]:\n"
+            "            trades += 1\n"
+            "    rets = [\n"
+            "        positions[t] * (spread[t + 1] - spread[t])\n"
+            "        for t in range(n - 1)\n"
+            "    ]\n"
+            "    if not rets:\n"
+            "        return {'sharpe': 0.0, 'max_drawdown': 0.0, 'trades': 0}\n"
+            "    m = sum(rets) / len(rets)\n"
+            "    var = sum((r - m) ** 2 for r in rets) / max(1, len(rets) - 1)\n"
+            "    s = math.sqrt(var)\n"
+            "    sharpe = 0.0 if s == 0 else (m * 252) / (s * math.sqrt(252))\n"
+            "    eq = 1.0\n"
+            "    peak = 1.0\n"
+            "    max_dd = 0.0\n"
+            "    for r in rets:\n"
+            "        eq *= 1 + r\n"
+            "        peak = max(peak, eq)\n"
+            "        dd = eq / peak - 1\n"
+            "        if dd < max_dd:\n"
+            "            max_dd = dd\n"
+            "    return {\n"
+            "        'sharpe': float(sharpe),\n"
+            "        'max_drawdown': float(max_dd),\n"
+            "        'trades': int(trades),\n"
+            "    }\n"
+        ),
+        tests_py=(
+            "\"\"\"Pairs trade: z-score correctness, no-lookahead, structural P&L.\"\"\"\n"
+            "import math\n"
+            "import pytest\n"
+            "\n"
+            "from solution import rolling_zscore, backtest\n"
+            "from mock_market import Market\n"
+            "\n"
+            "\n"
+            "def _spread():\n"
+            "    spy = Market().history('SPY')\n"
+            "    aapl = Market().history('AAPL')\n"
+            "    return [math.log(spy[i].close) - math.log(aapl[i].close)\n"
+            "            for i in range(min(len(spy), len(aapl)))]\n"
+            "\n"
+            "\n"
+            "def test_zscore_is_nan_before_window():\n"
+            "    s = _spread()\n"
+            "    for t in [0, 10, 58]:\n"
+            "        assert math.isnan(rolling_zscore(s, t, window=60))\n"
+            "\n"
+            "\n"
+            "def test_zscore_is_finite_after_window():\n"
+            "    s = _spread()\n"
+            "    for t in [60, 200, 500]:\n"
+            "        z = rolling_zscore(s, t, window=60)\n"
+            "        assert isinstance(z, float)\n"
+            "        assert math.isfinite(z)\n"
+            "\n"
+            "\n"
+            "def test_zscore_matches_hand_calc_constant_window():\n"
+            "    # Constant window → variance 0 → guard returns 0.\n"
+            "    s = [5.0] * 100\n"
+            "    assert rolling_zscore(s, 90, window=60) == 0.0\n"
+            "\n"
+            "\n"
+            "def test_zscore_matches_hand_calc_known_series():\n"
+            "    # Window of 4 with [1,2,3,4] → mean=2.5, sample std=sqrt(5/3).\n"
+            "    # Z at t=3 of 4 against window [1,2,3,4]: (4 - 2.5)/sqrt(5/3) ≈ 1.1619.\n"
+            "    s = [1.0, 2.0, 3.0, 4.0]\n"
+            "    z = rolling_zscore(s, 3, window=4)\n"
+            "    assert abs(z - 1.1619) < 1e-3\n"
+            "\n"
+            "\n"
+            "def test_zscore_no_lookahead_bias():\n"
+            "    # Poison spread[t+1:]; z at t must not change.\n"
+            "    s = _spread()\n"
+            "    t = 300\n"
+            "    truth = rolling_zscore(s, t, window=60)\n"
+            "    poisoned = s[: t + 1] + [-1e9] * (len(s) - t - 1)\n"
+            "    assert abs(rolling_zscore(poisoned, t, window=60) - truth) < 1e-9\n"
+            "\n"
+            "\n"
+            "def test_backtest_returns_dict_with_required_keys():\n"
+            "    r = backtest()\n"
+            "    assert isinstance(r, dict)\n"
+            "    for k in ('sharpe', 'max_drawdown', 'trades'):\n"
+            "        assert k in r\n"
+            "\n"
+            "\n"
+            "def test_backtest_sharpe_is_finite_float():\n"
+            "    r = backtest()\n"
+            "    assert isinstance(r['sharpe'], float)\n"
+            "    assert math.isfinite(r['sharpe'])\n"
+            "\n"
+            "\n"
+            "def test_backtest_max_drawdown_in_valid_range():\n"
+            "    r = backtest()\n"
+            "    assert -1.0 <= r['max_drawdown'] <= 0.0\n"
+            "\n"
+            "\n"
+            "def test_backtest_trades_is_nonnegative_int():\n"
+            "    r = backtest()\n"
+            "    assert isinstance(r['trades'], int)\n"
+            "    assert r['trades'] >= 0\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_zscore_is_nan_before_window",
+                "rolling_zscore returns NaN for t < window - 1.",
+            ),
+            (
+                "tests/test_solution.py::test_zscore_is_finite_after_window",
+                "rolling_zscore returns a finite float once the backward window is full.",
+            ),
+            (
+                "tests/test_solution.py::test_zscore_matches_hand_calc_constant_window",
+                "Constant series produces z = 0 (the zero-variance guard).",
+            ),
+            (
+                "tests/test_solution.py::test_zscore_matches_hand_calc_known_series",
+                "On [1,2,3,4], z at t=3 matches the analytical value ≈ 1.162.",
+            ),
+            (
+                "tests/test_solution.py::test_zscore_no_lookahead_bias",
+                "Poisoning spread[t+1:] does not change rolling_zscore at t.",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_returns_dict_with_required_keys",
+                "backtest returns a dict with sharpe / max_drawdown / trades.",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_sharpe_is_finite_float",
+                "Sharpe is a finite float.",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_max_drawdown_in_valid_range",
+                "Max drawdown is in [-1, 0].",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_trades_is_nonnegative_int",
+                "Trade count is a non-negative integer.",
+            ),
+        ],
+        extra_readonly={"mock_market.py": MOCK_MARKET_PY},
+        your_turn="Implement `rolling_zscore` (mean + sample std over the trailing window) and `backtest` (compute spread, walk forward, apply entry/exit rules, accumulate P&L). The lookahead-bias test and the constant-window guard are the structural checks; the sharpe/dd tests just verify the output shape.",
+        hint="rolling_zscore: slice `spread[t-window+1 : t+1]`, compute mean + std (sample, ddof=1), guard std==0. backtest: walk forward with a single `current` position int; flip on |z| > entry from flat, flatten on |z| < exit while in position.",
+        why_this="Pairs trades are the canonical statistical-arbitrage shape — the same z-score-of-spread structure underlies every cointegration-based strategy. The lesson's no-lookahead test is the screen every cointegration ticket is gated on at a real fund.",
         skills=["quant", "machine-learning", "backtesting"],
     ),
     Lesson(
