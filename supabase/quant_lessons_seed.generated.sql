@@ -22,7 +22,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'vectorisation'],
   true,
-  1
+  100
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -56,7 +56,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy'],
   true,
-  2
+  200
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -90,7 +90,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'vectorisation'],
   true,
-  3
+  300
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -124,7 +124,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'vectorisation'],
   true,
-  4
+  400
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -158,7 +158,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'vectorisation'],
   true,
-  5
+  500
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -192,7 +192,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'statistics'],
   true,
-  6
+  600
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -226,7 +226,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'linear-algebra', 'statistics'],
   true,
-  7
+  700
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -260,7 +260,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'random-numbers'],
   true,
-  8
+  800
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -294,7 +294,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'statistics'],
   true,
-  9
+  900
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -328,7 +328,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'performance'],
   true,
-  10
+  1000
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -362,7 +362,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'performance'],
   true,
-  11
+  1100
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -396,7 +396,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'vectorisation', 'performance'],
   true,
-  12
+  1200
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -430,7 +430,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'numpy', 'matplotlib', 'monte-carlo'],
   true,
-  13
+  1300
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -464,7 +464,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas'],
   true,
-  14
+  1400
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -498,7 +498,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas'],
   true,
-  15
+  1500
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -532,7 +532,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'vectorisation'],
   true,
-  16
+  1600
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -566,7 +566,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'time-series', 'statistics'],
   true,
-  17
+  1700
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -600,7 +600,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'time-series', 'statistics'],
   true,
-  18
+  1800
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -634,7 +634,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'time-series'],
   true,
-  19
+  1900
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -668,7 +668,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'time-series'],
   true,
-  20
+  2000
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -702,7 +702,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'statistics'],
   true,
-  21
+  2100
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -736,7 +736,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'statistics', 'regression'],
   true,
-  22
+  2200
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -770,7 +770,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'time-series', 'statistics'],
   true,
-  23
+  2300
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -804,7 +804,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'options'],
   true,
-  24
+  2400
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -838,7 +838,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'options'],
   true,
-  25
+  2500
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -872,7 +872,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'options', 'matplotlib'],
   true,
-  26
+  2600
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -906,7 +906,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'options'],
   true,
-  27
+  2700
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -940,7 +940,109 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'options', 'black-scholes'],
   true,
-  28
+  2800
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000333',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-28a-black-scholes-intuition',
+  E'Black-Scholes intuition',
+  E'The closed-form is in your hands from the previous lesson. Before solving for prices on a new structure, the desk''s intuition check is to bump one input at a time and see which way the price moves. This is how vol traders calibrate their gut.',
+  E'Read a working bs_call, then predict the direction the call price moves when volatility doubles.',
+  E'**Concept.** A European call is *long* volatility: vega `∂C/∂σ` is strictly positive everywhere. Doubling σ from 0.20 to 0.40 widens the terminal log-normal distribution; the upside tail gets fatter, the downside loss is bounded at -premium, so the expected payoff under the risk-neutral measure goes up. Concretely for an ATM 1-year call with r=5%: the price lifts from ≈ 10.45 to ≈ 17.69 — about 70% more.\n\n**Example.**\n\n```python\nimport math\nfrom scipy.stats import norm\n\ndef bs_call(S, K, r, sigma, T):\n    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n    d2 = d1 - sigma*math.sqrt(T)\n    return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)\n\n# Same ATM 1y call (r=5%) priced at two volatility regimes.\nlow_vol  = bs_call(100, 100, 0.05, 0.20, 1.0)\nhigh_vol = bs_call(100, 100, 0.05, 0.40, 1.0)\n# Direction of the move when sigma doubles.\nprint(''up'' if high_vol > low_vol else ''down'' if high_vol < low_vol else ''same'')\n```\n\n**Predict the output.** Predict the direction of the call price as σ doubles.\n\n**Expected.** `up`\n\n**Why this?** Bump-one-input-at-a-time is how vol traders sanity-check a quote in seconds. If your model says doubling vol decreases a call''s price, you know the sign of vega is wrong before you check a single test.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'black-scholes', 'greeks'],
+  true,
+  2810
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000334',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-28b-greeks-by-bumping',
+  E'Greeks by bumping',
+  E'Most options books compute Greeks both ways: closed-form when one exists, numerical bumping as the universal fallback (and the cross-check that catches the sign errors closed-form sometimes hides). The bumping function below is the same one you''d run against a Monte Carlo pricer or a binomial tree.',
+  E'Implement delta, gamma, and vega by central differences against the Black-Scholes pricer; match the closed-form Greeks at the Hull canonical numbers.',
+  E'**Concept.** Central differences turn any pricer into a Greek calculator. Delta is `(C(S+h) - C(S-h)) / (2h)`, gamma is the second difference `(C(S+h) - 2C(S) + C(S-h)) / h²`, vega is the σ-bump `(C(σ+h) - C(σ-h)) / (2h)`. Pick `h` small enough that the truncation error is below your tolerance, big enough that floating-point noise doesn''t dominate: `h=0.01` for spot and `h=0.001` for σ are conservative defaults for double precision.\n\n**Implement the function.** Implement the three Greeks via central differences against the provided bs_call. The default bump sizes in the signatures are tuned to give 3-decimal accuracy at Hull''s canonical example.\n\n**Expected.** All tests pass.\n\n**Why this?** Numerical bumping is the universal Greek calculator — it works against any pricer, even MC and trees that have no closed form. Most production options books compute both and alert when they diverge by more than rounding.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'black-scholes', 'greeks'],
+  true,
+  2820
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
+  '00000000-0000-0000-0000-000000000335',
+  '00000000-0000-0000-0000-000000000033',
+  'quant-28c-delta-hedge-simulation',
+  E'Delta-hedge simulation',
+  E'Selling an option without hedging is a punt on spot direction. Selling it and dynamically rebalancing delta shares against it isolates the *volatility* P&L — the actual exposure an options desk wants. The hedge loop you write here is the same one a market-maker runs after every fill.',
+  E'Implement a daily-rebalance delta hedge of a short European call over a price path; final P&L should be small in magnitude (discretisation error only).',
+  E'**Concept.** At each rebalance step: (a) carry the cash book at the risk-free rate over `dt`, (b) mark the existing share position to the new spot, (c) recompute the target hedge `Δ` at the new (S, T-t), (d) buy/sell the difference at the new spot, paying/receiving in cash. The replicating portfolio is `(-1 call, +Δ shares)`. If the BS model is correct, the P&L on a continuous hedge is identically zero; discrete rebalance leaves a small residual proportional to `Γ · (ΔS)² · dt` — the gamma slippage every options book budgets for.\n\n**Implement the function.** Implement `hedge_pnl`. The docstring spells out the three steps: receive premium + buy delta shares; per step, carry cash + rebalance to new delta at tau remaining; at expiry, deliver and unwind. The clean version is ~15 lines.\n\n**Expected.** All tests pass.\n\n**Why this?** This loop is the heartbeat of an options market-maker''s hedge book. Get it right and you isolate realised vs implied vol P&L — the actual edge an options trader is trying to capture.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'options', 'black-scholes', 'greeks'],
+  true,
+  2830
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -974,7 +1076,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'options', 'greeks'],
   true,
-  29
+  2900
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1008,7 +1110,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'options', 'black-scholes'],
   true,
-  30
+  3000
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1042,7 +1144,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'options', 'monte-carlo'],
   true,
-  31
+  3100
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1076,7 +1178,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'portfolio', 'linear-algebra'],
   true,
-  32
+  3200
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1110,7 +1212,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'pandas', 'risk-metrics'],
   true,
-  33
+  3300
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1144,7 +1246,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'machine-learning', 'regression'],
   true,
-  34
+  3400
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1178,7 +1280,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'machine-learning', 'backtesting'],
   true,
-  35
+  3500
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1212,7 +1314,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'machine-learning', 'regression', 'backtesting'],
   true,
-  36
+  3600
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1246,7 +1348,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'machine-learning', 'backtesting'],
   true,
-  37
+  3700
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1280,7 +1382,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'machine-learning', 'backtesting'],
   true,
-  38
+  3800
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1314,7 +1416,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'machine-learning', 'backtesting', 'risk-metrics'],
   true,
-  39
+  3900
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1348,7 +1450,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language', 'low-latency'],
   true,
-  40
+  4000
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1382,7 +1484,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language'],
   true,
-  41
+  4100
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1416,7 +1518,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language'],
   true,
-  42
+  4200
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1450,7 +1552,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language'],
   true,
-  43
+  4300
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1484,7 +1586,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language', 'memory'],
   true,
-  44
+  4400
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1518,7 +1620,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language', 'memory'],
   true,
-  45
+  4500
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1552,7 +1654,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language'],
   true,
-  46
+  4600
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1586,7 +1688,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language', 'memory'],
   true,
-  47
+  4700
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1620,7 +1722,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'c-language', 'low-latency', 'memory'],
   true,
-  48
+  4800
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1654,7 +1756,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'performance', 'memory'],
   true,
-  49
+  4900
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1688,7 +1790,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'performance', 'c-language'],
   true,
-  50
+  5000
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,
@@ -1722,7 +1824,7 @@ insert into public.challenges (
   '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
   array['quant', 'performance', 'c-language'],
   true,
-  51
+  5100
 )
 on conflict (slug) do update set
   module_id = excluded.module_id,

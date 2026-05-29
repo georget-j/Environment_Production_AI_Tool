@@ -124,6 +124,15 @@ class Lesson:
     # Used selectively (finance lessons especially) to justify the technique
     # rather than just state the mechanic.
     why_this: str = ""
+    # If set, replaces the numeric "{n:02d}" in the slug. Used for
+    # sub-arc lessons that slot between integer lesson numbers,
+    # e.g. n_label="28a" → slug "quant-28a-...". UUID still derives
+    # from int n so each lesson is uniquely identified.
+    n_label: str = ""
+    # If non-zero, overrides the default order_index (= n) used for
+    # display ordering in the module. Sub-arc lessons set this so the
+    # new lessons display in their intended slot between existing ints.
+    order_index_override: int = 0
     skills: list[str] = field(default_factory=list)
     # Bundled CSV slugs the lesson reads. The worker pre-mounts each under
     # /data/quant/<slug>.csv inside Pyodide's FS before the user code runs.
@@ -163,7 +172,16 @@ class Lesson:
     @property
     def slug(self) -> str:
         kebab = re.sub(r"[^a-z0-9]+", "-", self.title.lower()).strip("-")
-        return f"quant-{self.n:02d}-{kebab}"
+        label = self.n_label if self.n_label else f"{self.n:02d}"
+        return f"quant-{label}-{kebab}"
+
+    @property
+    def display_index(self) -> int:
+        # Default: n * 100. Multiplying gives sub-arc lessons room to slot
+        # between existing integer lessons via an explicit override
+        # (e.g. quant-28a sets order_index_override=2810 to sit between
+        # quant-28 at 2800 and quant-29 at 2900).
+        return self.order_index_override if self.order_index_override else self.n * 100
 
     @property
     def uuid(self) -> str:
@@ -2019,6 +2037,386 @@ LESSONS: list[Lesson] = [
         why_this="Closed-form is the calibration anchor; every other pricer (binomial, MC, PDE) has to agree with it on the European-vanilla case before you trust it on anything harder.",
         skills=["quant", "options", "black-scholes"],
     ),
+    # ---- BS deep-dive sub-arc (Phase BB.1) ----
+    # quant-28a: build intuition via driven inputs (read the code, predict
+    # which way the price moves under a parameter bump). Format A.
+    # quant-28b: compute Greeks numerically and compare to closed-form.
+    # quant-28c: simulate a daily delta-hedge and inspect residual P&L.
+    Lesson(
+        n=52, stage=3, mode="predict",
+        n_label="28a",
+        order_index_override=2810,
+        title="Black-Scholes intuition",
+        scenario="The closed-form is in your hands from the previous lesson. Before solving for prices on a new structure, the desk's intuition check is to bump one input at a time and see which way the price moves. This is how vol traders calibrate their gut.",
+        learner_goal="Read a working bs_call, then predict the direction the call price moves when volatility doubles.",
+        concept="A European call is *long* volatility: vega `∂C/∂σ` is strictly positive everywhere. Doubling σ from 0.20 to 0.40 widens the terminal log-normal distribution; the upside tail gets fatter, the downside loss is bounded at -premium, so the expected payoff under the risk-neutral measure goes up. Concretely for an ATM 1-year call with r=5%: the price lifts from ≈ 10.45 to ≈ 17.69 — about 70% more.",
+        example_code=(
+            "import math\n"
+            "from scipy.stats import norm\n"
+            "\n"
+            "def bs_call(S, K, r, sigma, T):\n"
+            "    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "    d2 = d1 - sigma*math.sqrt(T)\n"
+            "    return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)\n"
+            "\n"
+            "# Same ATM 1y call (r=5%) priced at two volatility regimes.\n"
+            "low_vol  = bs_call(100, 100, 0.05, 0.20, 1.0)\n"
+            "high_vol = bs_call(100, 100, 0.05, 0.40, 1.0)\n"
+            "# Direction of the move when sigma doubles.\n"
+            "print('up' if high_vol > low_vol else 'down' if high_vol < low_vol else 'same')"
+        ),
+        code=(
+            "import math\n"
+            "from scipy.stats import norm\n"
+            "\n"
+            "def bs_call(S, K, r, sigma, T):\n"
+            "    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "    d2 = d1 - sigma*math.sqrt(T)\n"
+            "    return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)\n"
+            "\n"
+            "low_vol  = bs_call(100, 100, 0.05, 0.20, 1.0)\n"
+            "high_vol = bs_call(100, 100, 0.05, 0.40, 1.0)\n"
+            "print('up' if high_vol > low_vol else 'down' if high_vol < low_vol else 'same')"
+        ),
+        your_turn="Predict the direction of the call price as σ doubles.",
+        expected_stdout="up",
+        prompt="Predict the printed output.",
+        why_this="Bump-one-input-at-a-time is how vol traders sanity-check a quote in seconds. If your model says doubling vol decreases a call's price, you know the sign of vega is wrong before you check a single test.",
+        skills=["quant", "options", "black-scholes", "greeks"],
+    ),
+    Lesson(
+        n=53, stage=3, mode="skeleton",
+        n_label="28b",
+        order_index_override=2820,
+        title="Greeks by bumping",
+        scenario="Most options books compute Greeks both ways: closed-form when one exists, numerical bumping as the universal fallback (and the cross-check that catches the sign errors closed-form sometimes hides). The bumping function below is the same one you'd run against a Monte Carlo pricer or a binomial tree.",
+        learner_goal="Implement delta, gamma, and vega by central differences against the Black-Scholes pricer; match the closed-form Greeks at the Hull canonical numbers.",
+        concept="Central differences turn any pricer into a Greek calculator. Delta is `(C(S+h) - C(S-h)) / (2h)`, gamma is the second difference `(C(S+h) - 2C(S) + C(S-h)) / h²`, vega is the σ-bump `(C(σ+h) - C(σ-h)) / (2h)`. Pick `h` small enough that the truncation error is below your tolerance, big enough that floating-point noise doesn't dominate: `h=0.01` for spot and `h=0.001` for σ are conservative defaults for double precision.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Greeks computed by central-difference bumping of bs_call.\"\"\"\n"
+            "import math\n"
+            "from scipy.stats import norm\n"
+            "\n"
+            "\n"
+            "def bs_call(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    \"\"\"Closed-form Black-Scholes European call (provided).\"\"\"\n"
+            "    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "    d2 = d1 - sigma*math.sqrt(T)\n"
+            "    return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)\n"
+            "\n"
+            "\n"
+            "def delta(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    \"\"\"∂C/∂S by central difference. Default bump h=0.01 on spot.\"\"\"\n"
+            "    raise NotImplementedError(\"Implement delta\")\n"
+            "\n"
+            "\n"
+            "def gamma(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    \"\"\"∂²C/∂S² by second-difference. Default bump h=0.01.\"\"\"\n"
+            "    raise NotImplementedError(\"Implement gamma\")\n"
+            "\n"
+            "\n"
+            "def vega(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    \"\"\"∂C/∂σ by central difference. Default bump h=0.001 on sigma.\n"
+            "\n"
+            "    Returned in price-per-unit-σ (i.e. dC for a +1.00 jump in σ);\n"
+            "    divide by 100 if you want per-vol-point.\n"
+            "    \"\"\"\n"
+            "    raise NotImplementedError(\"Implement vega\")\n"
+        ),
+        reference_solution=(
+            "import math\n"
+            "from scipy.stats import norm\n"
+            "\n"
+            "\n"
+            "def bs_call(S, K, r, sigma, T):\n"
+            "    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "    d2 = d1 - sigma*math.sqrt(T)\n"
+            "    return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)\n"
+            "\n"
+            "\n"
+            "def delta(S, K, r, sigma, T, h=0.01):\n"
+            "    return (bs_call(S+h, K, r, sigma, T) - bs_call(S-h, K, r, sigma, T)) / (2*h)\n"
+            "\n"
+            "\n"
+            "def gamma(S, K, r, sigma, T, h=0.01):\n"
+            "    return (\n"
+            "        bs_call(S+h, K, r, sigma, T)\n"
+            "        - 2*bs_call(S, K, r, sigma, T)\n"
+            "        + bs_call(S-h, K, r, sigma, T)\n"
+            "    ) / (h*h)\n"
+            "\n"
+            "\n"
+            "def vega(S, K, r, sigma, T, h=0.001):\n"
+            "    return (bs_call(S, K, r, sigma+h, T) - bs_call(S, K, r, sigma-h, T)) / (2*h)\n"
+        ),
+        tests_py=(
+            "\"\"\"Numerical Greeks vs the Hull canonical (S=K=100, r=5%, σ=20%, T=1y).\n"
+            "\n"
+            "Closed-form references:\n"
+            "  delta ≈ 0.63683\n"
+            "  gamma ≈ 0.01876\n"
+            "  vega  ≈ 37.524  (per 1.00 jump in σ)\n"
+            "\"\"\"\n"
+            "import pytest\n"
+            "\n"
+            "from solution import delta, gamma, vega\n"
+            "\n"
+            "\n"
+            "def test_delta_matches_closed_form_at_hull_atm():\n"
+            "    assert abs(delta(100, 100, 0.05, 0.20, 1.0) - 0.63683) < 1e-3\n"
+            "\n"
+            "\n"
+            "def test_gamma_matches_closed_form_at_hull_atm():\n"
+            "    assert abs(gamma(100, 100, 0.05, 0.20, 1.0) - 0.01876) < 1e-3\n"
+            "\n"
+            "\n"
+            "def test_vega_matches_closed_form_at_hull_atm():\n"
+            "    assert abs(vega(100, 100, 0.05, 0.20, 1.0) - 37.524) < 1e-1\n"
+            "\n"
+            "\n"
+            "def test_delta_deep_itm_approaches_one():\n"
+            "    assert delta(200, 100, 0.05, 0.20, 1.0) > 0.99\n"
+            "\n"
+            "\n"
+            "def test_delta_deep_otm_approaches_zero():\n"
+            "    assert delta(50, 150, 0.05, 0.20, 1.0) < 0.05\n"
+            "\n"
+            "\n"
+            "def test_gamma_is_positive_for_a_long_call():\n"
+            "    # Gamma is the convexity — always non-negative for a long option.\n"
+            "    assert gamma(100, 100, 0.05, 0.20, 1.0) > 0\n"
+            "\n"
+            "\n"
+            "def test_vega_is_positive_for_a_long_call():\n"
+            "    # Calls are long vol — vega strictly positive on the interior.\n"
+            "    assert vega(100, 100, 0.05, 0.20, 1.0) > 0\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_delta_matches_closed_form_at_hull_atm",
+                "delta at Hull ATM matches closed-form (0.63683) within 1e-3.",
+            ),
+            (
+                "tests/test_solution.py::test_gamma_matches_closed_form_at_hull_atm",
+                "gamma at Hull ATM matches closed-form (0.01876) within 1e-3.",
+            ),
+            (
+                "tests/test_solution.py::test_vega_matches_closed_form_at_hull_atm",
+                "vega at Hull ATM matches closed-form (37.524) within 0.1.",
+            ),
+            (
+                "tests/test_solution.py::test_delta_deep_itm_approaches_one",
+                "delta of a deep-ITM call (S=200, K=100) is > 0.99.",
+            ),
+            (
+                "tests/test_solution.py::test_delta_deep_otm_approaches_zero",
+                "delta of a deep-OTM call (S=50, K=150) is < 0.05.",
+            ),
+            (
+                "tests/test_solution.py::test_gamma_is_positive_for_a_long_call",
+                "gamma is positive — convexity of a long option.",
+            ),
+            (
+                "tests/test_solution.py::test_vega_is_positive_for_a_long_call",
+                "vega is positive — calls and puts are long vol.",
+            ),
+        ],
+        your_turn="Implement the three Greeks via central differences against the provided bs_call. The default bump sizes in the signatures are tuned to give 3-decimal accuracy at Hull's canonical example.",
+        hint="Central diff: `(f(x+h) - f(x-h)) / (2h)`. Gamma is the second difference around S; vega is the first difference around σ.",
+        why_this="Numerical bumping is the universal Greek calculator — it works against any pricer, even MC and trees that have no closed form. Most production options books compute both and alert when they diverge by more than rounding.",
+        skills=["quant", "options", "black-scholes", "greeks"],
+    ),
+    Lesson(
+        n=54, stage=3, mode="skeleton",
+        n_label="28c",
+        order_index_override=2830,
+        title="Delta-hedge simulation",
+        scenario="Selling an option without hedging is a punt on spot direction. Selling it and dynamically rebalancing delta shares against it isolates the *volatility* P&L — the actual exposure an options desk wants. The hedge loop you write here is the same one a market-maker runs after every fill.",
+        learner_goal="Implement a daily-rebalance delta hedge of a short European call over a price path; final P&L should be small in magnitude (discretisation error only).",
+        concept="At each rebalance step: (a) carry the cash book at the risk-free rate over `dt`, (b) mark the existing share position to the new spot, (c) recompute the target hedge `Δ` at the new (S, T-t), (d) buy/sell the difference at the new spot, paying/receiving in cash. The replicating portfolio is `(-1 call, +Δ shares)`. If the BS model is correct, the P&L on a continuous hedge is identically zero; discrete rebalance leaves a small residual proportional to `Γ · (ΔS)² · dt` — the gamma slippage every options book budgets for.",
+        example_code="",
+        editable_template=(
+            "\"\"\"Daily delta-hedge of a short European call over a price path.\"\"\"\n"
+            "import math\n"
+            "from typing import Sequence\n"
+            "from scipy.stats import norm\n"
+            "\n"
+            "\n"
+            "def bs_call(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    \"\"\"Closed-form Black-Scholes European call price (provided).\"\"\"\n"
+            "    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "    d2 = d1 - sigma*math.sqrt(T)\n"
+            "    return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)\n"
+            "\n"
+            "\n"
+            "def bs_delta(S: float, K: float, r: float, sigma: float, T: float) -> float:\n"
+            "    \"\"\"Closed-form BS delta of a European call (provided).\"\"\"\n"
+            "    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "    return float(norm.cdf(d1))\n"
+            "\n"
+            "\n"
+            "def hedge_pnl(\n"
+            "    path: Sequence[float],\n"
+            "    K: float,\n"
+            "    r: float,\n"
+            "    sigma: float,\n"
+            "    T: float,\n"
+            ") -> float:\n"
+            "    \"\"\"Simulate selling one call at t=0 and dynamically delta-hedging\n"
+            "    over the price path. Return the final cash P&L.\n"
+            "\n"
+            "    Parameters\n"
+            "    ----------\n"
+            "    path : daily prices, length n+1, with path[0] = S0 and path[-1] = S_T.\n"
+            "    K, r, sigma, T : option parameters at t=0.\n"
+            "\n"
+            "    Steps:\n"
+            "      1. At t=0: receive premium = bs_call(S0, K, r, sigma, T) into cash;\n"
+            "         buy delta = bs_delta(S0, K, r, sigma, T) shares, paying delta*S0.\n"
+            "      2. For each step i = 1..n:\n"
+            "         - dt = T / n (constant step size).\n"
+            "         - Carry cash forward: cash *= exp(r * dt).\n"
+            "         - Compute remaining time to expiry: tau = T - i*dt.\n"
+            "         - If tau > 0: recompute new_delta at (path[i], tau). Buy/sell\n"
+            "           (new_delta - delta) shares at path[i]; pay diff*path[i] cash.\n"
+            "      3. At expiry: short-call payout = max(path[-1] - K, 0); the shares\n"
+            "         are worth delta * path[-1]. Final P&L = cash + delta*path[-1]\n"
+            "         - max(path[-1] - K, 0).\n"
+            "\n"
+            "    Returns\n"
+            "    -------\n"
+            "    float — residual P&L. With a correct hedge, |P&L| << premium.\n"
+            "    \"\"\"\n"
+            "    raise NotImplementedError(\"Implement hedge_pnl\")\n"
+        ),
+        reference_solution=(
+            "import math\n"
+            "from typing import Sequence\n"
+            "from scipy.stats import norm\n"
+            "\n"
+            "\n"
+            "def bs_call(S, K, r, sigma, T):\n"
+            "    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "    d2 = d1 - sigma*math.sqrt(T)\n"
+            "    return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)\n"
+            "\n"
+            "\n"
+            "def bs_delta(S, K, r, sigma, T):\n"
+            "    d1 = (math.log(S/K) + (r + sigma**2/2)*T) / (sigma*math.sqrt(T))\n"
+            "    return float(norm.cdf(d1))\n"
+            "\n"
+            "\n"
+            "def hedge_pnl(path, K, r, sigma, T):\n"
+            "    n = len(path) - 1\n"
+            "    dt = T / n\n"
+            "    S = path[0]\n"
+            "    cash = bs_call(S, K, r, sigma, T)\n"
+            "    delta_shares = bs_delta(S, K, r, sigma, T)\n"
+            "    cash -= delta_shares * S\n"
+            "    for i in range(1, n + 1):\n"
+            "        cash *= math.exp(r * dt)\n"
+            "        S_new = path[i]\n"
+            "        tau = T - i * dt\n"
+            "        if tau > 1e-9:\n"
+            "            new_delta = bs_delta(S_new, K, r, sigma, tau)\n"
+            "            cash -= (new_delta - delta_shares) * S_new\n"
+            "            delta_shares = new_delta\n"
+            "        S = S_new\n"
+            "    payout = max(path[-1] - K, 0)\n"
+            "    return float(cash + delta_shares * path[-1] - payout)\n"
+        ),
+        tests_py=(
+            "\"\"\"hedge_pnl: daily-rebalance delta hedge of a short European call.\n"
+            "\n"
+            "Tests check the residual P&L is small on deterministic GBM paths\n"
+            "(seed-controlled). A correct hedge leaves ~1% of premium as gamma\n"
+            "slippage; the threshold here is loose to account for the fixed seed.\n"
+            "\"\"\"\n"
+            "import math\n"
+            "import numpy as np\n"
+            "import pytest\n"
+            "\n"
+            "from solution import bs_call, hedge_pnl\n"
+            "\n"
+            "\n"
+            "def _gbm_path(seed: int, S0=100.0, mu=0.05, sigma=0.20, T=0.25, n=63):\n"
+            "    \"\"\"Daily GBM path under the real-world measure (mu drift).\n"
+            "    n = 63 steps ~ one quarter at daily granularity.\"\"\"\n"
+            "    rng = np.random.default_rng(seed)\n"
+            "    dt = T / n\n"
+            "    Z = rng.standard_normal(n)\n"
+            "    log_steps = (mu - sigma**2/2)*dt + sigma*math.sqrt(dt)*Z\n"
+            "    path = np.empty(n + 1)\n"
+            "    path[0] = S0\n"
+            "    path[1:] = S0 * np.exp(np.cumsum(log_steps))\n"
+            "    return path\n"
+            "\n"
+            "\n"
+            "def test_pnl_is_finite():\n"
+            "    path = _gbm_path(seed=0)\n"
+            "    pnl = hedge_pnl(list(path), K=100.0, r=0.05, sigma=0.20, T=0.25)\n"
+            "    assert math.isfinite(pnl)\n"
+            "\n"
+            "\n"
+            "def test_pnl_magnitude_under_one_percent_premium():\n"
+            "    # Premium of a 3-month ATM call with σ=20%, r=5% is ≈ 4.6.\n"
+            "    # Daily rebalance should leave residual << premium.\n"
+            "    premium = bs_call(100.0, 100.0, 0.05, 0.20, 0.25)\n"
+            "    pnls = [\n"
+            "        hedge_pnl(list(_gbm_path(seed)), 100.0, 0.05, 0.20, 0.25)\n"
+            "        for seed in range(20)\n"
+            "    ]\n"
+            "    # Loose 30% threshold: gamma slippage on individual paths is bounded\n"
+            "    # but not zero. Tightens with more steps.\n"
+            "    assert max(abs(p) for p in pnls) < 0.30 * premium\n"
+            "\n"
+            "\n"
+            "def test_unhedged_short_call_loses_when_itm():\n"
+            "    # Sanity: if the function ignored hedging and just shorted the call,\n"
+            "    # the P&L on a path where S_T >> K would be very negative.\n"
+            "    # Conversely, a working hedge keeps the loss bounded.\n"
+            "    path = list(_gbm_path(seed=42))\n"
+            "    pnl = hedge_pnl(path, K=100.0, r=0.05, sigma=0.20, T=0.25)\n"
+            "    # On any path, a properly hedged short call's loss is bounded by\n"
+            "    # a few times the premium even if S_T finishes deep ITM.\n"
+            "    assert pnl > -5.0\n"
+            "\n"
+            "\n"
+            "def test_zero_volatility_path_makes_theta():\n"
+            "    # On a constant-spot path the realised vol is zero but the\n"
+            "    # option was priced at σ=20%. The short-call seller pockets\n"
+            "    # theta (time-decay) and pays nothing back to gamma. P&L is\n"
+            "    # positive, bounded by a couple of premiums.\n"
+            "    n = 63\n"
+            "    path = [100.0] * (n + 1)\n"
+            "    pnl = hedge_pnl(path, K=100.0, r=0.05, sigma=0.20, T=0.25)\n"
+            "    premium = bs_call(100.0, 100.0, 0.05, 0.20, 0.25)\n"
+            "    assert 0 < pnl < 2 * premium\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_pnl_is_finite",
+                "P&L is a finite real number on a basic GBM path.",
+            ),
+            (
+                "tests/test_solution.py::test_pnl_magnitude_under_one_percent_premium",
+                "Across 20 random GBM paths, |P&L| stays below 30% of the premium.",
+            ),
+            (
+                "tests/test_solution.py::test_unhedged_short_call_loses_when_itm",
+                "On a deep-ITM path, the hedged P&L is bounded above -5 (not unbounded).",
+            ),
+            (
+                "tests/test_solution.py::test_zero_volatility_path_makes_theta",
+                "On a constant-spot path, the trader pockets theta — P&L is positive (0 < pnl < 2×premium).",
+            ),
+        ],
+        your_turn="Implement `hedge_pnl`. The docstring spells out the three steps: receive premium + buy delta shares; per step, carry cash + rebalance to new delta at tau remaining; at expiry, deliver and unwind. The clean version is ~15 lines.",
+        hint="The cash account moves three ways per step: (1) interest carry `cash *= exp(r*dt)`, (2) rebalance cost `cash -= (new_delta - old_delta) * S_new`, (3) at expiry, pay `max(S_T - K, 0)` to the call buyer.",
+        why_this="This loop is the heartbeat of an options market-maker's hedge book. Get it right and you isolate realised vs implied vol P&L — the actual edge an options trader is trying to capture.",
+        skills=["quant", "options", "black-scholes", "greeks"],
+    ),
     Lesson(
         n=29, stage=3, mode="debug",
         title="Greeks: delta of a call",
@@ -3282,7 +3680,7 @@ def write_sql() -> Path:
         )
         lines.append(f"  {skills_array},")
         lines.append("  true,")
-        lines.append(f"  {lesson.n}")
+        lines.append(f"  {lesson.display_index}")
         lines.append(")")
         lines.append("on conflict (slug) do update set")
         lines.append(
