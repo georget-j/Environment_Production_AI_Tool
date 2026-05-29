@@ -1607,6 +1607,40 @@ insert into public.challenges (
   repo_template_url, repo_branch, validation_config_json, ai_rules_json,
   skills, is_free, order_index
 ) values (
+  '00000000-0000-0000-0000-00000000033d',
+  '00000000-0000-0000-0000-000000000034',
+  'quant-38c-trade-an-ml-signal',
+  E'Trade an ML signal',
+  E'The two previous capstones turned a rule into a position. This one starts from a probability — what a classifier emits — and turns it into a *sized* position via volatility targeting. Real desks size book exposure so the realised vol matches a target (often 10% annualised); a vol target divorces position size from raw signal strength and keeps the risk constant across regimes.',
+  E'Implement volatility-targeted sizing from a (probability, recent_vol) input; wire it into a backtest that uses a provided ''trained'' model and the mock market feed.',
+  E'**Concept.** `size_position` takes a directional probability and a recent realised vol; the position is `signal_strength × target_vol / max(recent_vol, vol_floor)`, capped at ±cap. Vol-targeting is the difference between ''win bigger in calm markets, smaller in storms'' and ''blow up in storms''. The lookahead constraint is the same as the previous lessons: recent_vol at t depends only on closes[:t+1].\n\n**Implement the function.** Implement `recent_vol` (sample-std of the last `window` returns), `size_position` (vol-targeted sizing with cap + NaN guard), and `backtest` (walk forward over SPY using model_prob_up + recent_vol → position → P&L). The vol-target test catches sizing functions that ignore recent_vol; the sign-flip count is what ''trades'' means here.\n\n**Expected.** All tests pass.\n\n**Why this?** The shape — model probability + recent vol → sized position → P&L — is what every quant fund''s production trading loop looks like. The lookahead checks, NaN handling, and vol-target sizing are the gates a senior reviewer applies before a new strategy crosses the line from research to live.',
+  null,
+  null,
+  '{}',
+  '{"max_hint_level": 2, "do_not_reveal_solution": false, "encourage_tests_first": false}',
+  array['quant', 'machine-learning', 'backtesting'],
+  true,
+  3830
+)
+on conflict (slug) do update set
+  module_id = excluded.module_id,
+  title = excluded.title,
+  scenario = excluded.scenario,
+  learner_goal = excluded.learner_goal,
+  instructions = excluded.instructions,
+  repo_template_url = excluded.repo_template_url,
+  repo_branch = excluded.repo_branch,
+  validation_config_json = excluded.validation_config_json,
+  ai_rules_json = excluded.ai_rules_json,
+  skills = excluded.skills,
+  is_free = excluded.is_free,
+  order_index = excluded.order_index;
+
+insert into public.challenges (
+  id, module_id, slug, title, scenario, learner_goal, instructions,
+  repo_template_url, repo_branch, validation_config_json, ai_rules_json,
+  skills, is_free, order_index
+) values (
   '00000000-0000-0000-0000-000000000326',
   '00000000-0000-0000-0000-000000000034',
   'quant-39-the-p-hacked-sharpe-trap',

@@ -1018,6 +1018,81 @@ export const QUANT_CONFIG: Record<string, ChallengeRunnerConfig> = {
     "mock_market.py": "\"\"\"Read-only synthetic market data feed.\n\nDeterministic daily bars for SPY and AAPL. SPY is a GBM with drift\nand 1.2% daily vol; AAPL is the SPY return path scaled by beta=1.3\nplus an idiosyncratic noise term. Reproducible across runs.\n\"\"\"\nfrom dataclasses import dataclass\nimport numpy as np\n\n\n@dataclass(frozen=True)\nclass Bar:\n    date: str\n    open: float\n    high: float\n    low: float\n    close: float\n    volume: int\n\n\ndef _build_bars(symbol: str, seed: int, n_days: int = 750):\n    rng = np.random.default_rng(seed)\n    if symbol == 'SPY':\n        shocks = rng.normal(0.0003, 0.012, n_days)\n    elif symbol == 'AAPL':\n        spy_rng = np.random.default_rng(42)\n        spy_shocks = spy_rng.normal(0.0003, 0.012, n_days)\n        # AAPL \u2248 1.3 \u00d7 SPY + idiosyncratic noise.\n        idio = rng.normal(0.0005, 0.009, n_days)\n        shocks = 1.3 * spy_shocks + idio\n    else:\n        raise ValueError(f'Unknown symbol seed for: {symbol}')\n    closes = 100.0 * np.exp(np.cumsum(shocks))\n    opens = np.empty(n_days)\n    opens[0] = 100.0\n    opens[1:] = closes[:-1] * (1 + rng.normal(0, 0.001, n_days - 1))\n    highs = np.maximum(opens, closes) * (\n        1 + np.abs(rng.normal(0, 0.005, n_days))\n    )\n    lows = np.minimum(opens, closes) * (\n        1 - np.abs(rng.normal(0, 0.005, n_days))\n    )\n    volumes = (50_000_000 + rng.normal(0, 5_000_000, n_days)).astype(int)\n    volumes = np.maximum(volumes, 1_000_000)\n    bars = []\n    for i in range(n_days):\n        bars.append(Bar(\n            date=f'2023-day-{i:03d}',\n            open=float(opens[i]),\n            high=float(highs[i]),\n            low=float(lows[i]),\n            close=float(closes[i]),\n            volume=int(volumes[i]),\n        ))\n    return bars\n\n\n_BARS = {\n    'SPY': _build_bars('SPY', seed=42),\n    'AAPL': _build_bars('AAPL', seed=137),\n}\n\n\nclass Market:\n    \"\"\"Historical data feed; supports SPY and AAPL.\"\"\"\n\n    def history(self, symbol: str = 'SPY'):\n        if symbol not in _BARS:\n            raise ValueError(f'Unknown symbol: {symbol}')\n        return list(_BARS[symbol])\n"
   }
 },
+  "quant-38c-trade-an-ml-signal": {
+  "mode": "pyodide",
+  "editable": [
+    "solution.py"
+  ],
+  "readonly": [
+    "model.py",
+    "mock_market.py",
+    "tests/test_solution.py"
+  ],
+  "tests": [
+    {
+      "id": "tests/test_solution.py::test_recent_vol_nan_before_window",
+      "description": "recent_vol returns NaN for t <= window (not enough returns)."
+    },
+    {
+      "id": "tests/test_solution.py::test_recent_vol_finite_after_window",
+      "description": "recent_vol returns a positive finite float once enough history exists."
+    },
+    {
+      "id": "tests/test_solution.py::test_recent_vol_no_lookahead_bias",
+      "description": "Poisoning closes[t+1:] does not change recent_vol at t."
+    },
+    {
+      "id": "tests/test_solution.py::test_size_position_zero_when_prob_is_half",
+      "description": "At prob=0.5 (no edge), position is zero regardless of vol."
+    },
+    {
+      "id": "tests/test_solution.py::test_size_position_returns_zero_on_nan_vol",
+      "description": "NaN vol \u2192 zero position (don't size against unknown risk)."
+    },
+    {
+      "id": "tests/test_solution.py::test_size_position_long_when_prob_above_half",
+      "description": "prob > 0.5 produces a positive position."
+    },
+    {
+      "id": "tests/test_solution.py::test_size_position_short_when_prob_below_half",
+      "description": "prob < 0.5 produces a negative position."
+    },
+    {
+      "id": "tests/test_solution.py::test_size_position_respects_cap",
+      "description": "Tiny vol can't make |position| exceed `cap` \u2014 clamps correctly."
+    },
+    {
+      "id": "tests/test_solution.py::test_size_position_scales_with_signal",
+      "description": "Stronger signal at fixed vol produces a larger position (up to cap)."
+    },
+    {
+      "id": "tests/test_solution.py::test_size_position_vol_targets",
+      "description": "Higher vol shrinks the position for the same signal \u2014 vol-target check."
+    },
+    {
+      "id": "tests/test_solution.py::test_backtest_returns_dict_with_required_keys",
+      "description": "backtest returns a dict with sharpe / max_drawdown / trades."
+    },
+    {
+      "id": "tests/test_solution.py::test_backtest_sharpe_is_finite_float",
+      "description": "Sharpe is a finite float."
+    },
+    {
+      "id": "tests/test_solution.py::test_backtest_max_drawdown_in_valid_range",
+      "description": "Max drawdown is in [-1, 0]."
+    },
+    {
+      "id": "tests/test_solution.py::test_backtest_trades_is_nonnegative_int",
+      "description": "Trade count is a non-negative integer."
+    }
+  ],
+  "inline": {
+    "solution.py": "\"\"\"ML-signal-driven sizing + backtest.\n\nUse:\n    from mock_market import Market\n    from model import model_prob_up\n\n`model_prob_up(closes, t)` returns the predicted P(close[t+1] > close[t]).\nIn production this is a RandomForestClassifier (quant-37); here it's a\nstand-in so the lesson tests stay fast.\n\nImplement:\n\n    recent_vol(closes, t, window=20) -> float\n        Sample standard deviation of the trailing `window` simple\n        returns ending at t. Returns float('nan') for t <= window\n        (need at least `window` consecutive returns).\n        \u26a0 Must use ONLY closes[:t+1].\n\n    size_position(prob_up, recent_vol_val,\n                  target_vol=0.01, cap=1.0) -> float\n        Convert (probability, vol) \u2192 position size in [-cap, +cap].\n        signal_strength = (prob_up - 0.5) * 2  \u2192 in [-1, 1]\n        scale = target_vol / max(recent_vol_val, target_vol / 4)\n        position = signal_strength * scale\n        clamp to [-cap, +cap].\n        Return 0 if recent_vol_val is NaN.\n\n    backtest(window=20) -> dict\n        Walk forward through SPY closes; at each t:\n          - prob = model_prob_up(closes, t)\n          - vol  = recent_vol(closes, t, window)\n          - pos  = size_position(prob, vol)\n          - P&L at t = pos * (closes[t+1] - closes[t]) / closes[t]\n        Return: {'sharpe': float, 'max_drawdown': float, 'trades': int}\n        - sharpe: annualised, 252-day convention.\n        - max_drawdown: negative fraction.\n        - trades: count of position-SIGN changes (sign(pos[t]) flips).\n\"\"\"\nimport math\nfrom mock_market import Market\nfrom model import model_prob_up\n\n\ndef recent_vol(closes, t, window=20):\n    raise NotImplementedError(\"Implement recent_vol\")\n\n\ndef size_position(prob_up, recent_vol_val, target_vol=0.01, cap=1.0):\n    raise NotImplementedError(\"Implement size_position\")\n\n\ndef backtest(window=20):\n    raise NotImplementedError(\"Implement backtest\")\n",
+    "tests/test_solution.py": "\"\"\"ML-signal sizing + backtest: sizing math, no-lookahead, P&L shape.\"\"\"\nimport math\nimport pytest\n\nfrom solution import recent_vol, size_position, backtest\nfrom mock_market import Market\n\n\ndef _closes():\n    return [b.close for b in Market().history('SPY')]\n\n\ndef test_recent_vol_nan_before_window():\n    closes = _closes()\n    for t in [0, 5, 18, 19]:\n        v = recent_vol(closes, t, window=20)\n        assert v != v  # NaN\n\n\ndef test_recent_vol_finite_after_window():\n    closes = _closes()\n    for t in [21, 100, 500]:\n        v = recent_vol(closes, t, window=20)\n        assert isinstance(v, float)\n        assert math.isfinite(v) and v > 0\n\n\ndef test_recent_vol_no_lookahead_bias():\n    closes = _closes()\n    t = 200\n    truth = recent_vol(closes, t, window=20)\n    poisoned = closes[: t + 1] + [-1e9] * (len(closes) - t - 1)\n    assert abs(recent_vol(poisoned, t, window=20) - truth) < 1e-9\n\n\ndef test_size_position_zero_when_prob_is_half():\n    # No edge \u2192 no position regardless of vol.\n    assert abs(size_position(0.5, 0.01)) < 1e-9\n\n\ndef test_size_position_returns_zero_on_nan_vol():\n    assert size_position(0.7, float('nan')) == 0.0\n\n\ndef test_size_position_long_when_prob_above_half():\n    assert size_position(0.8, 0.01) > 0\n\n\ndef test_size_position_short_when_prob_below_half():\n    assert size_position(0.2, 0.01) < 0\n\n\ndef test_size_position_respects_cap():\n    # Tiny vol \u2192 huge raw scale \u2192 must clip to cap.\n    assert abs(size_position(1.0, 1e-9, cap=1.0)) <= 1.0 + 1e-9\n    assert size_position(1.0, 1e-9, cap=1.0) == 1.0\n\n\ndef test_size_position_scales_with_signal():\n    a = size_position(0.55, 0.01)\n    b = size_position(0.65, 0.01)\n    c = size_position(0.85, 0.01)\n    # Stronger signal \u2192 larger long position (up to the cap).\n    assert 0 < a < b\n    # Once we hit the cap, c may equal cap; just require c >= b.\n    assert c >= b\n\n\ndef test_size_position_vol_targets():\n    # Higher vol \u2192 smaller absolute position for the same signal.\n    low_vol = size_position(0.7, 0.005)\n    high_vol = size_position(0.7, 0.05)\n    assert abs(high_vol) < abs(low_vol)\n\n\ndef test_backtest_returns_dict_with_required_keys():\n    r = backtest()\n    assert isinstance(r, dict)\n    for k in ('sharpe', 'max_drawdown', 'trades'):\n        assert k in r\n\n\ndef test_backtest_sharpe_is_finite_float():\n    r = backtest()\n    assert isinstance(r['sharpe'], float)\n    assert math.isfinite(r['sharpe'])\n\n\ndef test_backtest_max_drawdown_in_valid_range():\n    r = backtest()\n    assert -1.0 <= r['max_drawdown'] <= 0.0\n\n\ndef test_backtest_trades_is_nonnegative_int():\n    r = backtest()\n    assert isinstance(r['trades'], int) and r['trades'] >= 0\n",
+    "mock_market.py": "\"\"\"Read-only synthetic market data feed.\n\nDeterministic daily bars for SPY and AAPL. SPY is a GBM with drift\nand 1.2% daily vol; AAPL is the SPY return path scaled by beta=1.3\nplus an idiosyncratic noise term. Reproducible across runs.\n\"\"\"\nfrom dataclasses import dataclass\nimport numpy as np\n\n\n@dataclass(frozen=True)\nclass Bar:\n    date: str\n    open: float\n    high: float\n    low: float\n    close: float\n    volume: int\n\n\ndef _build_bars(symbol: str, seed: int, n_days: int = 750):\n    rng = np.random.default_rng(seed)\n    if symbol == 'SPY':\n        shocks = rng.normal(0.0003, 0.012, n_days)\n    elif symbol == 'AAPL':\n        spy_rng = np.random.default_rng(42)\n        spy_shocks = spy_rng.normal(0.0003, 0.012, n_days)\n        # AAPL \u2248 1.3 \u00d7 SPY + idiosyncratic noise.\n        idio = rng.normal(0.0005, 0.009, n_days)\n        shocks = 1.3 * spy_shocks + idio\n    else:\n        raise ValueError(f'Unknown symbol seed for: {symbol}')\n    closes = 100.0 * np.exp(np.cumsum(shocks))\n    opens = np.empty(n_days)\n    opens[0] = 100.0\n    opens[1:] = closes[:-1] * (1 + rng.normal(0, 0.001, n_days - 1))\n    highs = np.maximum(opens, closes) * (\n        1 + np.abs(rng.normal(0, 0.005, n_days))\n    )\n    lows = np.minimum(opens, closes) * (\n        1 - np.abs(rng.normal(0, 0.005, n_days))\n    )\n    volumes = (50_000_000 + rng.normal(0, 5_000_000, n_days)).astype(int)\n    volumes = np.maximum(volumes, 1_000_000)\n    bars = []\n    for i in range(n_days):\n        bars.append(Bar(\n            date=f'2023-day-{i:03d}',\n            open=float(opens[i]),\n            high=float(highs[i]),\n            low=float(lows[i]),\n            close=float(closes[i]),\n            volume=int(volumes[i]),\n        ))\n    return bars\n\n\n_BARS = {\n    'SPY': _build_bars('SPY', seed=42),\n    'AAPL': _build_bars('AAPL', seed=137),\n}\n\n\nclass Market:\n    \"\"\"Historical data feed; supports SPY and AAPL.\"\"\"\n\n    def history(self, symbol: str = 'SPY'):\n        if symbol not in _BARS:\n            raise ValueError(f'Unknown symbol: {symbol}')\n        return list(_BARS[symbol])\n",
+    "model.py": "\"\"\"Stand-in for a 'trained direction classifier'.\n\nProduction version: a RandomForestClassifier trained walk-forward\n(see quant-37). Here we use a deterministic momentum-derived\nprobability so the capstone tests stay fast and reproducible.\n\"\"\"\nimport math\n\n\ndef model_prob_up(closes, t, lookback: int = 20) -> float:\n    \"\"\"Predict P(next-day close > today's close) given closes[:t+1].\n\n    Uses a `tanh`-squashed lookback momentum: positive momentum \u2192\n    prob > 0.5, negative \u2192 prob < 0.5. Outputs strictly in (0, 1).\n    Lookahead-safe: depends only on closes[:t+1].\n    \"\"\"\n    if t < lookback:\n        return 0.5\n    base = closes[t - lookback]\n    if base == 0:\n        return 0.5\n    ret = (closes[t] - base) / base\n    # Saturate at \u00b110% lookback returns \u2192 prob \u2248 0.99 / 0.01.\n    return 0.5 + 0.5 * math.tanh(8.0 * ret)\n"
+  }
+},
   "quant-39-the-p-hacked-sharpe-trap": {
   "mode": "predict",
   "code": "import numpy as np\nrng = np.random.default_rng(42)\nR = rng.normal(0, 0.01, size=(1000, 1000))\nsharpe = R.mean(axis=1) / R.std(axis=1) * np.sqrt(252)\nprint(round(sharpe.max(), 2) > 1.5)",

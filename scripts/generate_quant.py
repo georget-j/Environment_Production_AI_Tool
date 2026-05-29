@@ -420,6 +420,39 @@ MOCK_MARKET_PY = (
 )
 
 
+# `model.py` — a stub "trained model" used by the RF-classifier-traded
+# capstone (quant-38c). In production this is the RandomForestClassifier
+# from quant-37; here it's a deterministic momentum-derived probability
+# so the lesson can focus on the sizing / backtest mechanics instead of
+# spending a minute retraining sklearn inside Pyodide each test.
+MODEL_PY = (
+    "\"\"\"Stand-in for a 'trained direction classifier'.\n"
+    "\n"
+    "Production version: a RandomForestClassifier trained walk-forward\n"
+    "(see quant-37). Here we use a deterministic momentum-derived\n"
+    "probability so the capstone tests stay fast and reproducible.\n"
+    "\"\"\"\n"
+    "import math\n"
+    "\n"
+    "\n"
+    "def model_prob_up(closes, t, lookback: int = 20) -> float:\n"
+    "    \"\"\"Predict P(next-day close > today's close) given closes[:t+1].\n"
+    "\n"
+    "    Uses a `tanh`-squashed lookback momentum: positive momentum →\n"
+    "    prob > 0.5, negative → prob < 0.5. Outputs strictly in (0, 1).\n"
+    "    Lookahead-safe: depends only on closes[:t+1].\n"
+    "    \"\"\"\n"
+    "    if t < lookback:\n"
+    "        return 0.5\n"
+    "    base = closes[t - lookback]\n"
+    "    if base == 0:\n"
+    "        return 0.5\n"
+    "    ret = (closes[t] - base) / base\n"
+    "    # Saturate at ±10% lookback returns → prob ≈ 0.99 / 0.01.\n"
+    "    return 0.5 + 0.5 * math.tanh(8.0 * ret)\n"
+)
+
+
 # Skill catalogue used by the quant track. Keep slugs short and lowercase.
 SKILL_TITLES: dict[str, str] = {
     "quant": "Quantitative finance",
@@ -4297,6 +4330,301 @@ LESSONS: list[Lesson] = [
         your_turn="Implement `rolling_zscore` (mean + sample std over the trailing window) and `backtest` (compute spread, walk forward, apply entry/exit rules, accumulate P&L). The lookahead-bias test and the constant-window guard are the structural checks; the sharpe/dd tests just verify the output shape.",
         hint="rolling_zscore: slice `spread[t-window+1 : t+1]`, compute mean + std (sample, ddof=1), guard std==0. backtest: walk forward with a single `current` position int; flip on |z| > entry from flat, flatten on |z| < exit while in position.",
         why_this="Pairs trades are the canonical statistical-arbitrage shape — the same z-score-of-spread structure underlies every cointegration-based strategy. The lesson's no-lookahead test is the screen every cointegration ticket is gated on at a real fund.",
+        skills=["quant", "machine-learning", "backtesting"],
+    ),
+    Lesson(
+        n=62, stage=4, mode="skeleton",
+        n_label="38c",
+        order_index_override=3830,
+        title="Trade an ML signal",
+        scenario="The two previous capstones turned a rule into a position. This one starts from a probability — what a classifier emits — and turns it into a *sized* position via volatility targeting. Real desks size book exposure so the realised vol matches a target (often 10% annualised); a vol target divorces position size from raw signal strength and keeps the risk constant across regimes.",
+        learner_goal="Implement volatility-targeted sizing from a (probability, recent_vol) input; wire it into a backtest that uses a provided 'trained' model and the mock market feed.",
+        concept="`size_position` takes a directional probability and a recent realised vol; the position is `signal_strength × target_vol / max(recent_vol, vol_floor)`, capped at ±cap. Vol-targeting is the difference between 'win bigger in calm markets, smaller in storms' and 'blow up in storms'. The lookahead constraint is the same as the previous lessons: recent_vol at t depends only on closes[:t+1].",
+        example_code="",
+        editable_template=(
+            "\"\"\"ML-signal-driven sizing + backtest.\n"
+            "\n"
+            "Use:\n"
+            "    from mock_market import Market\n"
+            "    from model import model_prob_up\n"
+            "\n"
+            "`model_prob_up(closes, t)` returns the predicted P(close[t+1] > close[t]).\n"
+            "In production this is a RandomForestClassifier (quant-37); here it's a\n"
+            "stand-in so the lesson tests stay fast.\n"
+            "\n"
+            "Implement:\n"
+            "\n"
+            "    recent_vol(closes, t, window=20) -> float\n"
+            "        Sample standard deviation of the trailing `window` simple\n"
+            "        returns ending at t. Returns float('nan') for t <= window\n"
+            "        (need at least `window` consecutive returns).\n"
+            "        ⚠ Must use ONLY closes[:t+1].\n"
+            "\n"
+            "    size_position(prob_up, recent_vol_val,\n"
+            "                  target_vol=0.01, cap=1.0) -> float\n"
+            "        Convert (probability, vol) → position size in [-cap, +cap].\n"
+            "        signal_strength = (prob_up - 0.5) * 2  → in [-1, 1]\n"
+            "        scale = target_vol / max(recent_vol_val, target_vol / 4)\n"
+            "        position = signal_strength * scale\n"
+            "        clamp to [-cap, +cap].\n"
+            "        Return 0 if recent_vol_val is NaN.\n"
+            "\n"
+            "    backtest(window=20) -> dict\n"
+            "        Walk forward through SPY closes; at each t:\n"
+            "          - prob = model_prob_up(closes, t)\n"
+            "          - vol  = recent_vol(closes, t, window)\n"
+            "          - pos  = size_position(prob, vol)\n"
+            "          - P&L at t = pos * (closes[t+1] - closes[t]) / closes[t]\n"
+            "        Return: {'sharpe': float, 'max_drawdown': float, 'trades': int}\n"
+            "        - sharpe: annualised, 252-day convention.\n"
+            "        - max_drawdown: negative fraction.\n"
+            "        - trades: count of position-SIGN changes (sign(pos[t]) flips).\n"
+            "\"\"\"\n"
+            "import math\n"
+            "from mock_market import Market\n"
+            "from model import model_prob_up\n"
+            "\n"
+            "\n"
+            "def recent_vol(closes, t, window=20):\n"
+            "    raise NotImplementedError(\"Implement recent_vol\")\n"
+            "\n"
+            "\n"
+            "def size_position(prob_up, recent_vol_val, target_vol=0.01, cap=1.0):\n"
+            "    raise NotImplementedError(\"Implement size_position\")\n"
+            "\n"
+            "\n"
+            "def backtest(window=20):\n"
+            "    raise NotImplementedError(\"Implement backtest\")\n"
+        ),
+        reference_solution=(
+            "import math\n"
+            "from mock_market import Market\n"
+            "from model import model_prob_up\n"
+            "\n"
+            "\n"
+            "def recent_vol(closes, t, window=20):\n"
+            "    if t <= window:\n"
+            "        return float('nan')\n"
+            "    rets = [\n"
+            "        (closes[i] - closes[i - 1]) / closes[i - 1]\n"
+            "        for i in range(t - window + 1, t + 1)\n"
+            "    ]\n"
+            "    m = sum(rets) / len(rets)\n"
+            "    var = sum((r - m) ** 2 for r in rets) / (len(rets) - 1)\n"
+            "    return math.sqrt(var)\n"
+            "\n"
+            "\n"
+            "def size_position(prob_up, recent_vol_val, target_vol=0.01, cap=1.0):\n"
+            "    if recent_vol_val != recent_vol_val:  # NaN check (NaN != NaN)\n"
+            "        return 0.0\n"
+            "    signal = (prob_up - 0.5) * 2.0\n"
+            "    vol_floor = target_vol / 4.0\n"
+            "    scale = target_vol / max(recent_vol_val, vol_floor)\n"
+            "    pos = signal * scale\n"
+            "    return float(max(-cap, min(cap, pos)))\n"
+            "\n"
+            "\n"
+            "def backtest(window=20):\n"
+            "    bars = Market().history('SPY')\n"
+            "    closes = [b.close for b in bars]\n"
+            "    n = len(closes)\n"
+            "    rets = []\n"
+            "    trades = 0\n"
+            "    prev_sign = 0\n"
+            "    for t in range(n - 1):\n"
+            "        prob = model_prob_up(closes, t)\n"
+            "        vol = recent_vol(closes, t, window)\n"
+            "        pos = size_position(prob, vol)\n"
+            "        next_ret = (closes[t + 1] - closes[t]) / closes[t]\n"
+            "        rets.append(pos * next_ret)\n"
+            "        cur_sign = (1 if pos > 0 else (-1 if pos < 0 else 0))\n"
+            "        if cur_sign != prev_sign:\n"
+            "            trades += 1\n"
+            "        prev_sign = cur_sign\n"
+            "    if not rets:\n"
+            "        return {'sharpe': 0.0, 'max_drawdown': 0.0, 'trades': 0}\n"
+            "    m = sum(rets) / len(rets)\n"
+            "    var = sum((r - m) ** 2 for r in rets) / max(1, len(rets) - 1)\n"
+            "    s = math.sqrt(var)\n"
+            "    sharpe = 0.0 if s == 0 else (m * 252) / (s * math.sqrt(252))\n"
+            "    eq = 1.0\n"
+            "    peak = 1.0\n"
+            "    max_dd = 0.0\n"
+            "    for r in rets:\n"
+            "        eq *= 1 + r\n"
+            "        peak = max(peak, eq)\n"
+            "        dd = eq / peak - 1\n"
+            "        if dd < max_dd:\n"
+            "            max_dd = dd\n"
+            "    return {\n"
+            "        'sharpe': float(sharpe),\n"
+            "        'max_drawdown': float(max_dd),\n"
+            "        'trades': int(trades),\n"
+            "    }\n"
+        ),
+        tests_py=(
+            "\"\"\"ML-signal sizing + backtest: sizing math, no-lookahead, P&L shape.\"\"\"\n"
+            "import math\n"
+            "import pytest\n"
+            "\n"
+            "from solution import recent_vol, size_position, backtest\n"
+            "from mock_market import Market\n"
+            "\n"
+            "\n"
+            "def _closes():\n"
+            "    return [b.close for b in Market().history('SPY')]\n"
+            "\n"
+            "\n"
+            "def test_recent_vol_nan_before_window():\n"
+            "    closes = _closes()\n"
+            "    for t in [0, 5, 18, 19]:\n"
+            "        v = recent_vol(closes, t, window=20)\n"
+            "        assert v != v  # NaN\n"
+            "\n"
+            "\n"
+            "def test_recent_vol_finite_after_window():\n"
+            "    closes = _closes()\n"
+            "    for t in [21, 100, 500]:\n"
+            "        v = recent_vol(closes, t, window=20)\n"
+            "        assert isinstance(v, float)\n"
+            "        assert math.isfinite(v) and v > 0\n"
+            "\n"
+            "\n"
+            "def test_recent_vol_no_lookahead_bias():\n"
+            "    closes = _closes()\n"
+            "    t = 200\n"
+            "    truth = recent_vol(closes, t, window=20)\n"
+            "    poisoned = closes[: t + 1] + [-1e9] * (len(closes) - t - 1)\n"
+            "    assert abs(recent_vol(poisoned, t, window=20) - truth) < 1e-9\n"
+            "\n"
+            "\n"
+            "def test_size_position_zero_when_prob_is_half():\n"
+            "    # No edge → no position regardless of vol.\n"
+            "    assert abs(size_position(0.5, 0.01)) < 1e-9\n"
+            "\n"
+            "\n"
+            "def test_size_position_returns_zero_on_nan_vol():\n"
+            "    assert size_position(0.7, float('nan')) == 0.0\n"
+            "\n"
+            "\n"
+            "def test_size_position_long_when_prob_above_half():\n"
+            "    assert size_position(0.8, 0.01) > 0\n"
+            "\n"
+            "\n"
+            "def test_size_position_short_when_prob_below_half():\n"
+            "    assert size_position(0.2, 0.01) < 0\n"
+            "\n"
+            "\n"
+            "def test_size_position_respects_cap():\n"
+            "    # Tiny vol → huge raw scale → must clip to cap.\n"
+            "    assert abs(size_position(1.0, 1e-9, cap=1.0)) <= 1.0 + 1e-9\n"
+            "    assert size_position(1.0, 1e-9, cap=1.0) == 1.0\n"
+            "\n"
+            "\n"
+            "def test_size_position_scales_with_signal():\n"
+            "    a = size_position(0.55, 0.01)\n"
+            "    b = size_position(0.65, 0.01)\n"
+            "    c = size_position(0.85, 0.01)\n"
+            "    # Stronger signal → larger long position (up to the cap).\n"
+            "    assert 0 < a < b\n"
+            "    # Once we hit the cap, c may equal cap; just require c >= b.\n"
+            "    assert c >= b\n"
+            "\n"
+            "\n"
+            "def test_size_position_vol_targets():\n"
+            "    # Higher vol → smaller absolute position for the same signal.\n"
+            "    low_vol = size_position(0.7, 0.005)\n"
+            "    high_vol = size_position(0.7, 0.05)\n"
+            "    assert abs(high_vol) < abs(low_vol)\n"
+            "\n"
+            "\n"
+            "def test_backtest_returns_dict_with_required_keys():\n"
+            "    r = backtest()\n"
+            "    assert isinstance(r, dict)\n"
+            "    for k in ('sharpe', 'max_drawdown', 'trades'):\n"
+            "        assert k in r\n"
+            "\n"
+            "\n"
+            "def test_backtest_sharpe_is_finite_float():\n"
+            "    r = backtest()\n"
+            "    assert isinstance(r['sharpe'], float)\n"
+            "    assert math.isfinite(r['sharpe'])\n"
+            "\n"
+            "\n"
+            "def test_backtest_max_drawdown_in_valid_range():\n"
+            "    r = backtest()\n"
+            "    assert -1.0 <= r['max_drawdown'] <= 0.0\n"
+            "\n"
+            "\n"
+            "def test_backtest_trades_is_nonnegative_int():\n"
+            "    r = backtest()\n"
+            "    assert isinstance(r['trades'], int) and r['trades'] >= 0\n"
+        ),
+        pytest_targets=[
+            (
+                "tests/test_solution.py::test_recent_vol_nan_before_window",
+                "recent_vol returns NaN for t <= window (not enough returns).",
+            ),
+            (
+                "tests/test_solution.py::test_recent_vol_finite_after_window",
+                "recent_vol returns a positive finite float once enough history exists.",
+            ),
+            (
+                "tests/test_solution.py::test_recent_vol_no_lookahead_bias",
+                "Poisoning closes[t+1:] does not change recent_vol at t.",
+            ),
+            (
+                "tests/test_solution.py::test_size_position_zero_when_prob_is_half",
+                "At prob=0.5 (no edge), position is zero regardless of vol.",
+            ),
+            (
+                "tests/test_solution.py::test_size_position_returns_zero_on_nan_vol",
+                "NaN vol → zero position (don't size against unknown risk).",
+            ),
+            (
+                "tests/test_solution.py::test_size_position_long_when_prob_above_half",
+                "prob > 0.5 produces a positive position.",
+            ),
+            (
+                "tests/test_solution.py::test_size_position_short_when_prob_below_half",
+                "prob < 0.5 produces a negative position.",
+            ),
+            (
+                "tests/test_solution.py::test_size_position_respects_cap",
+                "Tiny vol can't make |position| exceed `cap` — clamps correctly.",
+            ),
+            (
+                "tests/test_solution.py::test_size_position_scales_with_signal",
+                "Stronger signal at fixed vol produces a larger position (up to cap).",
+            ),
+            (
+                "tests/test_solution.py::test_size_position_vol_targets",
+                "Higher vol shrinks the position for the same signal — vol-target check.",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_returns_dict_with_required_keys",
+                "backtest returns a dict with sharpe / max_drawdown / trades.",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_sharpe_is_finite_float",
+                "Sharpe is a finite float.",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_max_drawdown_in_valid_range",
+                "Max drawdown is in [-1, 0].",
+            ),
+            (
+                "tests/test_solution.py::test_backtest_trades_is_nonnegative_int",
+                "Trade count is a non-negative integer.",
+            ),
+        ],
+        extra_readonly={
+            "mock_market.py": MOCK_MARKET_PY,
+            "model.py": MODEL_PY,
+        },
+        your_turn="Implement `recent_vol` (sample-std of the last `window` returns), `size_position` (vol-targeted sizing with cap + NaN guard), and `backtest` (walk forward over SPY using model_prob_up + recent_vol → position → P&L). The vol-target test catches sizing functions that ignore recent_vol; the sign-flip count is what 'trades' means here.",
+        hint="recent_vol: sample variance with ddof=1, sqrt to get std. size_position: signal = (p-0.5)*2; scale = target_vol/max(vol, target_vol/4); clamp to [-cap, +cap]. backtest: at each t, compute prob + vol + position, P&L = position * next-day return.",
+        why_this="The shape — model probability + recent vol → sized position → P&L — is what every quant fund's production trading loop looks like. The lookahead checks, NaN handling, and vol-target sizing are the gates a senior reviewer applies before a new strategy crosses the line from research to live.",
         skills=["quant", "machine-learning", "backtesting"],
     ),
     Lesson(
