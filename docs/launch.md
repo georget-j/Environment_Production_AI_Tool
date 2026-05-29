@@ -1,20 +1,21 @@
 # Launch playbook
 
-Operational reference for taking the MVP from `main` → live → "first paying user". Read [.claude/plans/i-have-created-a-mutable-rain.md](.claude/plans/i-have-created-a-mutable-rain.md) for the why; this doc is the what and how.
+Operational reference for taking the MVP from `main` → live → "first paying user". The product-level "why" lives in [CLAUDE.md](../CLAUDE.md); this doc is the what and how.
 
 ## Environments
 
-| Env | Web | API | DB / Auth |
-|---|---|---|---|
-| Local | `pnpm dev:web` (3000) | `scripts/dev.sh` (8000) | `supabase start` (54322) |
+| Env     | Web                     | API                                | DB / Auth                            |
+| ------- | ----------------------- | ---------------------------------- | ------------------------------------ |
+| Local   | `pnpm dev:web` (3000)   | `scripts/dev.sh` (8000)            | `supabase start` (54322)             |
 | Staging | Vercel preview (per-PR) | Fly.io app `prodready-api-staging` | Supabase project `prodready-staging` |
-| Prod | Vercel main domain | Fly.io app `prodready-api` | Supabase project `prodready` |
+| Prod    | Vercel main domain      | Fly.io app `prodready-api`         | Supabase project `prodready`         |
 
 ## Environment variables
 
 Set the same keys in each env; only values change.
 
 ### Web (Vercel project)
+
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -25,6 +26,7 @@ API_BASE_URL                        # server-component → api
 ```
 
 ### API (Fly.io app secrets)
+
 ```
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
@@ -40,10 +42,12 @@ CORS_ORIGINS                       # JSON list, e.g. ["https://prodready.ai"]
 ```
 
 ### Stripe → API webhook URL
+
 - Staging: `https://prodready-api-staging.fly.dev/api/billing/webhook`
 - Prod: `https://api.prodready.ai/api/billing/webhook`
 
 Events to subscribe (Stripe dashboard → Webhooks → Add endpoint):
+
 - `checkout.session.completed`
 - `customer.subscription.created`
 - `customer.subscription.updated`

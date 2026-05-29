@@ -6,18 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ProdReady AI** — an AI-mentored, in-browser Python coding learning platform.
 
-> **History note:** The product originally planned a GitHub-first MVP (template repos, Codespaces, GitHub Actions). It pivoted in the May 2026 build to an **in-browser Pyodide runner** — learners edit Python and run pytest entirely client-side, never touching Git. Files under `plans/` describe the *original* MVP. They are kept for history but are not authoritative. This file is.
+> **History note:** The product originally planned a GitHub-first MVP (template repos, Codespaces, GitHub Actions). It pivoted in the May 2026 build to an **in-browser Pyodide runner** — learners edit Python and run pytest entirely client-side, never touching Git. Files under `plans/` describe the _original_ MVP. They are kept for history but are not authoritative. This file is.
 
-| | |
-|---|---|
-| Web | Next.js 15 (App Router, TypeScript) + Tailwind + shadcn-style components, deployed to Vercel: https://prodready-ai.vercel.app |
-| API | FastAPI 0.115 + SQLAlchemy 2 + Pydantic 2, Python 3.12, deployed to Fly.io: https://prodready-api.fly.dev |
-| DB / Auth | Supabase (Postgres + Auth + Storage), project ref `ztrtiyvzzxiepbrognzf`, region `eu-west-2` |
-| In-browser runtime | Pyodide 0.26.4 from jsdelivr; pytest installed via micropip on first run |
-| AI | OpenAI; `gpt-4o-mini` for chat/explainer, `gpt-4o` for PR review and show-answer |
-| Payments | Stripe in **emulated mode** (`STRIPE_EMULATED=true` on Fly). Real Stripe code paths exist but are gated until paid validation. |
-| Auth on the API | Supabase user JWTs verified via JWKS (ES256). HS256 fallback supported for tests via `SUPABASE_JWT_SECRET`. |
-| Hosting / GitHub | Source on `main` at https://github.com/georget-j/Environment_Production_AI_Tool. Per-challenge template repo at https://github.com/georget-j/prodready-templates-fastapi-commerce (canonical content; learners never see it). |
+|                    |                                                                                                                                                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web                | Next.js 15 (App Router, TypeScript) + Tailwind + shadcn-style components, deployed to Vercel: https://prodready-ai.vercel.app                                                                                                 |
+| API                | FastAPI 0.115 + SQLAlchemy 2 + Pydantic 2, Python 3.12, deployed to Fly.io: https://prodready-api.fly.dev                                                                                                                     |
+| DB / Auth          | Supabase (Postgres + Auth + Storage), project ref `ztrtiyvzzxiepbrognzf`, region `eu-west-2`                                                                                                                                  |
+| In-browser runtime | Pyodide 0.26.4 from jsdelivr; pytest installed via micropip on first run                                                                                                                                                      |
+| AI                 | OpenAI; `gpt-4o-mini` for chat/explainer, `gpt-4o` for PR review and show-answer                                                                                                                                              |
+| Payments           | Stripe in **emulated mode** (`STRIPE_EMULATED=true` on Fly). Real Stripe code paths exist but are gated until paid validation.                                                                                                |
+| Auth on the API    | Supabase user JWTs verified via JWKS (ES256). HS256 fallback supported for tests via `SUPABASE_JWT_SECRET`.                                                                                                                   |
+| Hosting / GitHub   | Source on `main` at https://github.com/georget-j/Environment_Production_AI_Tool. Per-challenge template repo at https://github.com/georget-j/prodready-templates-fastapi-commerce (canonical content; learners never see it). |
 
 ## Commands
 
@@ -103,6 +103,7 @@ docs/launch.md      Operational playbook (env vars, deploy commands)
 ## Imperative ref bridge between sibling client components
 
 `ChallengeView` is the parent for the workspace and the mentor. It holds refs to both so:
+
 - the mentor's `<MentorMessage>` file-link clicks can call `runnerRef.current?.jumpTo(file, line)` to drive the editor
 - the show-answer flow can read the current file snapshot (via the runner's `onFilesChange` callback) and apply the AI-generated replacement via `runnerRef.current?.applyFiles(next)`
 - the runner's "I'm stuck — help" button can call `mentorRef.current?.askMentor(prebakedMessage, hintLevel)`
@@ -112,6 +113,7 @@ This pattern (forwardRef + `useImperativeHandle` exposing a typed `Handle`) is t
 ## Conventions
 
 **Backend:**
+
 - Pydantic `BaseModel` for request/response, `ConfigDict(from_attributes=True)` when reading from SQLAlchemy.
 - AI inputs are `dataclass(frozen=True)`; AI outputs go through OpenAI structured outputs with strict JSON Schema and a small filter step (e.g. `answers.py` drops fixed_files whose path isn't in the learner's editable set).
 - Every AI call records `prompt_sha` (git blob hash of `apps/api/app/ai/system_prompts.md`) in `AIMessage.metadata_json`.
@@ -119,6 +121,7 @@ This pattern (forwardRef + `useImperativeHandle` exposing a typed `Handle`) is t
 - No mocks in DB tests — Supabase Postgres is canonical, Alembic stays in sync for local parity.
 
 **Web:**
+
 - Server components fetch via `apiFetch`; client components carry the user's bearer token from the Supabase session.
 - LocalStorage namespace: `prodready:<purpose>:<slug>` (edits, answer-viewed, onboarded).
 - No `dangerouslySetInnerHTML`. All user-/AI-rendered text goes through `react-markdown` or `<MentorMessage>`.
@@ -135,7 +138,7 @@ This pattern (forwardRef + `useImperativeHandle` exposing a typed `Handle`) is t
 
 ## When making changes
 
-- Plans under `plans/` are historical — do not implement against them. The most recent design decisions for the UX live in [.claude/plans/i-have-created-a-mutable-rain.md](/Users/admin/.claude/plans/i-have-created-a-mutable-rain.md).
+- Plans under `plans/` are historical — do not implement against them. Current product decisions live in this file and in the operational playbook at [docs/launch.md](docs/launch.md); any other planning artefacts are tracked outside this repository.
 - Run `pytest -q` in `apps/api` and `pnpm --filter web typecheck` before commit.
 - Push to `main` (no PR workflow yet). Vercel auto-redeploys; Fly is manual via `flyctl deploy --remote-only`.
 - For UX work in the challenge surface: the layout is hero + 2-col (workspace left, mentor sidebar right on `lg+`, stacked on `md` and below). Don't reintroduce a 3-col layout — it cramps Monaco at 1024–1279px and was the Phase Q regression that Phase R fixed.
