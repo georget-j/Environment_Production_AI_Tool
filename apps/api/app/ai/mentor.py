@@ -1,6 +1,6 @@
 """Socratic mentor chat — OpenAI calls + hint-level enforcement.
 
-Levels (from plans/04_AI_MENTOR_AND_VALIDATION.md):
+Levels (from archive/plans/04_AI_MENTOR_AND_VALIDATION.md):
   1 → Socratic only. Ask one diagnostic question, no concrete next step.
   2 → Diagnostic + a concrete next step + file/function pointer if possible.
   3 → Add a pseudocode sketch. Final code only if attempts_count >= 3.
