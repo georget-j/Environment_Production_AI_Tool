@@ -20,18 +20,16 @@
  *   - generic-slider-chart
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import { AnnotatedFrames } from "@/components/widgets/annotated-frames";
 import { Button } from "@/components/ui/button";
 import { CodeStepper } from "@/components/widgets/code-stepper";
+import { framesFromWidgetConfig } from "@/lib/play-adapters";
 
-const STUB_KIND_LABELS: Record<string, string> = {
-  "call-stack-visualiser": "Call-stack visualiser",
-  "state-machine-animator": "State-machine animator",
-  "memory-model-viewer": "Memory-model viewer",
-  "complexity-plotter": "Complexity plotter",
-  "generic-slider-chart": "Slider + chart",
-};
+// M6 — code-stepper keeps its bespoke renderer; every other widget kind
+// is normalised to AnnotatedFrame[] via play-adapters.ts and rendered by
+// the generic <AnnotatedFrames> widget. Zero "coming soon" stubs in prod.
 
 export function ConceptPlay({
   widgetKind,
@@ -45,6 +43,16 @@ export function ConceptPlay({
   const [unlocked, setUnlocked] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const isCodeStepper = widgetKind === "code-stepper";
+  const adapted = useMemo(
+    () =>
+      isCodeStepper
+        ? { title: undefined, frames: [] }
+        : framesFromWidgetConfig(widgetKind, widgetConfig),
+    [isCodeStepper, widgetKind, widgetConfig],
+  );
+  const hasFrames = !isCodeStepper && adapted.frames.length > 0;
+
   async function complete() {
     setBusy(true);
     try {
@@ -56,11 +64,8 @@ export function ConceptPlay({
 
   return (
     <div className="flex flex-col gap-4">
-      {widgetKind === "code-stepper" && (
+      {isCodeStepper && (
         <CodeStepper
-          // The shape is validated by the widget itself; we hand it the
-          // JSON the API delivered without forcing a runtime schema check
-          // here. Type-checking happens against the public Config type.
           config={
             widgetConfig as unknown as Parameters<
               typeof CodeStepper
@@ -70,28 +75,31 @@ export function ConceptPlay({
         />
       )}
 
-      {widgetKind !== "code-stepper" && (
-        <div className="rounded-md border border-dashed border-border bg-muted/20 p-5 text-sm">
-          <p className="font-semibold">
-            {STUB_KIND_LABELS[widgetKind] ?? widgetKind} — coming in a later CC
-            sub-phase.
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            For now, this is a placeholder so the unit shell stays usable on
-            every concept. The widget framework dispatch is wired — only this
-            widget&apos;s implementation is deferred.
-          </p>
+      {!isCodeStepper && hasFrames && (
+        <AnnotatedFrames
+          title={adapted.title}
+          frames={adapted.frames}
+          onAllStepsViewed={() => setUnlocked(true)}
+        />
+      )}
+
+      {!isCodeStepper && !hasFrames && (
+        <div className="rounded-md border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+          This Play widget doesn&apos;t have any frames authored yet — you can
+          mark this stage complete and continue.
         </div>
       )}
 
       <div className="flex justify-end">
         <Button
           onClick={complete}
-          disabled={busy || (widgetKind === "code-stepper" && !unlocked)}
+          disabled={
+            busy || (isCodeStepper && !unlocked) || (hasFrames && !unlocked)
+          }
         >
           {busy
             ? "…"
-            : widgetKind === "code-stepper" && !unlocked
+            : (isCodeStepper || hasFrames) && !unlocked
               ? "Step through first"
               : "Mark Play complete → Check"}
         </Button>
